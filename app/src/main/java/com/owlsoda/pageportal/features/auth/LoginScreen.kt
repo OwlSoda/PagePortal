@@ -69,14 +69,13 @@ fun LoginScreen(
         Spacer(modifier = Modifier.height(48.dp))
         
         // Service selector
-        var selectedService by remember { mutableStateOf(0) }
         val services = listOf("Storyteller", "Audiobookshelf", "Booklore")
         
-        TabRow(selectedTabIndex = selectedService) {
+        TabRow(selectedTabIndex = uiState.selectedService) {
             services.forEachIndexed { index, title ->
                 Tab(
-                    selected = selectedService == index,
-                    onClick = { selectedService = index },
+                    selected = uiState.selectedService == index,
+                    onClick = { viewModel.selectService(index) },
                     text = { Text(text = title, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis) }
                 )
             }
@@ -91,7 +90,7 @@ fun LoginScreen(
             label = { Text("Server URL") },
             placeholder = { 
                 Text(
-                    when (selectedService) {
+                    when (uiState.selectedService) {
                         0 -> "https://storyteller.example.com"
                         1 -> "https://abs.example.com"
                         else -> "https://booklore.example.com"
@@ -151,7 +150,7 @@ fun LoginScreen(
         
         // Login button
         Button(
-            onClick = { viewModel.login(selectedService) },
+            onClick = { viewModel.login(uiState.selectedService) },
             modifier = Modifier.fillMaxWidth(),
             enabled = !uiState.isLoading && 
                       uiState.serverUrl.isNotBlank() && 

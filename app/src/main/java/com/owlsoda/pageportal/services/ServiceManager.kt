@@ -6,6 +6,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
+import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -17,7 +18,7 @@ class ServiceManager @Inject constructor(
     private val serverDao: ServerDao,
     private val okHttpClient: OkHttpClient
 ) {
-    private val services = mutableMapOf<Long, BookService>()
+    private val services = ConcurrentHashMap<Long, BookService>()
     
     /**
      * Add a new server and authenticate.
