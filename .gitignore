@@ -1,0 +1,46 @@
+# Android Studio / IntelliJ IDEA
+*.iml
+.idea/
+.gradle/
+local.properties
+
+# Android Build
+build/
+*.apk
+*.ap_
+*.aab
+
+# Gradle
+.gradle
+gradle-wrapper.jar
+
+# Local configuration files
+local.properties
+
+# Log Files
+*.log
+
+# Android NDK
+obj/
+
+# Signing files  
+*.jks
+*.keystore
+
+# Generated files
+bin/
+gen/
+out/
+captures/
+
+# OS-specific
+.DS_Store
+Thumbs.db
+
+# Misc
+*.swp
+*~
+.project
+.classpath
+.settings/
+commandlinetools.zip

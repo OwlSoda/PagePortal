@@ -1,0 +1,45 @@
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preDebugBuild UP-TO-DATE
+> Task :app:mergeDebugNativeDebugMetadata NO-SOURCE
+> Task :app:checkKotlinGradlePluginConfigurationErrors
+> Task :app:checkDebugAarMetadata UP-TO-DATE
+> Task :app:generateDebugResValues UP-TO-DATE
+> Task :app:mapDebugSourceSetPaths UP-TO-DATE
+> Task :app:generateDebugResources UP-TO-DATE
+> Task :app:mergeDebugResources UP-TO-DATE
+> Task :app:packageDebugResources UP-TO-DATE
+> Task :app:parseDebugLocalResources UP-TO-DATE
+> Task :app:createDebugCompatibleScreenManifests UP-TO-DATE
+> Task :app:extractDeepLinksDebug UP-TO-DATE
+> Task :app:processDebugMainManifest UP-TO-DATE
+> Task :app:processDebugManifest UP-TO-DATE
+> Task :app:processDebugManifestForPackage UP-TO-DATE
+> Task :app:processDebugResources UP-TO-DATE
+> Task :app:kspDebugKotlin UP-TO-DATE
+> Task :app:compileDebugKotlin UP-TO-DATE
+> Task :app:javaPreCompileDebug UP-TO-DATE
+
+> Task :app:compileDebugJavaWithJavac FAILED
+C:\Users\ghitr\OneDrive\Documents\github\PagePortal\app\build\generated\ksp\debug\java\com\owlsoda\pageportal\features\settings\SettingsViewModel_Factory.java:25: error: duplicate class: com.owlsoda.pageportal.features.settings.SettingsViewModel_Factory
+public final class SettingsViewModel_Factory implements Factory<SettingsViewModel> {
+             ^
+C:\Users\ghitr\OneDrive\Documents\github\PagePortal\app\build\generated\ksp\debug\java\hilt_aggregated_deps\_com_owlsoda_pageportal_di_RepositoryModule.java:14: error: duplicate class: hilt_aggregated_deps._com_owlsoda_pageportal_di_RepositoryModule
+public class _com_owlsoda_pageportal_di_RepositoryModule {
+       ^
+C:\Users\ghitr\OneDrive\Documents\github\PagePortal\app\build\generated\ksp\debug\java\hilt_aggregated_deps\_com_owlsoda_pageportal_MainActivity_GeneratedInjector.java:14: error: duplicate class: hilt_aggregated_deps._com_owlsoda_pageportal_MainActivity_GeneratedInjector
+public class _com_owlsoda_pageportal_MainActivity_GeneratedInjector {
+       ^
+3 errors
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':app:compileDebugJavaWithJavac'.
+> Compilation failed; see the compiler error output for details.
+
+* Try:
+> Run with --info option to get more log output.
+> Run with --scan to get full insights.
+
+BUILD FAILED in 1s
+17 actionable tasks: 2 executed, 15 up-to-date
