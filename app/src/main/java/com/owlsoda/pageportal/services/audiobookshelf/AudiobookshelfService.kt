@@ -25,9 +25,11 @@ class AudiobookshelfService(
     private var defaultLibraryId: String? = null
     private val deviceId = UUID.randomUUID().toString()
     
+    private val normalizedUrl = normalizeUrl(serverUrl)
+
     private fun getApi(): AudiobookshelfApi {
         if (api == null) {
-            val baseUrl = if (serverUrl.endsWith("/")) serverUrl else "$serverUrl/"
+            val baseUrl = if (normalizedUrl.endsWith("/")) normalizedUrl else "$normalizedUrl/"
             api = Retrofit.Builder()
                 .baseUrl(baseUrl)
                 .client(okHttpClient)
@@ -48,6 +50,9 @@ class AudiobookshelfService(
         password: String
     ): AuthResult {
         return try {
+            // Normalize the URL
+            val cleanUrl = normalizeUrl(serverUrl)
+
             // Create temporary client with generous timeouts for authentication
             val tempClient = okHttpClient.newBuilder()
                 .connectTimeout(20, java.util.concurrent.TimeUnit.SECONDS)
@@ -56,7 +61,7 @@ class AudiobookshelfService(
                 .build()
             
             // Create temporary API instance for login
-            val baseUrl = if (serverUrl.endsWith("/")) serverUrl else "$serverUrl/"
+            val baseUrl = if (cleanUrl.endsWith("/")) cleanUrl else "$cleanUrl/"
             val tempApi = Retrofit.Builder()
                 .baseUrl(baseUrl)
                 .client(tempClient)
@@ -154,7 +159,7 @@ class AudiobookshelfService(
                     filename = filename,
                     mimeType = audio.mimeType ?: "audio/mpeg",
                     size = audio.metadata?.size ?: 0L,
-                    downloadUrl = "$serverUrl/api/items/$bookId/file"
+                    downloadUrl = "$normalizedUrl/api/items/$bookId/file"
                 )
             )
         }
@@ -176,7 +181,7 @@ class AudiobookshelfService(
                     filename = filename,
                     mimeType = mimeType,
                     size = ebook.metadata?.size ?: 0L,
-                    downloadUrl = "$serverUrl/api/items/$bookId/file/$filename"
+                    downloadUrl = "$normalizedUrl/api/items/$bookId/file/$filename"
                 )
             )
         }
@@ -252,7 +257,7 @@ class AudiobookshelfService(
             // Return the content URL from the first audio track
             session.audioTracks?.firstOrNull()?.contentUrl?.let { url ->
                 // Make absolute URL if needed
-                if (url.startsWith("http")) url else "$serverUrl$url"
+                if (url.startsWith("http")) url else "$normalizedUrl$url"
             }
         } catch (e: Exception) {
             null
@@ -261,14 +266,14 @@ class AudiobookshelfService(
     
     suspend fun getDownloadUrl(bookId: String): String? {
         // ABS provides direct file download
-        return "$serverUrl/api/items/$bookId/file"
+        return "$normalizedUrl/api/items/$bookId/file"
     }
     
     suspend fun getEbookUrl(bookId: String): String? {
         return try {
             val item = getApi().getItem(bearerToken(), bookId)
             item.media.ebookFile?.let { ebook ->
-                "$serverUrl/api/items/$bookId/ebook"
+                "$normalizedUrl/api/items/$bookId/ebook"
             }
         } catch (e: Exception) {
             null
@@ -279,7 +284,7 @@ class AudiobookshelfService(
     
     override val displayName = "Audiobookshelf"
     
-    override fun getCoverUrl(bookId: String): String = "$serverUrl/api/items/$bookId/cover"
+    override fun getCoverUrl(bookId: String): String = "$normalizedUrl/api/items/$bookId/cover"
 
     override fun supportsFeature(feature: ServiceFeature): Boolean {
         return when (feature) {
@@ -296,6 +301,34 @@ class AudiobookshelfService(
          return flow { } // TODO: Implement if needed, or rely on DownloadService fetching URL
     }
     
+    private fun normalizeUrl(url: String): String {
+        val withProtocol = if (!url.startsWith("http")) {
+            val isPrivate = if (url.startsWith("localhost") ||
+                url.startsWith("127.0.0.1") ||
+                url.startsWith("192.168.") ||
+                url.startsWith("10.")) {
+                true
+            } else if (url.startsWith("172.")) {
+                val parts = url.split('.')
+                if (parts.size >= 2) {
+                    val second = parts[1].toIntOrNull()
+                    second != null && second in 16..31
+                } else {
+                    false
+                }
+            } else {
+                false
+            }
+
+            if (isPrivate) {
+                "http://$url"
+            } else {
+                "https://$url"
+            }
+        } else url
+        return if (withProtocol.endsWith("/")) withProtocol.dropLast(1) else withProtocol
+    }
+
     // Extension functions to convert ABS models to service models
     
     private fun AbsLibraryItem.toServiceBook(): ServiceBook {
@@ -312,7 +345,7 @@ class AudiobookshelfService(
                 ?: listOfNotNull(metadata?.narratorName),
             description = metadata?.description,
             coverUrl = if (media.coverPath != null) {
-                "$serverUrl/api/items/$id/cover"
+                "$normalizedUrl/api/items/$id/cover"
             } else null,
             duration = media.duration?.times(1000)?.toLong(),
             hasAudiobook = (media.numAudioFiles ?: 0) > 0,

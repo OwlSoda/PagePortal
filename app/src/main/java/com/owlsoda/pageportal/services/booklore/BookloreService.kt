@@ -23,7 +23,8 @@ class BookloreService(
 
 
     fun configure(serverUrl: String, authToken: String?) {
-        this.baseUrl = serverUrl
+        val cleanUrl = normalizeUrl(serverUrl)
+        this.baseUrl = cleanUrl
         
         val authClient = if (!authToken.isNullOrBlank()) {
             client.newBuilder()
@@ -40,7 +41,7 @@ class BookloreService(
         }
         
         val retrofit = retrofit2.Retrofit.Builder()
-            .baseUrl(if (serverUrl.endsWith("/")) serverUrl else "$serverUrl/")
+            .baseUrl(if (cleanUrl.endsWith("/")) cleanUrl else "$cleanUrl/")
             .client(authClient)
             .build()
         
@@ -50,6 +51,7 @@ class BookloreService(
     override suspend fun authenticate(serverUrl: String, username: String, password: String): AuthResult {
         return try {
             val token = okhttp3.Credentials.basic(username, password)
+            val cleanUrl = normalizeUrl(serverUrl)
             
             // Create temporary client with generous timeouts for authentication
             val tempClient = client.newBuilder()
@@ -67,18 +69,18 @@ class BookloreService(
             
             // Create temporary API for validation
             val tempRetrofit = retrofit2.Retrofit.Builder()
-                .baseUrl(if (serverUrl.endsWith("/")) serverUrl else "$serverUrl/")
+                .baseUrl(if (cleanUrl.endsWith("/")) cleanUrl else "$cleanUrl/")
                 .client(tempClient)
                 .build()
             
             val tempApi = tempRetrofit.create(OpdsApi::class.java)
             
             // Try to fetch and parse the feed to validate credentials
-            val response = tempApi.getFeed(serverUrl)
-            OpdsParser().parse(response.byteStream(), serverUrl)
+            val response = tempApi.getFeed(cleanUrl)
+            OpdsParser().parse(response.byteStream(), cleanUrl)
             
             // If successful, configure the service
-            configure(serverUrl, token)
+            configure(cleanUrl, token)
             
             AuthResult(success = true, token = token, userId = username)
         } catch (e: retrofit2.HttpException) {
@@ -190,5 +192,33 @@ class BookloreService(
             MediaFormat.COMIC -> "cbz"
             else -> "bin"
         }
+    }
+
+    private fun normalizeUrl(url: String): String {
+        val withProtocol = if (!url.startsWith("http")) {
+            val isPrivate = if (url.startsWith("localhost") ||
+                url.startsWith("127.0.0.1") ||
+                url.startsWith("192.168.") ||
+                url.startsWith("10.")) {
+                true
+            } else if (url.startsWith("172.")) {
+                val parts = url.split('.')
+                if (parts.size >= 2) {
+                    val second = parts[1].toIntOrNull()
+                    second != null && second in 16..31
+                } else {
+                    false
+                }
+            } else {
+                false
+            }
+
+            if (isPrivate) {
+                "http://$url"
+            } else {
+                "https://$url"
+            }
+        } else url
+        return if (withProtocol.endsWith("/")) withProtocol.dropLast(1) else withProtocol
     }
 }
