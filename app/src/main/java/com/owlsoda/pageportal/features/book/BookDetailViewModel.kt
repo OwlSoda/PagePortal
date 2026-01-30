@@ -7,7 +7,6 @@ import com.owlsoda.pageportal.core.database.dao.ProgressDao
 import com.owlsoda.pageportal.core.database.dao.ServerDao
 import com.owlsoda.pageportal.core.database.dao.UnifiedBookDao
 import com.owlsoda.pageportal.core.database.entity.BookEntity
-import com.owlsoda.pageportal.download.DownloadService
 import com.owlsoda.pageportal.services.ServiceManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -33,7 +32,8 @@ class BookDetailViewModel @Inject constructor(
     private val unifiedBookDao: UnifiedBookDao,
     private val progressDao: ProgressDao,
     private val serverDao: ServerDao,
-    private val serviceManager: ServiceManager
+    private val serviceManager: ServiceManager,
+    private val downloadRepository: com.owlsoda.pageportal.data.repository.DownloadRepository
 ) : ViewModel() {
     
     private val _state = MutableStateFlow(BookDetailState())
@@ -63,11 +63,11 @@ class BookDetailViewModel @Inject constructor(
                     
                     linkedBooks = unified.books
                     
-                    // Synthesize display book (use first as base, but combine flags)
+                    // Synthesize display book
                     val base = linkedBooks.first()
                     val displayBook = base.copy(
                         title = unified.unifiedBook.title,
-                        authors = unified.unifiedBook.author, // Unified uses display string
+                        authors = unified.unifiedBook.author,
                         coverUrl = unified.unifiedBook.coverUrl ?: base.coverUrl,
                         description = unified.unifiedBook.description ?: base.description,
                         hasEbook = linkedBooks.any { it.hasEbook },
@@ -75,17 +75,16 @@ class BookDetailViewModel @Inject constructor(
                         hasReadAloud = linkedBooks.any { it.hasReadAloud }
                     )
                     
-                    // Load progress (use best progress from linked books?)
                     val progress = progressDao.getProgressByBookId(base.id)
+                    
+                    // Observe first linked book for download status for now (imperfect but works for single source)
+                    observeDownloadStatus(base.id)
                     
                     _state.value = _state.value.copy(
                         book = displayBook,
                         progressPercent = progress?.percentComplete ?: 0f,
                         isLoading = false
                     )
-                    
-                    // Check downloads for ALL linked books
-                    linkedBooks.forEach { observeDownloadProgress(it.serviceBookId) }
                     
                 } else {
                     // Legacy/Direct Book ID
@@ -100,12 +99,13 @@ class BookDetailViewModel @Inject constructor(
                     linkedBooks = listOf(book)
                     val progress = progressDao.getProgressByBookId(book.id)
                     
+                    observeDownloadStatus(book.id)
+                    
                     _state.value = _state.value.copy(
                         book = book,
                         progressPercent = progress?.percentComplete ?: 0f,
                         isLoading = false
                     )
-                    observeDownloadProgress(book.serviceBookId)
                 }
                 
             } catch (e: Exception) {
@@ -117,50 +117,43 @@ class BookDetailViewModel @Inject constructor(
         }
     }
     
-    private fun observeDownloadProgress(realBookId: String) {
+    private fun observeDownloadStatus(bookId: Long) {
         viewModelScope.launch {
-            DownloadService.activeDownloads.collect { downloads ->
-                val download = downloads.find { it.bookId == realBookId }
-                if (download != null) {
-                     _state.value = _state.value.copy(
-                        isDownloading = !download.isCompleted && !download.isFailed,
-                        downloadProgress = download.progress,
-                        isDownloaded = download.isCompleted
+            bookDao.observeBook(bookId).collect { book ->
+                if (book != null) {
+                    val status = book.downloadStatus
+                    _state.value = _state.value.copy(
+                        isDownloading = status == "DOWNLOADING" || status == "QUEUED",
+                        isDownloaded = status == "COMPLETED",
+                        downloadProgress = book.downloadProgress
                     )
+                    // Update display book if needed to reflect local path
+                    if (book.localFilePath != _state.value.book?.localFilePath) {
+                         // _state.value = _state.value.copy(book = book) // Careful with overwrite
+                    }
                 }
             }
         }
     }
     
-    fun startDownload(context: android.content.Context) {
-        val target = linkedBooks.firstOrNull { it.hasAudiobook } 
-            ?: linkedBooks.firstOrNull { it.hasEbook } 
-            ?: linkedBooks.firstOrNull() 
-            ?: return
+    fun startDownload(type: String? = null) {
+        // Find best candidate
+        val target = if (type != null) {
+             when(type) {
+                 "audio" -> linkedBooks.firstOrNull { it.hasAudiobook }
+                 "ebook" -> linkedBooks.firstOrNull { it.hasEbook }
+                 "readaloud" -> linkedBooks.firstOrNull { it.hasReadAloud }
+                 else -> linkedBooks.firstOrNull()
+             }
+        } else {
+             linkedBooks.firstOrNull { it.hasAudiobook } 
+             ?: linkedBooks.firstOrNull { it.hasEbook } 
+             ?: linkedBooks.firstOrNull()
+        } ?: return
         
         viewModelScope.launch {
             try {
-                val server = serverDao.getServerById(target.serverId)
-                val token = server?.authToken
-                
-                 val service = serviceManager.getService(target.serverId)
-                 val details = service?.getBookDetails(target.serviceBookId)
-                 val url = details?.files?.firstOrNull()?.downloadUrl
-                 
-                 if (url != null && server != null) { // server must be valid to determine type
-                     DownloadService.startDownload(
-                         context = context,
-                         bookId = target.serviceBookId,
-                         serviceType = server.toServiceType(),
-                         downloadUrl = url,
-                         fileName = "${target.title}.bin",
-                         coverUrl = target.coverUrl,
-                         title = target.title,
-                         authToken = token
-                     )
-                 } else {
-                     _state.value = _state.value.copy(error = "Download URL not found")
-                 }
+                 downloadRepository.startDownload(target.id, target.serverId, target.serviceBookId, type)
             } catch (e: Exception) {
                  _state.value = _state.value.copy(error = e.message)
             }
@@ -168,27 +161,22 @@ class BookDetailViewModel @Inject constructor(
     }
     
     fun cancelDownload() {
-        linkedBooks.forEach { DownloadService.cancelDownload(it.serviceBookId) }
+        // Cancel all linked
+        viewModelScope.launch {
+            linkedBooks.forEach { downloadRepository.cancelDownload(it.id) }
+        }
     }
     
     fun unlinkBook() {
         viewModelScope.launch {
             try {
-                // Break the link for all books in this unified set
                 linkedBooks.forEach { book ->
-                    // Set unified ID to null and set manual flag to true to prevent auto-rematch
                     val updated = book.copy(
                         unifiedBookId = null,
                         isManuallyLinked = true
                     )
                     bookDao.updateBook(updated)
                 }
-                
-                // If there was a Unified Entry, we might want to delete it if it's now empty?
-                // The current schema doesn't cascade delete unified entries automatically if empty?
-                // For now, simpler to just unlink. Garbage collection of empty unified books can be a separate task.
-                
-                // Navigate back is handled by UI
             } catch (e: Exception) {
                 _state.value = _state.value.copy(error = "Failed to unlink: ${e.message}")
             }

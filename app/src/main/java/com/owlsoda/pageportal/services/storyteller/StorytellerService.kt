@@ -1,5 +1,6 @@
 package com.owlsoda.pageportal.services.storyteller
 
+import android.util.Log
 import com.owlsoda.pageportal.services.*
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -18,6 +19,10 @@ import java.util.concurrent.TimeUnit
 class StorytellerService(
     private val baseOkHttpClient: OkHttpClient
 ) : BookService {
+
+    companion object {
+        private const val TAG = "StorytellerService"
+    }
     
     override val serviceType: ServiceType = ServiceType.STORYTELLER
     override val displayName: String = "Storyteller"
@@ -37,21 +42,11 @@ class StorytellerService(
         baseUrl = cleanUrl
         authToken = token
         
-        val authInterceptor = Interceptor { chain ->
-            val request = chain.request().newBuilder().apply {
-                token?.let { addHeader("Authorization", "Bearer $it") }
-            }.build()
-            chain.proceed(request)
-        }
-        
-        val client = baseOkHttpClient.newBuilder()
-            .addInterceptor(authInterceptor)
-            .build()
-        
+        // Use baseOkHttpClient directly - global AuthInterceptor handles injection
         api = Retrofit.Builder()
             .baseUrl("$cleanUrl/")
             .addConverterFactory(GsonConverterFactory.create())
-            .client(client)
+            .client(baseOkHttpClient)
             .build()
             .create(StorytellerApi::class.java)
     }
@@ -109,36 +104,60 @@ class StorytellerService(
             null
         }
         
+                // Helper to construct URL from path (handling spaces)
+        fun getUrl(path: String?): String? {
+             if (path.isNullOrBlank()) return null
+             if (path.startsWith("http")) return path
+             val cleanBase = baseUrl?.trimEnd('/') ?: return null
+             val cleanPath = path.trimStart('/')
+             // Encode path to handle spaces
+             val encodedPath = cleanPath.split("/").joinToString("/") { segment ->
+                 java.net.URLEncoder.encode(segment, "UTF-8").replace("+", "%20")
+             }
+             return "$cleanBase/$encodedPath"
+        }
+        
         return ServiceBookDetails(
             book = response.toServiceBook(),
             chapters = emptyList(),  // Storyteller doesn't expose chapter list in main API
             files = buildList {
+                // Ebook
                 response.ebook?.let {
+                    // Always use API endpoint for downloads to avoid 404s on folder paths
+                    val url = getEbookDownloadUrl(bookId)
                     add(BookFile(
                         id = it.uuid,
-                        filename = it.filepath ?: "ebook.epub",
+                        filename = it.filepath?.substringAfterLast('/') ?: "ebook.epub",
                         mimeType = "application/epub+zip",
                         size = 0,
-                        downloadUrl = getEbookDownloadUrl(bookId)
+                        downloadUrl = url
                     ))
                 }
+                // Audiobook
                 response.audiobook?.let {
+                    // Always use API endpoint for downloads
+                    val url = getAudiobookDownloadUrl(bookId)
                     add(BookFile(
                         id = it.uuid,
-                        filename = it.filepath ?: "audiobook.m4b",
+                        filename = it.filepath?.substringAfterLast('/') ?: "audiobook.m4b",
                         mimeType = "audio/mp4",
                         size = 0,
-                        downloadUrl = getAudiobookDownloadUrl(bookId)
+                        downloadUrl = url
                     ))
                 }
+                // ReadAloud
                 response.readaloud?.let {
-                    if (it.status == "completed") {
+                    Log.d(TAG, "Book $bookId ReadAloud status: ${it.status}")
+                    val isAvailable = true
+                    if (isAvailable) {
+                        // Always use API endpoint for downloads
+                        val url = getSyncDownloadUrl(bookId)
                         add(BookFile(
                             id = it.uuid,
-                            filename = it.filepath ?: "readaloud.zip",
+                            filename = it.filepath?.substringAfterLast('/') ?: "readaloud.zip",
                             mimeType = "application/zip",
                             size = 0,
-                            downloadUrl = getSyncDownloadUrl(bookId)
+                            downloadUrl = url
                         ))
                     }
                 }
@@ -185,7 +204,8 @@ class StorytellerService(
     }
     
     override fun getCoverUrl(bookId: String): String {
-        return "${baseUrl}/api/v2/books/$bookId/cover"
+        val base = baseUrl?.trimEnd('/') ?: return ""
+        return "$base/api/v2/books/$bookId/cover"
     }
     
     override fun supportsFeature(feature: ServiceFeature): Boolean {
@@ -201,9 +221,9 @@ class StorytellerService(
     }
     
     // URL helpers
-    fun getEbookDownloadUrl(bookId: String): String = "${baseUrl}/api/v2/books/$bookId/files?format=ebook"
-    fun getAudiobookDownloadUrl(bookId: String): String = "${baseUrl}/api/v2/books/$bookId/files?format=audiobook"
-    fun getSyncDownloadUrl(bookId: String): String = "${baseUrl}/api/v2/books/$bookId/files?format=readaloud"
+    fun getEbookDownloadUrl(bookId: String): String = "${baseUrl}/api/v2/books/$bookId/files?format=ebook&token=$authToken"
+    fun getAudiobookDownloadUrl(bookId: String): String = "${baseUrl}/api/v2/books/$bookId/files?format=audiobook&token=$authToken"
+    fun getSyncDownloadUrl(bookId: String): String = "${baseUrl}/api/v2/books/$bookId/files?format=readaloud&token=$authToken"
     
     private fun getApi(): StorytellerApi {
         return api ?: throw IllegalStateException("StorytellerService not configured. Call configure() first.")
@@ -250,9 +270,10 @@ class StorytellerService(
             coverUrl = getCoverUrl(uuid),
             hasEbook = ebook != null,
             hasAudiobook = audiobook != null,
-            hasReadAloud = readaloud?.status == "completed",
+            hasReadAloud = readaloud != null && (readaloud.status == "completed" || readaloud.status == "ready" || !readaloud.filepath.isNullOrBlank()),
             description = description,
-            publishedYear = publicationDate?.take(4)?.toIntOrNull()
+            publishedYear = publicationDate?.take(4)?.toIntOrNull(),
+            collections = collections?.map { CollectionRef(it.uuid, it.name) } ?: emptyList()
         )
     }
     

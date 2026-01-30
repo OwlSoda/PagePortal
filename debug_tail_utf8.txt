@@ -1,0 +1,5 @@
+﻿[2026-01-30 16:45:57] DownloadWorker (Std) started
+[2026-01-30 16:45:57] Inputs: dbId=213, serverId=1, type=audio
+[2026-01-30 16:45:57] Fetching details for book: Ghost Story
+[2026-01-30 16:45:57] Starting download: http://jurano.ddns.net:8001/audiobooks/Peter%20Straub/Ghost%20Story
+[2026-01-30 16:45:57] EXCEPTION (URL: http://jurano.ddns.net:8001/audiobooks/Peter%20Straub/Ghost%20Story): HTTP Error 404: Not Found

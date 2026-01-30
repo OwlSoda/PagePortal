@@ -8,7 +8,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -23,6 +23,7 @@ fun SettingsScreen(
     onBack: () -> Unit,
     onServersClick: () -> Unit,
     onMatchReviewClick: () -> Unit,
+    onStorageClick: () -> Unit,
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsState()
@@ -76,16 +77,211 @@ fun SettingsScreen(
                     showChevron = false,
                     onClick = { viewModel.clearCache() }
                 )
+                SettingsItem(
+                    icon = Icons.Default.SdStorage,
+                    title = "Storage Management",
+                    subtitle = "Manage downloads",
+                    onClick = onStorageClick
+                )
+            }
+            
+            item {
+                SettingsSectionHeader("Playback")
+                
+                // Playback Speed
+                var showSpeedDialog by remember { mutableStateOf(false) }
+                SettingsItem(
+                    icon = Icons.Default.Speed,
+                    title = "Playback Speed",
+                    subtitle = String.format("%.2fx", state.playbackSpeed),
+                    onClick = { showSpeedDialog = true }
+                )
+                
+                if (showSpeedDialog) {
+                    AlertDialog(
+                        onDismissRequest = { showSpeedDialog = false },
+                        title = { Text("Playback Speed") },
+                        text = {
+                            Column {
+                                Text(
+                                    text = String.format("%.2fx", state.playbackSpeed), 
+                                    style = MaterialTheme.typography.headlineMedium, 
+                                    modifier = Modifier.align(Alignment.CenterHorizontally)
+                                )
+                                Slider(
+                                    value = state.playbackSpeed,
+                                    onValueChange = { viewModel.setPlaybackSpeed(it) },
+                                    valueRange = 0.5f..3.0f,
+                                    steps = 49 // (3.0 - 0.5) / 0.05 - 1 = 49 steps
+                                )
+                            }
+                        },
+                        confirmButton = {
+                            TextButton(onClick = { showSpeedDialog = false }) {
+                                Text("Done")
+                            }
+                        }
+                    )
+                }
+
+                // Grid Size
+                var showGridDialog by remember { mutableStateOf(false) }
+                SettingsItem(
+                    icon = Icons.Default.GridView,
+                    title = "Grid Item Size",
+                    subtitle = when {
+                        state.gridMinWidth < 110 -> "Small"
+                        state.gridMinWidth < 140 -> "Normal"
+                        state.gridMinWidth < 180 -> "Large"
+                        else -> "Extra Large"
+                    },
+                    onClick = { showGridDialog = true }
+                )
+
+                if (showGridDialog) {
+                    AlertDialog(
+                        onDismissRequest = { showGridDialog = false },
+                        title = { Text("Grid Item Size") },
+                        text = {
+                            Column {
+                                Text(
+                                    text = "${state.gridMinWidth}dp",
+                                    style = MaterialTheme.typography.headlineMedium,
+                                    modifier = Modifier.align(Alignment.CenterHorizontally)
+                                )
+                                Text(
+                                    text = "Larger items = fewer columns",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    modifier = Modifier.align(Alignment.CenterHorizontally).padding(bottom = 16.dp)
+                                )
+                                Slider(
+                                    value = state.gridMinWidth.toFloat(),
+                                    onValueChange = { viewModel.setGridMinWidth(it.toInt()) },
+                                    valueRange = 100f..300f,
+                                    steps = 19 
+                                )
+                            }
+                        },
+                        confirmButton = {
+                            TextButton(onClick = { showGridDialog = false }) {
+                                Text("Done")
+                            }
+                        }
+                    )
+                }
+                
+                // Sleep Timer
+                var showTimerDialog by remember { mutableStateOf(false) }
+                val timerOptions = listOf(0, 15, 30, 45, 60, 90, 120)
+                SettingsItem(
+                    icon = Icons.Default.Timer,
+                    title = "Default Sleep Timer",
+                    subtitle = if (state.sleepTimerMinutes == 0) "Disabled" else "${state.sleepTimerMinutes} minutes",
+                    onClick = { showTimerDialog = true }
+                )
+                
+                if (showTimerDialog) {
+                    AlertDialog(
+                        onDismissRequest = { showTimerDialog = false },
+                        title = { Text("Default Sleep Timer") },
+                        text = {
+                            Column {
+                                timerOptions.forEach { minutes ->
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clickable {
+                                                viewModel.setSleepTimerMinutes(minutes)
+                                                showTimerDialog = false
+                                            }
+                                            .padding(vertical = 12.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text(if (minutes == 0) "Disabled" else "$minutes minutes")
+                                        RadioButton(
+                                            selected = state.sleepTimerMinutes == minutes,
+                                            onClick = {
+                                                viewModel.setSleepTimerMinutes(minutes)
+                                                showTimerDialog = false
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+                        },
+                        confirmButton = {
+                            TextButton(onClick = { showTimerDialog = false }) {
+                                Text("Cancel")
+                            }
+                        }
+                    )
+                }
             }
 
             item {
                 SettingsSectionHeader("Appearance")
+                
+                var showThemeDialog by remember { mutableStateOf(false) }
+                
                 SettingsItem(
                     icon = Icons.Default.DarkMode,
                     title = "Theme",
-                    subtitle = "System Default",
-                    onClick = { /* TODO */ }
+                    subtitle = when (state.themeMode) {
+                        "LIGHT" -> "Light"
+                        "DARK" -> "Dark"
+                        else -> "System Default"
+                    },
+                    onClick = { showThemeDialog = true }
                 )
+                
+                if (showThemeDialog) {
+                    AlertDialog(
+                        onDismissRequest = { showThemeDialog = false },
+                        title = { Text("Choose Theme") },
+                        text = {
+                            Column {
+                                ThemeOption(
+                                    title = "System Default",
+                                    selected = state.themeMode == "SYSTEM",
+                                    onClick = {
+                                        viewModel.updateTheme("SYSTEM")
+                                        showThemeDialog = false
+                                    }
+                                )
+                                ThemeOption(
+                                    title = "Light",
+                                    selected = state.themeMode == "LIGHT",
+                                    onClick = {
+                                        viewModel.updateTheme("LIGHT")
+                                        showThemeDialog = false
+                                    }
+                                )
+                                ThemeOption(
+                                    title = "Dark",
+                                    selected = state.themeMode == "DARK",
+                                    onClick = {
+                                        viewModel.updateTheme("DARK")
+                                        showThemeDialog = false
+                                    }
+                                )
+                                ThemeOption(
+                                    title = "AMOLED Black",
+                                    selected = state.themeMode == "AMOLED",
+                                    onClick = {
+                                        viewModel.updateTheme("AMOLED")
+                                        showThemeDialog = false
+                                    }
+                                )
+                            }
+                        },
+                        confirmButton = {
+                            TextButton(onClick = { showThemeDialog = false }) {
+                                Text("Cancel")
+                            }
+                        }
+                    )
+                }
             }
 
             item {
@@ -162,4 +358,26 @@ fun SwitchSettingsItem(
         },
         modifier = Modifier.clickable(onClick = { onCheckedChange(!checked) })
     )
+}
+
+@Composable
+fun ThemeOption(
+    title: String,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(text = title)
+        RadioButton(
+            selected = selected,
+            onClick = onClick
+        )
+    }
 }

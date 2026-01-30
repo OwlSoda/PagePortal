@@ -20,8 +20,17 @@ interface BookDao {
     """)
     fun searchBooks(query: String): Flow<List<BookEntity>>
     
+    @Query("SELECT * FROM books WHERE authors LIKE '%' || :author || '%' ORDER BY title ASC")
+    fun getBooksByAuthor(author: String): Flow<List<BookEntity>>
+
+    @Query("SELECT * FROM books WHERE series = :series ORDER BY seriesIndex ASC, title ASC")
+    fun getBooksBySeries(series: String): Flow<List<BookEntity>>
+    
     @Query("SELECT * FROM books WHERE id = :id")
     suspend fun getBookById(id: Long): BookEntity?
+
+    @Query("SELECT * FROM books WHERE id = :id")
+    fun observeBook(id: Long): Flow<BookEntity?>
     
     @Query("SELECT * FROM books WHERE serverId = :serverId AND serviceBookId = :serviceBookId LIMIT 1")
     suspend fun getBookByServiceId(serverId: Long, serviceBookId: String): BookEntity?
@@ -63,4 +72,34 @@ interface BookDao {
     
     @Query("SELECT * FROM books WHERE unifiedBookId IS NULL")
     suspend fun getUnlinkedBooks(): List<BookEntity>
+    
+    @Query("UPDATE books SET downloadStatus = :status, downloadProgress = :progress, localFilePath = :localPath WHERE id = :bookId")
+    suspend fun updateDownloadStatus(bookId: Long, status: String, progress: Float, localPath: String?)
+    
+    // Per-format download updates
+    @Query("UPDATE books SET isAudiobookDownloaded = :downloaded, localFilePath = :path WHERE id = :bookId")
+    suspend fun updateAudiobookDownloaded(bookId: Long, downloaded: Boolean, path: String?)
+    
+    @Query("UPDATE books SET isEbookDownloaded = :downloaded, localFilePath = :path WHERE id = :bookId")
+    suspend fun updateEbookDownloaded(bookId: Long, downloaded: Boolean, path: String?)
+    
+    @Query("UPDATE books SET isReadAloudDownloaded = :downloaded, localFilePath = :path WHERE id = :bookId")
+    suspend fun updateReadAloudDownloaded(bookId: Long, downloaded: Boolean, path: String?)
+    
+    // Update download URLs
+    @Query("UPDATE books SET audiobookUrl = :url WHERE id = :bookId")
+    suspend fun updateAudiobookUrl(bookId: Long, url: String?)
+    
+    @Query("UPDATE books SET ebookUrl = :url WHERE id = :bookId")  
+    suspend fun updateEbookUrl(bookId: Long, url: String?)
+    
+    @Query("UPDATE books SET syncedUrl = :url WHERE id = :bookId")
+    suspend fun updateSyncedUrl(bookId: Long, url: String?)
+    
+    // Get downloaded books
+    @Query("SELECT * FROM books WHERE isAudiobookDownloaded = 1 OR isEbookDownloaded = 1 OR isReadAloudDownloaded = 1 ORDER BY title")
+    fun getDownloadedBooks(): Flow<List<BookEntity>>
+
+    @Query("SELECT * FROM books WHERE serverId = :serverId AND serviceBookId IN (:serviceIds) ORDER BY title ASC")
+    fun getBooksByServiceIds(serverId: Long, serviceIds: List<String>): Flow<List<BookEntity>>
 }

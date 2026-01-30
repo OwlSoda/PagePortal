@@ -27,13 +27,21 @@ data class BookResponse(
     val authors: List<AuthorResponse> = emptyList(),
     val narrators: List<NarratorResponse>? = null,
     val series: List<SeriesResponse>? = null,
-    val collections: List<SeriesResponse>? = null,
+    val collections: List<CollectionResponse>? = null,
     val tags: List<TagResponse>? = null,
     val status: Any? = null,
     val position: Any? = null,
     val audiobook: AudiobookResponse? = null,
     val ebook: EbookResponse? = null,
     @SerializedName("readaloud") val readaloud: ReadAloudResponse? = null
+)
+
+data class CollectionResponse(
+    val uuid: String,
+    val name: String,
+    val description: String? = null,
+    val createdAt: String? = null,
+    val updatedAt: String? = null
 )
 
 data class SeriesResponse(

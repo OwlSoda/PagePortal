@@ -89,20 +89,57 @@ class ServiceManager @Inject constructor(
         // Load server and create service
         val server = serverDao.getServerById(serverId) ?: return null
         val service = createService(server.toServiceType(), server.serverUrl)
+        
+        // Configure service with auth token
+        when (service) {
+            is com.owlsoda.pageportal.services.audiobookshelf.AudiobookshelfService -> {
+                server.authToken?.let { service.setAuthToken(it) }
+            }
+            is com.owlsoda.pageportal.services.booklore.BookloreService -> {
+                server.authToken?.let { token ->
+                    service.configure(server.serverUrl, token)
+                }
+            }
+            is com.owlsoda.pageportal.services.storyteller.StorytellerService -> {
+                server.authToken?.let { token ->
+                    service.configure(server.serverUrl, token)
+                }
+            }
+        }
+        
         services[serverId] = service
         return service
     }
     
     /**
      * Get all books from all active servers.
+     * Fetches all pages for each server.
      */
     suspend fun getAllBooks(): List<Pair<ServerEntity, List<ServiceBook>>> {
         val activeServers = serverDao.getActiveServers().first()
         return activeServers.mapNotNull { server ->
             val service = getService(server.id) ?: return@mapNotNull null
             try {
-                val books = service.listBooks()
-                server to books
+                val allServiceBooks = mutableListOf<ServiceBook>()
+                var currentPage = 0
+                val pageSize = 50
+                
+                while (true) {
+                    val pageBooks = service.listBooks(page = currentPage, pageSize = pageSize)
+                    if (pageBooks.isEmpty()) break
+                    
+                    allServiceBooks.addAll(pageBooks)
+                    
+                    // If we got fewer books than requested, it's likely the last page
+                    if (pageBooks.size < pageSize) break
+                    
+                    currentPage++
+                    
+                    // Safety cap to prevent infinite loops (e.g. 10k books max per server for now)
+                    if (currentPage > 200) break 
+                }
+                
+                server to allServiceBooks
             } catch (e: Exception) {
                 e.printStackTrace()
                 null
@@ -116,6 +153,31 @@ class ServiceManager @Inject constructor(
     suspend fun removeServer(serverId: Long) {
         services.remove(serverId)
         serverDao.deleteServerById(serverId)
+    }
+    
+    data class ServerStatus(
+        val serverId: Long,
+        val isHealthy: Boolean,
+        val lastSyncTime: Long?,
+        val errorMessage: String?
+    )
+
+    suspend fun checkServerHealth(serverId: Long): ServerStatus {
+        return try {
+            val service = getService(serverId)
+            if (service == null) {
+                return ServerStatus(serverId, false, null, "Service not initialized")
+            }
+            
+            // Try to list books as health check (minimal fetch)
+            withContext(Dispatchers.IO) {
+                service.listBooks(page = 0, pageSize = 1)
+            }
+            
+            ServerStatus(serverId, true, System.currentTimeMillis(), null)
+        } catch (e: Exception) {
+            ServerStatus(serverId, false, null, e.message)
+        }
     }
     
     /**

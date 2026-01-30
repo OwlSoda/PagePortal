@@ -55,5 +55,25 @@ data class BookEntity(
     val asin: String? = null,
     val addedAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis(),
-    val lastSyncAt: Long = System.currentTimeMillis()
+    val lastSyncAt: Long = System.currentTimeMillis(),
+    
+    // Download Tracking (per format)
+    val isAudiobookDownloaded: Boolean = false,
+    val isEbookDownloaded: Boolean = false,
+    val isReadAloudDownloaded: Boolean = false,
+    
+    // Download URLs (from server response)
+    val audiobookUrl: String? = null,
+    val ebookUrl: String? = null,
+    val syncedUrl: String? = null,  // ReadAloud/sync URL
+    
+    // Processing status (for ReadAloud generation)
+    val processingStatus: String? = null,  // queued, processing, completed, failed
+    val processingStage: String? = null,
+    val processingProgress: Float? = null,
+    
+    // Legacy fields (kept for migration compatibility)
+    val downloadStatus: String = "NONE", // Enum name: NONE, QUEUED, DOWNLOADING, COMPLETED, FAILED
+    val localFilePath: String? = null,
+    val downloadProgress: Float = 0f  // 0.0 to 1.0
 )

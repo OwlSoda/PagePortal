@@ -117,19 +117,29 @@ class AudiobookshelfService(
     
     override suspend fun listBooks(page: Int, pageSize: Int): List<ServiceBook> {
         return try {
-            val libraries = getApi().getLibraries(bearerToken())
-            val bookLibrary = libraries.libraries.firstOrNull { it.mediaType == "book" }
-                ?: return emptyList()
+            val validTypes = setOf("book", "audiobook")
+            val targetLibraryId = defaultLibraryId ?: run {
+                val libraries = getApi().getLibraries(bearerToken())
+                libraries.libraries.firstOrNull { it.mediaType in validTypes }?.id
+            }
+
+            if (targetLibraryId == null) {
+                android.util.Log.w("AudiobookshelfService", "No valid book/audiobook library found.")
+                return emptyList()
+            }
+            
+            android.util.Log.d("AudiobookshelfService", "Listing books from library: $targetLibraryId (page $page)")
 
             val response = getApi().getLibraryItems(
                 token = bearerToken(),
-                libraryId = bookLibrary.id,
+                libraryId = targetLibraryId,
                 page = page,
                 limit = pageSize
             )
             
             response.results.map { it.toServiceBook() }
         } catch (e: Exception) {
+            android.util.Log.e("AudiobookshelfService", "Failed to list books", e)
             emptyList()
         }
     }
@@ -153,13 +163,23 @@ class AudiobookshelfService(
         
         item.media.audioFiles?.firstOrNull()?.let { audio ->
             val filename = audio.metadata?.filename ?: "audio"
+            // Use inode (ino) as fileId if available, otherwise filename might work
+            val fileId = audio.ino ?: filename
+            
+            android.util.Log.d("AudiobookshelfService", "Found audio file: ino=${audio.ino}, filename=$filename")
+            
+            // Try specific file download endpoint
+            // Common format: /api/items/{itemId}/file/{fileId}/download
+             val encodedFileId = java.net.URLEncoder.encode(fileId, "UTF-8").replace("+", "%20")
+             val url = "$normalizedUrl/api/items/$bookId/file/$encodedFileId/download?token=$authToken"
+            
             files.add(
                 BookFile(
                     id = filename,
                     filename = filename,
                     mimeType = audio.mimeType ?: "audio/mpeg",
                     size = audio.metadata?.size ?: 0L,
-                    downloadUrl = "$normalizedUrl/api/items/$bookId/file"
+                    downloadUrl = url
                 )
             )
         }
@@ -167,6 +187,9 @@ class AudiobookshelfService(
         item.media.ebookFile?.let { ebook ->
             val filename = ebook.metadata?.filename ?: "book"
             val format = ebook.ebookFormat ?: "epub"
+            // Use inode as fileId
+            val fileId = ebook.ino ?: filename
+            
             val mimeType = when(format.lowercase()) {
                 "epub" -> "application/epub+zip"
                 "pdf" -> "application/pdf"
@@ -175,13 +198,18 @@ class AudiobookshelfService(
                 else -> "application/octet-stream"
             }
             
+            // Common format: /api/items/{itemId}/file/{fileId}/download
+            // Encode fileId to handle spaces/special characters
+            val encodedFileId = java.net.URLEncoder.encode(fileId, "UTF-8").replace("+", "%20")
+            val url = "$normalizedUrl/api/items/$bookId/file/$encodedFileId/download?token=$authToken"
+            
             files.add(
                 BookFile(
                     id = filename,
                     filename = filename,
                     mimeType = mimeType,
                     size = ebook.metadata?.size ?: 0L,
-                    downloadUrl = "$normalizedUrl/api/items/$bookId/file/$filename"
+                    downloadUrl = url
                 )
             )
         }

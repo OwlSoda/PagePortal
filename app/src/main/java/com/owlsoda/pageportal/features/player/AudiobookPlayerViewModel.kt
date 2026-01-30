@@ -48,7 +48,8 @@ class AudiobookPlayerViewModel @Inject constructor(
     private val bookDao: BookDao,
     private val progressDao: ProgressDao,
     private val serverDao: ServerDao,
-    private val serviceManager: ServiceManager
+    private val serviceManager: ServiceManager,
+    private val libraryRepository: com.owlsoda.pageportal.data.repository.LibraryRepository
 ) : ViewModel() {
     
     private val _state = MutableStateFlow(AudiobookPlayerState())
@@ -124,10 +125,6 @@ class AudiobookPlayerViewModel @Inject constructor(
                     return@launch
                 }
                 
-                // Get server for auth token
-                val server = serverDao.getServerById(book.serverId)
-                val token = server?.authToken
-                
                 // Get saved progress
                 val progress = progressDao.getProgressByBookId(book.id)
                 val resumePosition = progress?.currentPosition ?: 0L
@@ -146,30 +143,38 @@ class AudiobookPlayerViewModel @Inject constructor(
                     .setArtworkUri(book.coverUrl?.let { android.net.Uri.parse(it) })
                     .build()
                 
-                // Get streaming URL from book
-                // Get streaming URL from service
-                val service = serviceManager.getService(book.serverId)
-                val streamUrl = if (service != null) {
-                    try {
-                        // Check for direct stream support or use file URL
-                        // For now, use file download URL which often works for streaming
-                        val details = service.getBookDetails(book.serviceBookId)
-                        details.files.firstOrNull { it.mimeType.startsWith("audio") }?.downloadUrl
-                    } catch (e: Exception) {
-                        null
+                // Determine Media URI (Local vs Remote)
+                val mediaUri = if (book.isAudiobookDownloaded && !book.localFilePath.isNullOrBlank()) {
+                    android.net.Uri.fromFile(java.io.File(book.localFilePath))
+                } else {
+                    val service = serviceManager.getService(book.serverId)
+                    val streamUrl = if (service != null) {
+                        try {
+                            // Try specialized stream URL first (for ABS/REST services)
+                            if (service is com.owlsoda.pageportal.services.audiobookshelf.AudiobookshelfService) {
+                                service.getStreamUrl(book.serviceBookId)
+                            } else {
+                                // Fallback to file download URL
+                                val details = service.getBookDetails(book.serviceBookId)
+                                details.files.firstOrNull { it.mimeType.startsWith("audio") }?.downloadUrl
+                            }
+                        } catch (e: Exception) {
+                            null
+                        }
+                    } else null
+                    
+                    if (streamUrl.isNullOrBlank()) {
+                        _state.value = _state.value.copy(
+                            isLoading = false,
+                            error = "No audio available for streaming or offline"
+                        )
+                        return@launch
                     }
-                } else null
-
-                if (streamUrl.isNullOrBlank()) {
-                    _state.value = _state.value.copy(
-                        isLoading = false,
-                        error = "No audio available"
-                    )
-                    return@launch
+                    android.net.Uri.parse(streamUrl)
                 }
                 
                 val mediaItem = MediaItem.Builder()
-                    .setUri(android.net.Uri.parse(streamUrl))
+                    .setUri(mediaUri)
                     .setMediaMetadata(mediaMetadata)
                     .build()
                 
@@ -372,7 +377,12 @@ class AudiobookPlayerViewModel @Inject constructor(
             )
             progressDao.insertProgress(progress)
             
-            // TODO: Sync to server via service
+            // Sync to server via library repository
+            try {
+                libraryRepository.syncProgress(state.bookId.toLongOrNull() ?: 0L)
+            } catch (e: Exception) {
+                // Ignore sync failures for now, they'll be retried next time
+            }
         }
     }
     

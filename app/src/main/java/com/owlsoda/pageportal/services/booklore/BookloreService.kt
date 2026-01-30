@@ -25,24 +25,12 @@ class BookloreService(
     fun configure(serverUrl: String, authToken: String?) {
         val cleanUrl = normalizeUrl(serverUrl)
         this.baseUrl = cleanUrl
+        this.authToken = authToken // Store locally, but AuthInterceptor reads from DB
         
-        val authClient = if (!authToken.isNullOrBlank()) {
-            client.newBuilder()
-                .addInterceptor { chain ->
-                    val original = chain.request()
-                    val request = original.newBuilder()
-                        .header("Authorization", authToken)
-                        .build()
-                    chain.proceed(request)
-                }
-                .build()
-        } else {
-            client
-        }
-        
+        // Use global client - AuthInterceptor handles injection
         val retrofit = retrofit2.Retrofit.Builder()
             .baseUrl(if (cleanUrl.endsWith("/")) cleanUrl else "$cleanUrl/")
-            .client(authClient)
+            .client(client)
             .build()
         
         this.api = retrofit.create(OpdsApi::class.java)
@@ -51,7 +39,7 @@ class BookloreService(
     override suspend fun authenticate(serverUrl: String, username: String, password: String): AuthResult {
         return try {
             val token = okhttp3.Credentials.basic(username, password)
-            val cleanUrl = normalizeUrl(serverUrl)
+            var cleanUrl = normalizeUrl(serverUrl)
             
             // Create temporary client with generous timeouts for authentication
             val tempClient = client.newBuilder()
@@ -67,20 +55,56 @@ class BookloreService(
                 }
                 .build()
             
-            // Create temporary API for validation
-            val tempRetrofit = retrofit2.Retrofit.Builder()
-                .baseUrl(if (cleanUrl.endsWith("/")) cleanUrl else "$cleanUrl/")
-                .client(tempClient)
-                .build()
+            // Helper function to try authentication with a specific URL
+            suspend fun tryAuthenticate(url: String): Boolean {
+                val tempRetrofit = retrofit2.Retrofit.Builder()
+                    .baseUrl(if (url.endsWith("/")) url else "$url/")
+                    .client(tempClient)
+                    .build()
+                
+                val tempApi = tempRetrofit.create(OpdsApi::class.java)
+                
+                return try {
+                    val response = tempApi.getFeed(url)
+                    val bodyString = response.string()
+                    
+                    // Basic check: Does it look like XML?
+                    if (bodyString.trim().startsWith("<") && !bodyString.trim().startsWith("<!")) {
+                        OpdsParser().parse(bodyString.byteInputStream(), url)
+                        true
+                    } else {
+                        false
+                    }
+                } catch (e: Exception) {
+                    false
+                }
+            }
             
-            val tempApi = tempRetrofit.create(OpdsApi::class.java)
+            // Try common OPDS paths
+            val pathsToTry = listOf("", "/opds", "/opds/v1.2", "/feed.xml")
+            var success = false
+            var finalUrl = cleanUrl
             
-            // Try to fetch and parse the feed to validate credentials
-            val response = tempApi.getFeed(cleanUrl)
-            OpdsParser().parse(response.byteStream(), cleanUrl)
+            for (path in pathsToTry) {
+                val tryUrl = if (path.isEmpty()) cleanUrl else {
+                    if (cleanUrl.endsWith("/")) cleanUrl + path.substring(1) else cleanUrl + path
+                }
+                if (tryAuthenticate(tryUrl)) {
+                    success = true
+                    finalUrl = tryUrl
+                    break
+                }
+            }
+            
+            if (!success) {
+                return AuthResult(
+                    success = false, 
+                    errorMessage = "Could not find a valid OPDS feed at $cleanUrl or common sub-paths. Please check the URL."
+                )
+            }
             
             // If successful, configure the service
-            configure(cleanUrl, token)
+            configure(finalUrl, token)
             
             AuthResult(success = true, token = token, userId = username)
         } catch (e: retrofit2.HttpException) {

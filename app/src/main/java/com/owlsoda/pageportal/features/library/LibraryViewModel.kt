@@ -5,8 +5,8 @@ import androidx.lifecycle.viewModelScope
 import com.owlsoda.pageportal.core.database.dao.ServerDao
 import com.owlsoda.pageportal.core.database.dao.UnifiedBookDao
 import com.owlsoda.pageportal.core.database.entity.ServerEntity
-import com.owlsoda.pageportal.data.repository.LibraryRepository
 import com.owlsoda.pageportal.data.preferences.PreferencesRepository
+import com.owlsoda.pageportal.services.ServiceManager
 import com.owlsoda.pageportal.services.ServiceType
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
@@ -21,73 +21,233 @@ data class UnifiedBookDisplay(
     val hasEbook: Boolean,
     val hasAudiobook: Boolean,
     val hasReadAloud: Boolean,
-    val serverIds: Set<Long> // Store server IDs for filtering
+    val serverIds: Set<Long>,
+    val isDownloaded: Boolean,
+    val isDownloading: Boolean,
+    val downloadProgress: Float,
+    val series: String? = null,
+    val seriesIndex: String? = null
 )
+
+data class ServerTab(
+    val id: Long,
+    val name: String,
+    val serviceType: ServiceType?,
+    val isConnected: Boolean = true,
+    val bookCount: Int = 0
+)
+
+// View modes matching ReadaloudBooks
+enum class ViewMode {
+    Home,
+    Grid,
+    List,
+    Authors,
+    Series
+}
+
+// Sort options matching ReadaloudBooks
+enum class SortOption(val displayName: String) {
+    TitleAsc("Title (A-Z)"),
+    TitleDesc("Title (Z-A)"),
+    AuthorAsc("Author (A-Z)"),
+    AuthorDesc("Author (Z-A)"),
+    SeriesAsc("Series (A-Z)"),
+    SeriesDesc("Series (Z-A)")
+}
 
 data class LibraryUiState(
     val books: List<UnifiedBookDisplay> = emptyList(),
+    // Grouped content for Home Screen
+    val recentBooks: List<UnifiedBookDisplay> = emptyList(),
+    val booksByService: Map<String, List<UnifiedBookDisplay>> = emptyMap(),
+    
     val servers: List<ServerEntity> = emptyList(),
+    val serverTabs: List<ServerTab> = emptyList(),
     val selectedTabIndex: Int = 0,
     val isLoading: Boolean = false,
-    val error: String? = null
+    val error: String? = null,
+    
+    // Filters
+    val isOfflineFilterActive: Boolean = false,
+    val filterHasAudiobook: Boolean = false,
+    val filterHasEbook: Boolean = false,
+    val filterHasReadAloud: Boolean = false,
+    val filterDownloaded: Boolean = false,
+    
+    // Search
+    val searchQuery: String = "",
+    
+    // View & Sort
+    val viewMode: ViewMode = ViewMode.Home,
+    val sortOption: SortOption = SortOption.TitleAsc,
+    
+    // Grouped data for Authors/Series views
+    val uniqueAuthors: List<String> = emptyList(),
+    val uniqueSeries: List<String> = emptyList(),
+    val selectedFilter: String? = null,  // Selected author or series
+    
+    // Appearance
+    val gridMinWidth: Int = 120
 )
 
 @HiltViewModel
 class LibraryViewModel @Inject constructor(
-    private val libraryRepository: LibraryRepository,
     private val unifiedBookDao: UnifiedBookDao,
     private val serverDao: ServerDao,
-    private val preferencesRepository: PreferencesRepository
+    private val preferencesRepository: PreferencesRepository,
+    private val serviceManager: ServiceManager,
+    private val libraryRepository: com.owlsoda.pageportal.data.repository.LibraryRepository,
+    private val downloadRepository: com.owlsoda.pageportal.data.repository.DownloadRepository
 ) : ViewModel() {
-    
-    private val _uiState = MutableStateFlow(LibraryUiState())
+
+    private val _uiState = MutableStateFlow(LibraryUiState(isLoading = true))
     val uiState: StateFlow<LibraryUiState> = _uiState.asStateFlow()
-    
-    // Check if user has any configured servers
-    val hasServers: StateFlow<Boolean> = serverDao.getActiveServers()
-        .map { it.isNotEmpty() }
-        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
-    
-    // Keep track of all books (unified)
+
     private var allUnifiedBooks: List<UnifiedBookDisplay> = emptyList()
-    private var isOfflineMode = false
-    
+    private var isOfflineMode: Boolean = false
+
     init {
         observeServers()
         observeBooks()
-        observePreferences()
-        // Only refresh if servers exist - prevents crash on first launch
+        observeOfflineMode()
+        observeGridSettings()
+    }
+
+    fun refresh() {
         viewModelScope.launch {
-            try {
-                if (serverDao.getActiveServerCount() > 0) {
-                    refresh()
+            _uiState.update { it.copy(isLoading = true) }
+            val result = libraryRepository.syncLibrary()
+            _uiState.update { it.copy(isLoading = false, error = result.exceptionOrNull()?.message) }
+        }
+    }
+    
+    fun downloadSeries(seriesName: String) {
+        viewModelScope.launch {
+            val booksInSeries = allUnifiedBooks.filter { it.series == seriesName }
+            booksInSeries.forEach { book ->
+                if (!book.isDownloaded) {
+                    downloadBook(book)
                 }
-            } catch (e: Exception) {
-                e.printStackTrace()
-                _uiState.value = _uiState.value.copy(
-                    error = "Failed to initialize: ${e.message}"
-                )
             }
         }
     }
     
-    private fun observePreferences() {
+    fun downloadAuthor(authorName: String) {
         viewModelScope.launch {
-            preferencesRepository.isOfflineModeEnabled.collectLatest { enabled ->
-                isOfflineMode = enabled
+            val booksByAuthor = allUnifiedBooks.filter { it.authors == authorName }
+            booksByAuthor.forEach { book ->
+                if (!book.isDownloaded) {
+                    downloadBook(book)
+                }
+            }
+        }
+    }
+
+    private suspend fun downloadBook(book: UnifiedBookDisplay) {
+        val unifiedWithBooks = unifiedBookDao.getUnifiedBookWithBooksById(book.id) ?: return
+        val books = unifiedWithBooks.books
+        
+        // Prioritize: Audio > Ebook > ReadAloud > First available
+        val target = books.firstOrNull { it.hasAudiobook }
+             ?: books.firstOrNull { it.hasEbook }
+             ?: books.firstOrNull { it.hasReadAloud }
+             ?: books.firstOrNull()
+             ?: return
+
+        try {
+            downloadRepository.startDownload(target.id, target.serverId, target.serviceBookId)
+        } catch (e: Exception) {
+            // Log error or update state
+        }
+    }
+
+    fun selectTab(index: Int) {
+        _uiState.update { it.copy(selectedTabIndex = index, selectedFilter = null) }
+        updateDisplayedBooks()
+    }
+    
+    // ... existing filter toggles ...
+    fun toggleOfflineFilter() {
+        _uiState.update { it.copy(isOfflineFilterActive = !it.isOfflineFilterActive) }
+        updateDisplayedBooks()
+    }
+    
+    fun toggleAudiobookFilter() {
+        _uiState.update { it.copy(filterHasAudiobook = !it.filterHasAudiobook) }
+        updateDisplayedBooks()
+    }
+    
+    fun toggleEbookFilter() {
+        _uiState.update { it.copy(filterHasEbook = !it.filterHasEbook) }
+        updateDisplayedBooks()
+    }
+    
+    fun toggleReadAloudFilter() {
+        _uiState.update { it.copy(filterHasReadAloud = !it.filterHasReadAloud) }
+        updateDisplayedBooks()
+    }
+    
+    fun toggleDownloadedFilter() {
+        _uiState.update { it.copy(filterDownloaded = !it.filterDownloaded) }
+        updateDisplayedBooks()
+    }
+    
+    // Search
+    fun updateSearchQuery(query: String) {
+        _uiState.update { it.copy(searchQuery = query) }
+        updateDisplayedBooks()
+    }
+    
+    // View mode
+    fun setViewMode(mode: ViewMode) {
+        _uiState.update { it.copy(viewMode = mode, selectedFilter = null) }
+        updateDisplayedBooks()
+    }
+    
+    // Sort
+    fun setSortOption(sort: SortOption) {
+        _uiState.update { it.copy(sortOption = sort) }
+        updateDisplayedBooks()
+    }
+    
+    // Author/Series selection
+    fun selectFilter(filter: String) {
+        _uiState.update { it.copy(selectedFilter = filter) }
+        updateDisplayedBooks()
+    }
+    
+    fun clearFilter() {
+        _uiState.update { it.copy(selectedFilter = null) }
+        updateDisplayedBooks()
+    }
+
+    private fun observeServers() {
+        viewModelScope.launch {
+            serverDao.getAllServers().collect { servers ->
+                _uiState.update { it.copy(servers = servers) }
+                updateDisplayedBooks()
+            }
+        }
+    }
+
+    private fun observeOfflineMode() {
+        viewModelScope.launch {
+            preferencesRepository.isOfflineModeEnabled.collect { offline ->
+                isOfflineMode = offline
                 updateDisplayedBooks()
             }
         }
     }
     
-    private fun observeServers() {
+    private fun observeGridSettings() {
         viewModelScope.launch {
-            serverDao.getActiveServers().collect { servers ->
-                _uiState.value = _uiState.value.copy(servers = servers)
+            preferencesRepository.gridMinWidth.collect { width ->
+                _uiState.update { it.copy(gridMinWidth = width) }
             }
         }
     }
-    
+
     private fun observeBooks() {
         viewModelScope.launch {
             unifiedBookDao.getAllWithBooks().collect { unifiedList ->
@@ -103,84 +263,183 @@ class LibraryViewModel @Inject constructor(
                         hasEbook = books.any { it.hasEbook },
                         hasAudiobook = books.any { it.hasAudiobook },
                         hasReadAloud = books.any { it.hasReadAloud },
-                        serverIds = serverIds
+                        serverIds = serverIds,
+                        isDownloaded = books.any { 
+                            it.downloadStatus == "COMPLETED" ||
+                            it.isAudiobookDownloaded ||
+                            it.isEbookDownloaded ||
+                            it.isReadAloudDownloaded
+                        },
+                        isDownloading = books.any {
+                            it.downloadStatus == "QUEUED" || it.downloadStatus == "DOWNLOADING"
+                        },
+                        downloadProgress = books.maxOfOrNull { it.downloadProgress } ?: 0f,
+                        series = books.firstOrNull()?.series,
+                        seriesIndex = books.firstOrNull()?.seriesIndex
                     )
                 }
                 updateDisplayedBooks()
             }
         }
     }
-    
-    fun refresh() {
-        viewModelScope.launch {
-            try {
-                if (isOfflineMode) return@launch // No online sync in offline mode
-                
-                _uiState.value = _uiState.value.copy(isLoading = true, error = null)
-                
-                try {
-                    val result = libraryRepository.syncLibrary()
-                    _uiState.value = _uiState.value.copy(isLoading = false)
-                    
-                    result.onFailure {
-                        if (allUnifiedBooks.isEmpty()) {
-                            _uiState.value = _uiState.value.copy(error = it.message ?: "Failed to sync library")
-                        }
-                    }
-                } catch (e: Exception) {
-                    _uiState.value = _uiState.value.copy(
-                        isLoading = false,
-                        error = if (allUnifiedBooks.isEmpty()) {
-                            "Failed to load library: ${e.message ?: "Unknown error"}"
-                        } else null
-                    )
-                }
-            } catch (e: Exception) {
-                // Outer catch to prevent any crash
-                _uiState.value = _uiState.value.copy(
-                    isLoading = false,
-                    error = "Error: ${e.message ?: "Unknown error"}"
-                )
-            }
-        }
-    }
-    
-    fun selectTab(index: Int) {
-        _uiState.value = _uiState.value.copy(selectedTabIndex = index)
-        updateDisplayedBooks()
-    }
-    
-    private fun updateDisplayedBooks() {
-        // Filter logic:
-        // 1. If Offline Mode: Show NO items? Or only downloaded?
-        //    Current UnifiedBookEntity doesn't track "isDownloaded".
-        //    We need to check DownloadService OR rely on "hasDownloadedFile" which we don't track in DB properly yet.
-        //    Phase 7 simplification: If offline mode is on, we just show the list but actions might fail if not downloaded.
-        //    Ideally we would filter.
-        //    Let's inject DownloadService or verify downloads? That's expensive for a list.
-        //    For now, pass "isOfflineMode" to UI state and let UI show a banner.
-        //    And maybe gray out items?
+
+    private fun buildServerTabs(servers: List<ServerEntity>, books: List<UnifiedBookDisplay>): List<ServerTab> {
+        val tabs = mutableListOf<ServerTab>()
         
-        // 2. Tab Filtering
+        // "All" Tab
+        tabs.add(ServerTab(
+            id = -1,
+            name = "All",
+            serviceType = null,
+            isConnected = true,
+            bookCount = books.size
+        ))
+        
+        // Server Tabs
+        for (server in servers) {
+            val count = books.count { it.serverIds.contains(server.id) }
+            val sType = try {
+                ServiceType.valueOf(server.serviceType)
+            } catch (e: Exception) { null }
+            
+            tabs.add(ServerTab(
+                id = server.id,
+                name = server.displayName ?: server.serviceType,
+                serviceType = sType,
+                isConnected = true,
+                bookCount = count
+            ))
+        }
+        return tabs
+    }
+
+    private fun updateDisplayedBooks() {
+        val currentServers = _uiState.value.servers
+        val newTabs = buildServerTabs(currentServers, allUnifiedBooks)
+        val state = _uiState.value
+        
+        var newIndex = state.selectedTabIndex
+        if (newIndex >= newTabs.size) {
+            newIndex = 0
+        }
+        
+        val selectedTab = newTabs.getOrNull(newIndex)
         var filtered = allUnifiedBooks
         
-        if (!isOfflineMode) {
-             val servers = _uiState.value.servers
-             val selectedServerId = if (_uiState.value.selectedTabIndex > 0 && 
-                                       _uiState.value.selectedTabIndex - 1 < servers.size) {
-                 servers[_uiState.value.selectedTabIndex - 1].id
-             } else null
-
-             if (selectedServerId != null) {
-                 filtered = filtered.filter { book ->
-                     book.serverIds.contains(selectedServerId)
-                 }
+        // Filter by Tab
+        if (selectedTab != null && selectedTab.id != -1L) {
+             filtered = filtered.filter { book: UnifiedBookDisplay ->
+                 book.serverIds.contains(selectedTab.id)
              }
         }
         
-        _uiState.value = _uiState.value.copy(
-            books = filtered.sortedBy { it.title },
+        // Apply global filters
+        filtered = applyFilters(filtered, state)
+        
+        // Apply search
+        if (state.searchQuery.isNotBlank()) {
+            val query = state.searchQuery.lowercase().trim()
+            filtered = filtered.filter { book ->
+                book.title.lowercase().contains(query) ||
+                book.authors.lowercase().contains(query) ||
+                (book.series?.lowercase()?.contains(query) == true)
+            }
+        }
+        
+        // Apply view-specific filtering
+        if (state.viewMode == ViewMode.Authors && state.selectedFilter != null) {
+            filtered = filtered.filter { it.authors == state.selectedFilter }
+        } else if (state.viewMode == ViewMode.Series && state.selectedFilter != null) {
+            filtered = filtered.filter { it.series == state.selectedFilter }
+        }
+        
+        // Apply sorting
+        filtered = applySorting(filtered, state.sortOption, state.viewMode, state.selectedFilter)
+        
+        // Build unique authors/series for grouped views
+        val uniqueAuthors = allUnifiedBooks.map { it.authors }.distinct().sorted()
+        val uniqueSeries = allUnifiedBooks.mapNotNull { it.series }.distinct().sorted()
+        
+        // Home Screen Data
+        // Recent: For now, just take the first 10. Ideally, this would be based on lastAccessTime from DB.
+        val recent = allUnifiedBooks.take(10)
+        
+        // Group by Service Name
+        val serviceMap = newTabs
+            .filter { it.id != -1L } // Exclude "All"
+            .associate { tab ->
+                val tabBooks = allUnifiedBooks.filter { book -> book.serverIds.contains(tab.id) }
+                tab.name to tabBooks
+            }
+            .filter { it.value.isNotEmpty() }
+        
+        _uiState.value = state.copy(
+            books = filtered,
+            recentBooks = recent,
+            booksByService = serviceMap,
+            serverTabs = newTabs,
+            selectedTabIndex = newIndex,
+            uniqueAuthors = uniqueAuthors,
+            uniqueSeries = uniqueSeries,
             isLoading = false
         )
     }
+    
+    private fun applyFilters(books: List<UnifiedBookDisplay>, state: LibraryUiState): List<UnifiedBookDisplay> {
+        var result = books
+        
+        // Offline mode OR filter toggle
+        if (state.isOfflineFilterActive || isOfflineMode || state.filterDownloaded) {
+            result = result.filter { it.isDownloaded }
+        }
+        
+        if (state.filterHasAudiobook) {
+            result = result.filter { it.hasAudiobook }
+        }
+        
+        if (state.filterHasEbook) {
+            result = result.filter { it.hasEbook }
+        }
+        
+        if (state.filterHasReadAloud) {
+            result = result.filter { it.hasReadAloud }
+        }
+        
+        return result
+    }
+    
+    private fun applySorting(
+        books: List<UnifiedBookDisplay>, 
+        sort: SortOption,
+        viewMode: ViewMode,
+        selectedFilter: String?
+    ): List<UnifiedBookDisplay> {
+        // Series view with selection: sort by series index
+        if (viewMode == ViewMode.Series && selectedFilter != null) {
+            return books.sortedWith(compareBy { 
+                it.seriesIndex?.toDoubleOrNull() ?: Double.MAX_VALUE 
+            })
+        }
+        
+        return when (sort) {
+            SortOption.TitleAsc -> books.sortedBy { normalizeTitle(it.title) }
+            SortOption.TitleDesc -> books.sortedByDescending { normalizeTitle(it.title) }
+            SortOption.AuthorAsc -> books.sortedBy { normalizeTitle(it.authors) }
+            SortOption.AuthorDesc -> books.sortedByDescending { normalizeTitle(it.authors) }
+            SortOption.SeriesAsc -> books.sortedBy { normalizeTitle(it.series ?: "zzz") }
+            SortOption.SeriesDesc -> books.sortedByDescending { normalizeTitle(it.series ?: "") }
+        }
+    }
+    
+    // Normalize title by removing common prefixes like "The", "A", "An"
+    private fun normalizeTitle(title: String): String {
+        val lower = title.lowercase().trim()
+        return when {
+            lower.startsWith("the ") -> lower.removePrefix("the ")
+            lower.startsWith("a ") -> lower.removePrefix("a ")
+            lower.startsWith("an ") -> lower.removePrefix("an ")
+            else -> lower
+        }
+    }
 }
+
