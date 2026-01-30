@@ -18,13 +18,6 @@ object RepositoryModule {
     
     // AuthRepository removed - uses @Inject constructor directly
     
-    @Provides
-    @Singleton
-    fun provideLibraryRepository(
-        serviceManager: ServiceManager,
-        bookDao: com.owlsoda.pageportal.core.database.dao.BookDao,
-        matchingEngine: com.owlsoda.pageportal.core.matching.MatchingEngine
-    ): com.owlsoda.pageportal.data.repository.LibraryRepository {
-        return com.owlsoda.pageportal.data.repository.LibraryRepository(serviceManager, bookDao, matchingEngine)
-    }
+    // LibraryRepository uses @Inject constructor directly
+
 }

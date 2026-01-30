@@ -68,15 +68,7 @@ enum class ServiceType {
     BOOKLORE
 }
 
-enum class ServiceFeature {
-    EBOOK_READING,
-    AUDIOBOOK_PLAYBACK,
-    READALOUD_SYNC,
-    DOWNLOAD,
-    PROGRESS_SYNC,
-    METADATA_EDIT,
-    COMIC_READING  // CBZ/CBR support
-}
+
 
 enum class MediaFormat {
     AUDIOBOOK,      // M4B, MP3, etc.
@@ -109,7 +101,13 @@ data class ServiceBook(
     val hasReadAloud: Boolean = false,
     val duration: Long? = null,  // audiobook duration in seconds
     val publishedYear: Int? = null,
-    val description: String? = null
+    val description: String? = null,
+    val collections: List<CollectionRef> = emptyList()
+)
+
+data class CollectionRef(
+    val id: String,
+    val name: String
 )
 
 data class ServiceBookDetails(
@@ -146,6 +144,7 @@ data class ReadingProgress(
     val lastUpdated: Long = System.currentTimeMillis()
 )
 
+
 data class DownloadProgress(
     val bookId: String,
     val bytesDownloaded: Long,
@@ -153,12 +152,4 @@ data class DownloadProgress(
     val status: DownloadStatus
 ) {
     val progress: Float get() = if (totalBytes > 0) bytesDownloaded.toFloat() / totalBytes else 0f
-}
-
-enum class DownloadStatus {
-    QUEUED,
-    DOWNLOADING,
-    COMPLETED,
-    FAILED,
-    CANCELLED
 }

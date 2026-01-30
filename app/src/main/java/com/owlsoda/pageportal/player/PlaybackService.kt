@@ -15,10 +15,9 @@ import androidx.media3.common.Player
 import androidx.media3.common.Tracks
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DataSource
-import androidx.media3.datasource.DataSpec
 import androidx.media3.datasource.DefaultDataSource
-import androidx.media3.datasource.DefaultHttpDataSource
-import androidx.media3.datasource.TransferListener
+import androidx.media3.datasource.okhttp.OkHttpDataSource
+import okhttp3.OkHttpClient
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
@@ -46,14 +45,16 @@ import javax.inject.Inject
 @AndroidEntryPoint
 class PlaybackService : MediaSessionService() {
     
+    @Inject lateinit var okHttpClient: OkHttpClient
+    
     private var mediaSession: MediaSession? = null
     private var bitmapLoaderExecutor: java.util.concurrent.ExecutorService? = null
     
-    // Token provider for authenticated streaming
-    private var authToken: String? = null
+    // No longer needed as AuthInterceptor handles it globally
+    // private var authToken: String? = null
     
     fun setAuthToken(token: String?) {
-        authToken = token
+        // Keeping for compatibility but delegating to interceptor logic
     }
     
     override fun onCreate() {
@@ -72,14 +73,10 @@ class PlaybackService : MediaSessionService() {
             .setBufferDurationsMs(20000, 60000, 2000, 3000)
             .build()
         
-        // Data source with auth header injection
+        // Data source with global auth interceptor support
         val dataSourceFactory = DataSource.Factory {
-            val httpFactory = DefaultHttpDataSource.Factory()
-            authToken?.let { token ->
-                httpFactory.setDefaultRequestProperties(mapOf("Authorization" to "Bearer $token"))
-            }
-            
-            val defaultFactory = DefaultDataSource.Factory(this, httpFactory)
+            val okHttpFactory = OkHttpDataSource.Factory(okHttpClient)
+            val defaultFactory = DefaultDataSource.Factory(this, okHttpFactory)
             defaultFactory.createDataSource()
         }
         

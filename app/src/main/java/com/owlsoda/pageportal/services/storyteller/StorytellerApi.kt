@@ -66,5 +66,5 @@ interface StorytellerApi {
     suspend fun getTags(): List<TagResponse>
     
     @GET("api/v2/collections")
-    suspend fun getCollections(): List<SeriesResponse>
+    suspend fun getCollections(): List<CollectionResponse>
 }

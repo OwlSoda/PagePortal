@@ -8,6 +8,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -23,6 +24,7 @@ import com.owlsoda.pageportal.services.ServiceType
 fun ServerManagementScreen(
     onBack: () -> Unit,
     onAddServer: () -> Unit,
+    onTestServer: (Long) -> Unit,
     viewModel: ServerManagementViewModel = hiltViewModel()
 ) {
     val servers by viewModel.servers.collectAsState()
@@ -66,7 +68,8 @@ fun ServerManagementScreen(
                 items(servers) { server ->
                     ServerItem(
                         server = server,
-                        onDelete = { viewModel.deleteServer(server) }
+                        onDelete = { viewModel.deleteServer(server) },
+                        onTest = { onTestServer(server.id) }
                     )
                 }
             }
@@ -77,7 +80,8 @@ fun ServerManagementScreen(
 @Composable
 fun ServerItem(
     server: ServerEntity,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onTest: () -> Unit
 ) {
     var showDialog by remember { mutableStateOf(false) }
 
@@ -114,12 +118,21 @@ fun ServerItem(
             }
         },
         trailingContent = {
-            IconButton(onClick = { showDialog = true }) {
-                Icon(
-                    Icons.Default.Delete,
-                    contentDescription = "Remove",
-                    tint = MaterialTheme.colorScheme.error
-                )
+            Row {
+                IconButton(onClick = onTest) {
+                    Icon(
+                        Icons.Default.Info, // Or Build/Settings
+                        contentDescription = "Run Diagnostics",
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+                IconButton(onClick = { showDialog = true }) {
+                    Icon(
+                        Icons.Default.Delete,
+                        contentDescription = "Remove",
+                        tint = MaterialTheme.colorScheme.error
+                    )
+                }
             }
         }
     )

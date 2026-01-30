@@ -21,11 +21,19 @@ object DatabaseModule {
     @Provides
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): PagePortalDatabase {
+        val MIGRATION_4_5 = object : androidx.room.migration.Migration(4, 5) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("CREATE TABLE IF NOT EXISTS `highlights` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `bookId` INTEGER NOT NULL, `chapterIndex` INTEGER NOT NULL, `cfi` TEXT NOT NULL, `selectedText` TEXT NOT NULL, `color` TEXT NOT NULL, `note` TEXT, `createdAt` INTEGER NOT NULL, FOREIGN KEY(`bookId`) REFERENCES `books`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_highlights_bookId` ON `highlights` (`bookId`)")
+            }
+        }
+
         return Room.databaseBuilder(
             context,
             PagePortalDatabase::class.java,
             "pageportal_db"
         )
+            .addMigrations(MIGRATION_4_5)
             .fallbackToDestructiveMigration()
             .build()
     }
@@ -48,5 +56,15 @@ object DatabaseModule {
     @Provides
     fun provideUnifiedBookDao(database: PagePortalDatabase): UnifiedBookDao {
         return database.unifiedBookDao()
+    }
+
+    @Provides
+    fun provideHighlightDao(database: PagePortalDatabase): com.owlsoda.pageportal.core.database.dao.HighlightDao {
+        return database.highlightDao()
+    }
+    
+    @Provides
+    fun provideCollectionDao(database: PagePortalDatabase): com.owlsoda.pageportal.core.database.dao.CollectionDao {
+        return database.collectionDao()
     }
 }
