@@ -6,7 +6,6 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleService
 import androidx.lifecycle.lifecycleScope
 import com.owlsoda.pageportal.core.database.dao.BookDao
-import com.owlsoda.pageportal.services.ServiceBook
 import com.owlsoda.pageportal.services.ServiceType
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.*
@@ -37,6 +36,9 @@ class DownloadService : LifecycleService() {
     @Inject
     lateinit var bookDao: BookDao
     
+    @Inject
+    lateinit var preferencesRepository: PreferencesRepository
+
     companion object {
         private const val NOTIFICATION_ID = 1001
         private const val CHANNEL_ID = "download_channel"
@@ -110,27 +112,36 @@ class DownloadService : LifecycleService() {
     
     private fun processQueue() {
         lifecycleScope.launch {
-            while (true) {
+            while (isActive) {
                 val request = synchronized(downloadQueue) {
-                    downloadQueue.firstOrNull { activeJobs[it.bookId] == null }
-                } ?: break
-                
-                val job = downloadSemaphore.withPermit {
-                    performDownload(request)
+                    downloadQueue.firstOrNull { !activeJobs.containsKey(it.bookId) }
                 }
-            }
-            
-            // Stop service when queue is empty
-            if (_activeDownloads.value.all { it.isCompleted || it.isFailed }) {
-                stopSelf()
+                
+                if (request == null) {
+                    val shouldStop = synchronized(downloadQueue) { downloadQueue.isEmpty() } && activeJobs.isEmpty()
+                    if (shouldStop) {
+                        stopSelf()
+                        return@launch
+                    }
+                    delay(1000)
+                    continue
+                }
+
+                val job = launch {
+                    downloadSemaphore.withPermit {
+                        try {
+                            performDownload(request)
+                        } finally {
+                            activeJobs.remove(request.bookId)
+                        }
+                    }
+                }
+                activeJobs[request.bookId] = job
             }
         }
     }
-    
-    @Inject
-    lateinit var preferencesRepository: PreferencesRepository
 
-    private suspend fun performDownload(request: DownloadRequest) {
+    private suspend fun performDownload(request: DownloadRequest) = withContext(Dispatchers.IO) {
         val downloadJob = DownloadJob(
             bookId = request.bookId,
             serviceType = request.serviceType,
@@ -157,7 +168,7 @@ class DownloadService : LifecycleService() {
              synchronized(downloadQueue) {
                  downloadQueue.removeAll { it.bookId == request.bookId }
              }
-             return
+             return@withContext
         }
         
         var retryCount = 0
@@ -190,6 +201,7 @@ class DownloadService : LifecycleService() {
                         var read: Int
                         
                         while (input.read(buffer).also { read = it } != -1) {
+                            ensureActive() // Check for cancellation
                             output.write(buffer, 0, read)
                             bytesRead += read
                             
@@ -220,9 +232,11 @@ class DownloadService : LifecycleService() {
                 synchronized(downloadQueue) {
                     downloadQueue.removeAll { it.bookId == request.bookId }
                 }
-                return
+                return@withContext
                 
             } catch (e: CancellationException) {
+                // If cancelled, we should clean up partial file?
+                // Leaving it for now as per original code logic (except original didn't handle it much)
                 throw e
             } catch (e: Exception) {
                 retryCount++
@@ -239,6 +253,10 @@ class DownloadService : LifecycleService() {
                     )
                     _activeDownloads.value = _activeDownloads.value.map {
                         if (it.bookId == request.bookId) failed else it
+                    }
+                    // CRITICAL FIX: Remove from queue on failure to prevent infinite loop
+                    synchronized(downloadQueue) {
+                        downloadQueue.removeAll { it.bookId == request.bookId }
                     }
                 }
             }
