@@ -93,12 +93,20 @@ fun LibraryScreen(
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            text = uiState.error!!,
-                            color = MaterialTheme.colorScheme.error,
-                            textAlign = TextAlign.Center,
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
                             modifier = Modifier.padding(16.dp)
-                        )
+                        ) {
+                            Text(
+                                text = uiState.error!!,
+                                color = MaterialTheme.colorScheme.error,
+                                textAlign = TextAlign.Center
+                            )
+                            Button(onClick = { viewModel.refresh() }) {
+                                Text("Retry")
+                            }
+                        }
                     }
                 }
                 uiState.books.isEmpty() -> {
@@ -116,16 +124,26 @@ fun LibraryScreen(
                             )
                             Spacer(modifier = Modifier.height(16.dp))
                             Text(
-                                text = "No books yet",
+                                text = "Your library is empty",
                                 style = MaterialTheme.typography.headlineSmall
                             )
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
-                                text = "Pull down to refresh from your servers",
+                                text = "Connect to your servers to sync books",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 textAlign = TextAlign.Center
                             )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            OutlinedButton(onClick = { viewModel.refresh() }) {
+                                Icon(
+                                    imageVector = Icons.Default.Refresh,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Refresh Library")
+                            }
                         }
                     }
                 }
@@ -202,18 +220,32 @@ private fun BookCard(
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     if (book.hasEbook) {
-                        AssistChip(
-                            onClick = {},
-                            label = { Text("📖", style = MaterialTheme.typography.labelSmall) },
+                        Surface(
+                            color = MaterialTheme.colorScheme.secondaryContainer,
+                            shape = MaterialTheme.shapes.extraSmall,
                             modifier = Modifier.height(24.dp)
-                        )
+                        ) {
+                            Box(
+                                contentAlignment = Alignment.Center,
+                                modifier = Modifier.padding(horizontal = 8.dp)
+                            ) {
+                                Text("📖", style = MaterialTheme.typography.labelSmall)
+                            }
+                        }
                     }
                     if (book.hasAudiobook) {
-                        AssistChip(
-                            onClick = {},
-                            label = { Text("🎧", style = MaterialTheme.typography.labelSmall) },
+                        Surface(
+                            color = MaterialTheme.colorScheme.secondaryContainer,
+                            shape = MaterialTheme.shapes.extraSmall,
                             modifier = Modifier.height(24.dp)
-                        )
+                        ) {
+                            Box(
+                                contentAlignment = Alignment.Center,
+                                modifier = Modifier.padding(horizontal = 8.dp)
+                            ) {
+                                Text("🎧", style = MaterialTheme.typography.labelSmall)
+                            }
+                        }
                     }
                 }
             }
