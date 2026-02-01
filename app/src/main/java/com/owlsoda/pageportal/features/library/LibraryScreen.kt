@@ -273,7 +273,7 @@ fun LibraryScreen(
             }
             
             // Content
-<<<<<<< HEAD
+            // Content
             when {
                 uiState.isLoading -> {
                     Box(
@@ -331,6 +331,8 @@ fun LibraryScreen(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 textAlign = TextAlign.Center
 =======
+=======
+>>>>>>> 1e4d143 (Merge fix-login-crashes branch into main: Resolved LibraryScreen conflict by keeping new UI)
             Box(
                 modifier = Modifier.fillMaxSize()
             ) {
@@ -372,7 +374,6 @@ fun LibraryScreen(
                                 message = info.message,
                                 buttonText = info.buttonText,
                                 onButtonClick = info.onAction
->>>>>>> 8a8a68c (Fix Downloads: Refactor DownloadWorker injection and fix Service URLs)
                             )
                             Spacer(modifier = Modifier.height(16.dp))
                             OutlinedButton(onClick = { viewModel.refresh() }) {
