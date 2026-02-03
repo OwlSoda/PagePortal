@@ -14,8 +14,10 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.FormatSize
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -23,6 +25,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -304,12 +308,39 @@ fun ReaderSettingsSheet(
         
         // Font Size
         Text("Font Size: $fontSize%", style = MaterialTheme.typography.bodyMedium)
-        Slider(
-            value = fontSize.toFloat(),
-            onValueChange = { onFontSizeChanged(it.toInt()) },
-            valueRange = 50f..200f,
-            steps = 14
-        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(
+                onClick = { onFontSizeChanged(fontSize - 10) },
+                enabled = fontSize > 50
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Remove,
+                    contentDescription = "Decrease font size"
+                )
+            }
+
+            Slider(
+                value = fontSize.toFloat(),
+                onValueChange = { onFontSizeChanged(it.toInt()) },
+                valueRange = 50f..200f,
+                steps = 14,
+                modifier = Modifier
+                    .weight(1f)
+                    .semantics { contentDescription = "Font size adjustment" }
+            )
+
+            IconButton(
+                onClick = { onFontSizeChanged(fontSize + 10) },
+                enabled = fontSize < 200
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = "Increase font size"
+                )
+            }
+        }
         
         Spacer(modifier = Modifier.height(24.dp))
         
