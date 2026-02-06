@@ -9,3 +9,7 @@
 ## 2024-05-24 - Slider Precision Controls
 **Learning:** Touch sliders are often imprecise, making it difficult for users to select specific values (like an exact font size). Adding incremental +/- buttons alongside the slider significantly improves usability and accessibility for fine-tuning.
 **Action:** When using `Slider` for precise adjustments, always consider wrapping it in a `Row` with decrement/increment buttons. Ensure these buttons have proper `contentDescription` and `enabled` states based on the slider's range to prevent crashes or invalid states.
+
+## 2024-05-31 - Semantic Error States
+**Learning:** Using emojis like "⚠️" for critical error messages is unprofessional and inaccessible. Screen readers announce the emoji name instead of the context, and it lacks standard semantic meaning in all cultures.
+**Action:** Replace error emojis with a standardized `ErrorState` component using semantic icons (e.g., `Icons.Default.Warning`) and clear, actionable text. Ensure high contrast (e.g., white on dark backgrounds) is maintained via props.

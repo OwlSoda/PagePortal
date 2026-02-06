@@ -26,6 +26,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.compose.foundation.Image
+import com.owlsoda.pageportal.ui.components.ErrorState
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.filter
 
@@ -146,23 +147,10 @@ fun ComicReaderScreen(
         
         // Error message
         if (state.error != null) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(24.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("⚠️", style = MaterialTheme.typography.displayLarge)
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        state.error!!,
-                        style = MaterialTheme.typography.bodyLarge,
-                        textAlign = TextAlign.Center,
-                        color = Color.White
-                    )
-                }
-            }
+            ErrorState(
+                message = state.error!!,
+                contentColor = Color.White
+            )
         }
         
         // Controls overlay

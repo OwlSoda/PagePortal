@@ -23,6 +23,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
+import com.owlsoda.pageportal.ui.components.ErrorState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -84,21 +85,7 @@ fun AudiobookPlayerScreen(
                     CircularProgressIndicator()
                 }
             } else if (state.error != null) {
-                Box(
-                    modifier = Modifier.fillMaxSize().padding(24.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("⚠️", style = MaterialTheme.typography.displayLarge)
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text(
-                            state.error!!,
-                            style = MaterialTheme.typography.bodyLarge,
-                            textAlign = TextAlign.Center,
-                            color = MaterialTheme.colorScheme.error
-                        )
-                    }
-                }
+                ErrorState(message = state.error!!)
             } else {
                 // Main content
                 Column(
@@ -283,7 +270,7 @@ fun AudiobookPlayerScreen(
                                 if (isCurrentChapter) {
                                     Icon(
                                         Icons.Default.PlayArrow,
-                                        null,
+                                        "Now playing",
                                         tint = MaterialTheme.colorScheme.primary
                                     )
                                 }
