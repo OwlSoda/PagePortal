@@ -3,6 +3,7 @@ package com.owlsoda.pageportal.features.auth
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
@@ -45,9 +46,11 @@ fun LoginScreen(
         verticalArrangement = Arrangement.Center
     ) {
         // Logo and title
-        Text(
-            text = "📚",
-            style = MaterialTheme.typography.displayLarge
+        Icon(
+            imageVector = Icons.AutoMirrored.Filled.MenuBook,
+            contentDescription = "PagePortal Logo",
+            modifier = Modifier.size(64.dp),
+            tint = MaterialTheme.colorScheme.primary
         )
         
         Spacer(modifier = Modifier.height(16.dp))

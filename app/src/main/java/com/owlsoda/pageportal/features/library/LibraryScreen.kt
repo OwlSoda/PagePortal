@@ -48,7 +48,16 @@ fun LibraryScreen(
         topBar = {
             TopAppBar(
                 title = { 
-                    Text("📚 PagePortal")
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.MenuBook,
+                            contentDescription = null,
+                            modifier = Modifier.size(24.dp),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("PagePortal")
+                    }
                 },
                 actions = {
                     IconButton(onClick = { viewModel.refresh() }) {
@@ -120,9 +129,11 @@ fun LibraryScreen(
                             horizontalAlignment = Alignment.CenterHorizontally,
                             modifier = Modifier.padding(32.dp)
                         ) {
-                            Text(
-                                text = "📚",
-                                style = MaterialTheme.typography.displayLarge
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.MenuBook,
+                                contentDescription = null,
+                                modifier = Modifier.size(72.dp),
+                                tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
                             )
                             Spacer(modifier = Modifier.height(16.dp))
                             Text(
