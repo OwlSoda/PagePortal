@@ -33,7 +33,20 @@ object DownloadUtils {
      * Structure: filesDir/Author/Series/ or filesDir/Author/
      */
     fun getBookDir(filesDir: File, book: BookEntity): File {
-        val authorPart = sanitize(book.authors.ifBlank { "Unknown Author" })
+        var authorName = book.authors.ifBlank { "Unknown Author" }
+        // Handle JSON array if present
+        if (authorName.startsWith("[") && authorName.endsWith("]")) {
+            try {
+                // Simple parsing to avoid Gson dependency here if possible, or just strip
+                val content = authorName.substring(1, authorName.length - 1)
+                val authors = content.split(",").map { it.trim().removeSurrounding("\"") }
+                authorName = authors.firstOrNull() ?: "Unknown Author"
+            } catch (e: Exception) {
+                // Fallback to raw string
+            }
+        }
+        
+        val authorPart = sanitize(authorName)
         val seriesPart = book.series?.let { sanitize(it) }
         
         return if (!seriesPart.isNullOrBlank()) {
@@ -109,6 +122,7 @@ object DownloadUtils {
         val fileName = when (format) {
             DownloadFormat.AUDIO -> "$baseFileName.m4b"
             DownloadFormat.EBOOK -> "$baseFileName.epub"
+            DownloadFormat.PDF -> "$baseFileName.pdf"
             DownloadFormat.READALOUD -> "$baseFileName (readaloud).epub"
         }
         return File(bookDir, fileName)
@@ -219,9 +233,43 @@ object DownloadUtils {
         }
     }
 
+    /**
+     * Unzip a file to a destination directory using ZipFile.
+     * This is more robust than ZipInputStream for some archives.
+     */
+    fun unzipFile(zipFile: File, requestDestDir: File) {
+        if (!requestDestDir.exists()) requestDestDir.mkdirs()
+        
+        java.util.zip.ZipFile(zipFile).use { zip ->
+            val entries = zip.entries()
+            while (entries.hasMoreElements()) {
+                val entry = entries.nextElement()
+                
+                // Prevent Zip Slip vulnerability
+                val newFile = File(requestDestDir, entry.name)
+                if (!newFile.canonicalPath.startsWith(requestDestDir.canonicalPath)) {
+                    throw SecurityException("Zip Path Traversal detected: ${entry.name}")
+                }
+                
+                if (entry.isDirectory) {
+                    newFile.mkdirs()
+                } else {
+                    newFile.parentFile?.mkdirs()
+                    // Use FileOutputStream with buffer
+                    zip.getInputStream(entry).use { input ->
+                        FileOutputStream(newFile).use { output ->
+                            input.copyTo(output)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     enum class DownloadFormat {
         AUDIO,
         EBOOK,
+        PDF,
         READALOUD
     }
 }

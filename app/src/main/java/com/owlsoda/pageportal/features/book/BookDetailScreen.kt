@@ -6,6 +6,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -169,7 +170,7 @@ fun BookDetailScreen(
                         if (state.progressPercent > 0) {
                             Spacer(modifier = Modifier.height(16.dp))
                             LinearProgressIndicator(
-                                progress = state.progressPercent / 100f,
+                                progress = { state.progressPercent / 100f },
                                 modifier = Modifier
                                     .width(120.dp)
                                     .height(4.dp)
@@ -202,7 +203,7 @@ fun BookDetailScreen(
                             if (book.hasEbook) {
                                 MainActionButton(
                                     text = "Read",
-                                    icon = Icons.Default.MenuBook,
+                                    icon = Icons.AutoMirrored.Filled.MenuBook,
                                     onClick = { onReadEbook(book.id.toString()) },
                                     modifier = Modifier.weight(1f),
                                     containerColor = MaterialTheme.colorScheme.secondaryContainer,
@@ -213,7 +214,7 @@ fun BookDetailScreen(
                             // Sync Button (ReadAloud specific)
                             if (book.hasReadAloud) {
                                 MainActionButton(
-                                    text = "Sync",
+                                    text = "ReadAloud",
                                     icon = Icons.Default.AutoFixHigh,
                                     onClick = { onPlayReadAloud(book.id.toString()) },
                                     modifier = Modifier.weight(1f),
@@ -234,7 +235,7 @@ fun BookDetailScreen(
                             if (state.isDownloading) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     CircularProgressIndicator(
-                                        progress = state.downloadProgress,
+                                        progress = { state.downloadProgress },
                                         modifier = Modifier.size(24.dp),
                                         strokeWidth = 3.dp
                                     )
@@ -257,14 +258,21 @@ fun BookDetailScreen(
                                             Text("Download Audio")
                                         }
                                     } else {
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.Center
+                                        ) {
                                             Icon(Icons.Default.CheckCircle, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
                                             Spacer(modifier = Modifier.width(8.dp))
-                                            Text("Audio Downloaded", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                                            Text("Audio Ready", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                                            IconButton(onClick = { viewModel.deleteDownload("audio") }) {
+                                                Icon(Icons.Default.Delete, "Delete", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(20.dp))
+                                            }
                                         }
                                     }
                                 }
-
+                                
                                 // Ebook Download Status
                                 if (book.hasEbook) {
                                     if (!book.isEbookDownloaded) {
@@ -277,10 +285,17 @@ fun BookDetailScreen(
                                             Text("Download Ebook")
                                         }
                                     } else {
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.Center
+                                        ) {
                                             Icon(Icons.Default.CheckCircle, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
                                             Spacer(modifier = Modifier.width(8.dp))
-                                            Text("Ebook Downloaded", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                                            Text("Ebook Ready", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                                            IconButton(onClick = { viewModel.deleteDownload("ebook") }) {
+                                                Icon(Icons.Default.Delete, "Delete", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(20.dp))
+                                            }
                                         }
                                     }
                                 }
@@ -295,13 +310,20 @@ fun BookDetailScreen(
                                         ) {
                                             Icon(Icons.Default.Sync, null, modifier = Modifier.size(18.dp))
                                             Spacer(modifier = Modifier.width(8.dp))
-                                            Text("Download Sync Files")
+                                            Text("Download ReadAloud")
                                         }
                                     } else {
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.Center
+                                        ) {
                                             Icon(Icons.Default.CheckCircle, null, tint = MaterialTheme.colorScheme.tertiary, modifier = Modifier.size(16.dp))
                                             Spacer(modifier = Modifier.width(8.dp))
-                                            Text("Sync Files Ready", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.tertiary)
+                                            Text("ReadAloud Ready", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.tertiary)
+                                            IconButton(onClick = { viewModel.deleteDownload("readaloud") }) {
+                                                Icon(Icons.Default.Delete, "Delete", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(20.dp))
+                                            }
                                         }
                                     }
                                 }

@@ -1,0 +1,80 @@
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preDebugBuild UP-TO-DATE
+> Task :app:mergeDebugNativeDebugMetadata NO-SOURCE
+> Task :app:checkKotlinGradlePluginConfigurationErrors
+> Task :app:checkDebugAarMetadata UP-TO-DATE
+> Task :app:generateDebugResValues UP-TO-DATE
+> Task :app:mapDebugSourceSetPaths UP-TO-DATE
+> Task :app:generateDebugResources UP-TO-DATE
+> Task :app:mergeDebugResources UP-TO-DATE
+> Task :app:packageDebugResources UP-TO-DATE
+> Task :app:parseDebugLocalResources UP-TO-DATE
+> Task :app:createDebugCompatibleScreenManifests UP-TO-DATE
+> Task :app:extractDeepLinksDebug UP-TO-DATE
+> Task :app:processDebugMainManifest UP-TO-DATE
+> Task :app:processDebugManifest UP-TO-DATE
+> Task :app:processDebugManifestForPackage UP-TO-DATE
+> Task :app:processDebugResources UP-TO-DATE
+> Task :app:javaPreCompileDebug UP-TO-DATE
+> Task :app:mergeDebugShaders UP-TO-DATE
+> Task :app:compileDebugShaders NO-SOURCE
+> Task :app:generateDebugAssets UP-TO-DATE
+> Task :app:mergeDebugAssets UP-TO-DATE
+> Task :app:compressDebugAssets UP-TO-DATE
+> Task :app:desugarDebugFileDependencies UP-TO-DATE
+> Task :app:checkDebugDuplicateClasses UP-TO-DATE
+> Task :app:mergeExtDexDebug UP-TO-DATE
+> Task :app:mergeLibDexDebug UP-TO-DATE
+> Task :app:mergeDebugJniLibFolders UP-TO-DATE
+> Task :app:mergeDebugNativeLibs UP-TO-DATE
+> Task :app:stripDebugDebugSymbols UP-TO-DATE
+> Task :app:validateSigningDebug UP-TO-DATE
+> Task :app:writeDebugAppMetadata UP-TO-DATE
+> Task :app:writeDebugSigningConfigVersions UP-TO-DATE
+> Task :app:kspDebugKotlin
+
+> Task :app:compileDebugKotlin
+w: file:///C:/Users/ghitr/OneDrive/Documents/github/PagePortal/app/src/main/java/com/owlsoda/pageportal/core/matching/MatchingEngine.kt:39:21 Variable 'unifiedAuthors' is never used
+w: file:///C:/Users/ghitr/OneDrive/Documents/github/PagePortal/app/src/main/java/com/owlsoda/pageportal/features/book/BookDetailScreen.kt:171:29 'LinearProgressIndicator(Float, Modifier = ..., Color = ..., Color = ..., StrokeCap = ...): Unit' is deprecated. Use the overload that takes `progress` as a lambda
+w: file:///C:/Users/ghitr/OneDrive/Documents/github/PagePortal/app/src/main/java/com/owlsoda/pageportal/features/book/BookDetailScreen.kt:205:58 'MenuBook: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.MenuBook
+w: file:///C:/Users/ghitr/OneDrive/Documents/github/PagePortal/app/src/main/java/com/owlsoda/pageportal/features/book/BookDetailScreen.kt:236:37 'CircularProgressIndicator(Float, Modifier = ..., Color = ..., Dp = ..., Color = ..., StrokeCap = ...): Unit' is deprecated. Use the overload that takes `progress` as a lambda
+w: file:///C:/Users/ghitr/OneDrive/Documents/github/PagePortal/app/src/main/java/com/owlsoda/pageportal/features/book/BookListViewModel.kt:87:34 Variable 'bookIds' is never used
+w: file:///C:/Users/ghitr/OneDrive/Documents/github/PagePortal/app/src/main/java/com/owlsoda/pageportal/features/browse/EntityGridScreen.kt:30:5 Parameter 'currentType' is never used
+w: file:///C:/Users/ghitr/OneDrive/Documents/github/PagePortal/app/src/main/java/com/owlsoda/pageportal/features/comic/ComicReaderScreen.kt:62:32 Parameter 'index' is never used, could be renamed to _
+w: file:///C:/Users/ghitr/OneDrive/Documents/github/PagePortal/app/src/main/java/com/owlsoda/pageportal/features/comic/ComicReaderViewModel.kt:167:17 Variable 'currentPage' is never used
+w: file:///C:/Users/ghitr/OneDrive/Documents/github/PagePortal/app/src/main/java/com/owlsoda/pageportal/features/library/LibraryScreen.kt:101:64 'ViewList: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ViewList
+w: file:///C:/Users/ghitr/OneDrive/Documents/github/PagePortal/app/src/main/java/com/owlsoda/pageportal/features/library/LibraryScreen.kt:111:48 'Sort: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.Sort
+w: file:///C:/Users/ghitr/OneDrive/Documents/github/PagePortal/app/src/main/java/com/owlsoda/pageportal/features/library/LibraryViewModel.kt:308:43 Elvis operator (?:) always returns the left operand of non-nullable type String
+w: file:///C:/Users/ghitr/OneDrive/Documents/github/PagePortal/app/src/main/java/com/owlsoda/pageportal/features/player/AudiobookPlayerScreen.kt:71:44 'List: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.List
+w: file:///C:/Users/ghitr/OneDrive/Documents/github/PagePortal/app/src/main/java/com/owlsoda/pageportal/features/player/AudiobookPlayerScreen.kt:320:29 'Divider(Modifier = ..., Dp = ..., Color = ...): Unit' is deprecated. Renamed to HorizontalDivider
+w: file:///C:/Users/ghitr/OneDrive/Documents/github/PagePortal/app/src/main/java/com/owlsoda/pageportal/features/reader/ReaderScreen.kt:212:76 'getter for scale: Float' is deprecated. Deprecated in Java
+w: file:///C:/Users/ghitr/OneDrive/Documents/github/PagePortal/app/src/main/java/com/owlsoda/pageportal/features/reader/ReaderScreen.kt:275:44 Parameter 'result' is never used, could be renamed to _
+w: file:///C:/Users/ghitr/OneDrive/Documents/github/PagePortal/app/src/main/java/com/owlsoda/pageportal/features/reader/ReaderViewModel.kt:106:57 Unnecessary non-null assertion (!!) on a non-null receiver of type String
+w: file:///C:/Users/ghitr/OneDrive/Documents/github/PagePortal/app/src/main/java/com/owlsoda/pageportal/features/reader/ReaderViewModel.kt:387:38 Parameter 'id' is never used, could be renamed to _
+w: file:///C:/Users/ghitr/OneDrive/Documents/github/PagePortal/app/src/main/java/com/owlsoda/pageportal/features/settings/MatchReviewScreen.kt:115:13 'Divider(Modifier = ..., Dp = ..., Color = ...): Unit' is deprecated. Renamed to HorizontalDivider
+w: file:///C:/Users/ghitr/OneDrive/Documents/github/PagePortal/app/src/main/java/com/owlsoda/pageportal/features/settings/ServerManagementScreen.kt:139:5 'Divider(Modifier = ..., Dp = ..., Color = ...): Unit' is deprecated. Renamed to HorizontalDivider
+w: file:///C:/Users/ghitr/OneDrive/Documents/github/PagePortal/app/src/main/java/com/owlsoda/pageportal/features/settings/storage/StorageManagementScreen.kt:38:44 'ArrowBack: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ArrowBack
+w: file:///C:/Users/ghitr/OneDrive/Documents/github/PagePortal/app/src/main/java/com/owlsoda/pageportal/features/testing/DefaultServiceValidator.kt:12:27 Variable 'latency' initializer is redundant
+w: file:///C:/Users/ghitr/OneDrive/Documents/github/PagePortal/app/src/main/java/com/owlsoda/pageportal/features/testing/ServiceTestScreen.kt:44:44 'ArrowBack: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ArrowBack
+w: file:///C:/Users/ghitr/OneDrive/Documents/github/PagePortal/app/src/main/java/com/owlsoda/pageportal/features/testing/ServiceTestViewModel.kt:43:82 Elvis operator (?:) always returns the left operand of non-nullable type String
+w: file:///C:/Users/ghitr/OneDrive/Documents/github/PagePortal/app/src/main/java/com/owlsoda/pageportal/player/PlaybackService.kt:65:22 Parameter 'token' is never used
+w: file:///C:/Users/ghitr/OneDrive/Documents/github/PagePortal/app/src/main/java/com/owlsoda/pageportal/services/audiobookshelf/AudiobookshelfService.kt:303:41 Parameter 'ebook' is never used, could be renamed to _
+w: file:///C:/Users/ghitr/OneDrive/Documents/github/PagePortal/app/src/main/java/com/owlsoda/pageportal/services/audiobookshelf/AudiobookshelfService.kt:364:13 Variable 'progress' is never used
+w: file:///C:/Users/ghitr/OneDrive/Documents/github/PagePortal/app/src/main/java/com/owlsoda/pageportal/workers/DownloadWorker.kt:129:34 Unnecessary non-null assertion (!!) on a non-null receiver of type String
+w: file:///C:/Users/ghitr/OneDrive/Documents/github/PagePortal/app/src/main/java/com/owlsoda/pageportal/workers/DownloadWorker.kt:167:75 Unnecessary non-null assertion (!!) on a non-null receiver of type String
+
+> Task :app:compileDebugJavaWithJavac
+> Task :app:hiltAggregateDepsDebug
+> Task :app:hiltJavaCompileDebug
+> Task :app:processDebugJavaRes
+> Task :app:transformDebugClassesWithAsm
+> Task :app:mergeDebugJavaResource
+> Task :app:dexBuilderDebug
+> Task :app:mergeDebugGlobalSynthetics UP-TO-DATE
+> Task :app:mergeProjectDexDebug
+> Task :app:packageDebug
+> Task :app:createDebugApkListingFileRedirect UP-TO-DATE
+> Task :app:assembleDebug
+
+BUILD SUCCESSFUL in 33s
+40 actionable tasks: 12 executed, 28 up-to-date

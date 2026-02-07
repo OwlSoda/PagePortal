@@ -65,7 +65,8 @@ interface BookService {
 enum class ServiceType {
     STORYTELLER,
     AUDIOBOOKSHELF,
-    BOOKLORE
+    BOOKLORE,
+    LOCAL
 }
 
 

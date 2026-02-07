@@ -33,21 +33,28 @@
             </intent-filter>
         </activity>
 
-        <!-- Media playback service -->
+        <meta-data
+            android:name="com.google.android.gms.car.application"
+            android:resource="@xml/automotive_app_desc" />
+
+        <!-- Media playback service (MediaLibraryService for Auto) -->
         <service
             android:name=".player.PlaybackService"
-            android:exported="false"
+            android:exported="true"
             android:foregroundServiceType="mediaPlayback">
             <intent-filter>
                 <action android:name="androidx.media3.session.MediaSessionService" />
+                <action android:name="androidx.media3.session.MediaLibraryService" />
+                <action android:name="android.media.browse.MediaBrowserService" />
             </intent-filter>
         </service>
 
         <!-- Download service -->
+        <!-- WorkManager Foreground Service (Required for Android 14+) -->
         <service
-            android:name=".download.DownloadService"
-            android:exported="false"
-            android:foregroundServiceType="dataSync" />
+            android:name="androidx.work.impl.foreground.SystemForegroundService"
+            android:foregroundServiceType="dataSync"
+            tools:node="merge" />
 
         <!-- Disable default WorkManager initializer to use Hilt's -->
         <provider

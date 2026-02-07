@@ -151,4 +151,20 @@ class LibraryRepository @Inject constructor(
             Result.failure(e)
         }
     }
+    suspend fun syncPendingProgress(): Result<Int> {
+        return try {
+            val pending = progressDao.getUnsyncedProgress()
+            if (pending.isEmpty()) return Result.success(0)
+            
+            var successCount = 0
+            for (progress in pending) {
+                // Try to sync each one
+                val result = syncProgress(progress.bookId)
+                if (result.isSuccess) successCount++
+            }
+            Result.success(successCount)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
 }

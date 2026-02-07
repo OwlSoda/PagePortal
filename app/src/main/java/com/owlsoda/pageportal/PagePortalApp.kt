@@ -27,6 +27,25 @@ class PagePortalApp : Application(), Configuration.Provider, ImageLoaderFactory 
     override fun onCreate() {
         super.onCreate()
         android.util.Log.d("PagePortalApp", "Application Created. WorkerFactory injected: ${::workerFactory.isInitialized}")
+        scheduleSyncWorker()
+    }
+    
+    private fun scheduleSyncWorker() {
+        val constraints = androidx.work.Constraints.Builder()
+            .setRequiredNetworkType(androidx.work.NetworkType.CONNECTED)
+            .build()
+            
+        val syncWork = androidx.work.PeriodicWorkRequestBuilder<com.owlsoda.pageportal.workers.SyncWorker>(
+            15, java.util.concurrent.TimeUnit.MINUTES
+        )
+            .setConstraints(constraints)
+            .build()
+            
+        androidx.work.WorkManager.getInstance(this).enqueueUniquePeriodicWork(
+            com.owlsoda.pageportal.workers.SyncWorker.WORK_NAME,
+            androidx.work.ExistingPeriodicWorkPolicy.UPDATE,
+            syncWork
+        )
     }
 
     override fun newImageLoader(): ImageLoader {

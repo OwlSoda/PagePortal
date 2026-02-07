@@ -72,6 +72,9 @@ fun ReadAloudPlayerScreen(
                     CircularProgressIndicator()
                 }
             } else if (state.error != null) {
+                val clipboardManager = androidx.compose.ui.platform.LocalClipboardManager.current
+                val localContext = LocalContext.current
+                
                 Box(
                     modifier = Modifier.fillMaxSize().padding(24.dp),
                     contentAlignment = Alignment.Center
@@ -85,6 +88,35 @@ fun ReadAloudPlayerScreen(
                             textAlign = TextAlign.Center,
                             color = MaterialTheme.colorScheme.error
                         )
+                        Spacer(modifier = Modifier.height(24.dp))
+                        Button(
+                            onClick = {
+                                clipboardManager.setText(androidx.compose.ui.text.AnnotatedString(state.error!!))
+                                android.widget.Toast.makeText(localContext, "Error copied to clipboard", android.widget.Toast.LENGTH_SHORT).show()
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.errorContainer,
+                                contentColor = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                        ) {
+                            Icon(Icons.Default.ContentCopy, contentDescription = null)
+                            Spacer(Modifier.width(8.dp))
+                            Text("Copy Error")
+                        }
+                        
+                        Spacer(modifier = Modifier.height(12.dp))
+                        
+                        FilledTonalButton(
+                            onClick = { viewModel.deleteReadAloud() },
+                            colors = ButtonDefaults.filledTonalButtonColors(
+                                containerColor = MaterialTheme.colorScheme.error,
+                                contentColor = MaterialTheme.colorScheme.onError
+                            )
+                        ) {
+                            Icon(Icons.Default.Delete, contentDescription = null)
+                            Spacer(Modifier.width(8.dp))
+                            Text("Delete Download")
+                        }
                     }
                 }
             } else {

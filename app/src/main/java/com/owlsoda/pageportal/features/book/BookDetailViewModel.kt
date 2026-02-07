@@ -167,6 +167,12 @@ class BookDetailViewModel @Inject constructor(
         }
     }
     
+    fun deleteDownload(type: String) {
+        viewModelScope.launch {
+            linkedBooks.forEach { downloadRepository.deleteDownload(it.id, type) }
+        }
+    }
+    
     fun unlinkBook() {
         viewModelScope.launch {
             try {

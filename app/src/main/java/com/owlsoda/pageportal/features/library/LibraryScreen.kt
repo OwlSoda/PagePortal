@@ -13,14 +13,18 @@ import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.Headphones
 import androidx.compose.material.icons.filled.OfflinePin
 import androidx.compose.material.icons.filled.CloudQueue
+import androidx.compose.material.icons.automirrored.filled.ViewList
+import androidx.compose.material.icons.automirrored.filled.Sort
+import androidx.compose.material.icons.filled.Add
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Category
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.GridView
-import androidx.compose.material.icons.filled.ViewList
-import androidx.compose.material.icons.filled.Sort
+
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Home
@@ -58,6 +62,12 @@ fun LibraryScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var showSortMenu by remember { mutableStateOf(false) }
+    
+    val importLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        uri?.let { viewModel.importBook(it) }
+    }
     
     // Show login UI if no servers configured
     if (uiState.servers.isEmpty()) {
@@ -98,7 +108,7 @@ fun LibraryScreen(
                             when (uiState.viewMode) {
                                 ViewMode.Home -> Icons.Default.Home
                                 ViewMode.Grid -> Icons.Default.GridView
-                                ViewMode.List -> Icons.Default.ViewList
+                                ViewMode.List -> Icons.AutoMirrored.Filled.ViewList
                                 else -> Icons.Default.GridView
                             },
                             contentDescription = "View: ${uiState.viewMode.name}"
@@ -108,7 +118,7 @@ fun LibraryScreen(
                     // Sort dropdown
                     Box {
                         IconButton(onClick = { showSortMenu = true }) {
-                            Icon(Icons.Default.Sort, contentDescription = "Sort")
+                            Icon(Icons.AutoMirrored.Filled.Sort, contentDescription = "Sort")
                         }
                         DropdownMenu(
                             expanded = showSortMenu,
@@ -155,6 +165,13 @@ fun LibraryScreen(
                     }
                     IconButton(onClick = onSettingsClick) {
                         Icon(Icons.Default.Settings, contentDescription = "Settings")
+                    }
+                    
+                    // Import Button
+                    IconButton(onClick = { 
+                        importLauncher.launch(arrayOf("application/epub+zip", "audio/*"))
+                    }) {
+                        Icon(Icons.Default.Add, contentDescription = "Import Book")
                     }
                 }
             )
@@ -599,7 +616,7 @@ fun ServiceCarousel(
 }
 
 @Composable
-private fun BookCard(
+fun BookCard(
     book: UnifiedBookDisplay,
     modifier: Modifier = Modifier,
     onClick: () -> Unit

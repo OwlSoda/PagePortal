@@ -16,7 +16,9 @@ data class EpubBook(
     val coverImage: String?, // Relative path to cover
     val chapters: List<EpubChapter>,
     val cssFiles: List<String>,
-    val basePath: String // Path inside zip where OPF is located
+    val basePath: String, // Path inside zip where OPF is located
+    val hasMediaOverlays: Boolean = false,
+    val smilData: Map<String, SmilData> = emptyMap() // ID -> SmilData
 )
 
 data class EpubChapter(
@@ -41,7 +43,7 @@ class EpubParser {
             
             // 2. Parse OPF
             val opfEntry = zip.getEntry(opfPath) ?: return@withContext Result.failure(Exception("OPF file missing"))
-            val opfResult = parseOpf(zip.getInputStream(opfEntry), basePath)
+            val opfResult = parseOpf(zip.getInputStream(opfEntry), basePath, zip)
             
             Result.success(opfResult)
         } catch (e: Exception) {
@@ -72,7 +74,7 @@ class EpubParser {
         return null
     }
 
-    private fun parseOpf(inputStream: InputStream, basePath: String): EpubBook {
+    private fun parseOpf(inputStream: InputStream, basePath: String, zip: ZipFile): EpubBook {
         val parser = Xml.newPullParser().apply {
             setInput(inputStream, null)
             setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, false)
@@ -83,7 +85,10 @@ class EpubParser {
         val manifest = mutableMapOf<String, String>() // ID -> Href
         val spine = mutableListOf<String>() // ID references
         val cssFiles = mutableListOf<String>()
+        val smilFiles = mutableMapOf<String, String>() // ID -> Href
+        val chapterSmilMap = mutableMapOf<String, String>() // Chapter ID -> SMIL ID
         var coverId: String? = null
+        var hasMediaOverlays = false
 
         while (parser.next() != XmlPullParser.END_DOCUMENT) {
             if (parser.eventType == XmlPullParser.START_TAG) {
@@ -98,12 +103,23 @@ class EpubParser {
                         val id = parser.getAttributeValue(null, "id")
                         val href = parser.getAttributeValue(null, "href")
                         val mediaType = parser.getAttributeValue(null, "media-type")
+                        val mediaOverlay = parser.getAttributeValue(null, "media-overlay")
                         
                         if (id != null && href != null) {
-                            manifest[id] = basePath + href
+                            val fullPath = basePath + href
+                            manifest[id] = fullPath
                             if (mediaType == "text/css") {
-                                cssFiles.add(basePath + href)
+                                cssFiles.add(fullPath)
                             }
+                            if (mediaType == "application/smil+xml") {
+                                hasMediaOverlays = true
+                                smilFiles[id] = fullPath
+                            }
+                            
+                            if (mediaOverlay != null) {
+                                chapterSmilMap[id] = mediaOverlay
+                            }
+                            
                             // Detect cover
                             if (id.contains("cover") || href.contains("cover")) {
                                 if (mediaType?.startsWith("image/") == true) {
@@ -136,6 +152,41 @@ class EpubParser {
             }
         }
         
+        // Parse SMIL files and map to Chapter ID
+        // The smilData definition in EpubBook is: val smilData: Map<String, SmilData>
+        // We want the key to be the Chapter ID (HTML ID) so ViewModel can look it up easily.
+        
+        val smilDataMap = mutableMapOf<String, SmilData>()
+        
+        if (hasMediaOverlays) {
+            // first parse all SMIL files by their own ID
+            val rawSmilData = mutableMapOf<String, SmilData>()
+            
+            for ((smilId, href) in smilFiles) {
+                try {
+                    val entry = zip.getEntry(href)
+                    if (entry != null) {
+                        // Calculate base directory for this SMIL file
+                        val smilDir = if (href.contains("/")) href.substringBeforeLast("/") else ""
+                        
+                        // We use the SMIL ID for internal storage
+                        val data = SmilParser.parse(zip.getInputStream(entry), smilId, smilDir)
+                        rawSmilData[smilId] = data
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+            
+            // Now map to Chapter IDs
+            for ((chapterId, smilId) in chapterSmilMap) {
+                val data = rawSmilData[smilId]
+                if (data != null) {
+                    smilDataMap[chapterId] = data
+                }
+            }
+        }
+        
         val coverImage = coverId?.let { manifest[it] }
 
         return EpubBook(
@@ -144,7 +195,9 @@ class EpubParser {
             coverImage = coverImage,
             chapters = chapters,
             cssFiles = cssFiles,
-            basePath = basePath
+            basePath = basePath,
+            hasMediaOverlays = hasMediaOverlays,
+            smilData = smilDataMap
         )
     }
 }

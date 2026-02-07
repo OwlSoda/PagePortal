@@ -38,6 +38,7 @@ class PreferencesRepository @Inject constructor(
         val READER_LINE_HEIGHT = floatPreferencesKey("reader_line_height") // e.g. 1.5
         val READER_MARGIN = intPreferencesKey("reader_margin") // e.g. 2 (rem or %)
         val READER_THEME = stringPreferencesKey("reader_theme") // Light, Sepia, Dark, Black
+        val READER_VERTICAL_SCROLL = booleanPreferencesKey("reader_vertical_scroll") // true = vertical, false = horizontal
     }
 
     val isOfflineModeEnabled: Flow<Boolean> = context.dataStore.data
@@ -144,5 +145,13 @@ class PreferencesRepository @Inject constructor(
 
     suspend fun setReaderTheme(theme: String) {
         context.dataStore.edit { it[PreferencesKeys.READER_THEME] = theme }
+    }
+
+    val readerVerticalScroll: Flow<Boolean> = context.dataStore.data
+        .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
+        .map { it[PreferencesKeys.READER_VERTICAL_SCROLL] ?: true } // Default to Vertical (true)
+
+    suspend fun setReaderVerticalScroll(isVertical: Boolean) {
+        context.dataStore.edit { it[PreferencesKeys.READER_VERTICAL_SCROLL] = isVertical }
     }
 }

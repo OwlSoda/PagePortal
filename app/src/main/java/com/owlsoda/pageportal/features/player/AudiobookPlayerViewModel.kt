@@ -49,7 +49,8 @@ class AudiobookPlayerViewModel @Inject constructor(
     private val progressDao: ProgressDao,
     private val serverDao: ServerDao,
     private val serviceManager: ServiceManager,
-    private val libraryRepository: com.owlsoda.pageportal.data.repository.LibraryRepository
+    private val libraryRepository: com.owlsoda.pageportal.data.repository.LibraryRepository,
+    private val preferencesRepository: com.owlsoda.pageportal.data.preferences.PreferencesRepository
 ) : ViewModel() {
     
     private val _state = MutableStateFlow(AudiobookPlayerState())
@@ -70,6 +71,13 @@ class AudiobookPlayerViewModel @Inject constructor(
                 player = controller
                 setupPlayerListener(controller)
                 startProgressUpdates()
+            }
+        }
+        
+        // Observe persistent playback speed
+        viewModelScope.launch {
+            preferencesRepository.playbackSpeed.collect { speed ->
+                _state.value = _state.value.copy(playbackSpeed = speed)
             }
         }
     }
@@ -110,6 +118,12 @@ class AudiobookPlayerViewModel @Inject constructor(
     }
     
     fun loadBook(bookId: String, autoPlay: Boolean = true) {
+        // Optimization: prevent redundant reloading
+        if (_state.value.bookId == bookId && !_state.value.isLoading && _state.value.error == null) {
+             if (autoPlay) play()
+             return
+        }
+
         viewModelScope.launch {
             _state.value = _state.value.copy(isLoading = true, error = null)
             
@@ -307,8 +321,11 @@ class AudiobookPlayerViewModel @Inject constructor(
     }
     
     fun setPlaybackSpeed(speed: Float) {
-        player?.setPlaybackSpeed(speed)
-        _state.value = _state.value.copy(playbackSpeed = speed)
+        viewModelScope.launch {
+            preferencesRepository.setPlaybackSpeed(speed)
+            // _state update will happen via subscription or service feedback
+            _state.value = _state.value.copy(playbackSpeed = speed)
+        }
     }
     
     fun cyclePlaybackSpeed() {
@@ -332,6 +349,13 @@ class AudiobookPlayerViewModel @Inject constructor(
     fun setSleepTimer(minutes: Int) {
         sleepTimerJob?.cancel()
         
+        // Send command to Service
+        val args = android.os.Bundle().apply {
+            putInt(PlaybackService.ARG_MINUTES, minutes)
+        }
+        val command = androidx.media3.session.SessionCommand(PlaybackService.COMMAND_SLEEP_TIMER, android.os.Bundle.EMPTY)
+        (player as? MediaController)?.sendCustomCommand(command, args)
+        
         if (minutes <= 0) {
             _state.value = _state.value.copy(sleepTimerRemaining = 0)
             return
@@ -340,25 +364,26 @@ class AudiobookPlayerViewModel @Inject constructor(
         var remaining = minutes * 60 * 1000L
         _state.value = _state.value.copy(sleepTimerRemaining = remaining)
         
+        // UI-only countdown
         sleepTimerJob = viewModelScope.launch {
             while (remaining > 0) {
                 delay(1000)
                 if (_state.value.isPlaying) {
                     remaining -= 1000
                     _state.value = _state.value.copy(sleepTimerRemaining = remaining)
-                    
-                    if (remaining <= 0) {
-                        player?.pause()
-                        _state.value = _state.value.copy(sleepTimerRemaining = 0)
-                    }
+                } else {
+                    // If paused (by service or user), stop countdown
+                    break
                 }
             }
+            if (!isActive) return@launch
+            // We don't pause here; the Service does it. 
+            // When Service pauses, isPlaying -> false, loop breaks.
         }
     }
     
     fun cancelSleepTimer() {
-        sleepTimerJob?.cancel()
-        _state.value = _state.value.copy(sleepTimerRemaining = 0)
+        setSleepTimer(0)
     }
     
     private fun saveProgress() {

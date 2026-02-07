@@ -22,6 +22,8 @@ import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -35,16 +37,22 @@ import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.owlsoda.pageportal.R
+import androidx.compose.foundation.verticalScroll
 import com.owlsoda.pageportal.reader.epub.EpubBook
+import com.owlsoda.pageportal.features.reader.pdf.PdfViewer
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReaderScreen(
     bookId: String,
     onBack: () -> Unit,
+    isReadAloud: Boolean = false,
     viewModel: ReaderViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -52,11 +60,11 @@ fun ReaderScreen(
     
     // Load book on entry
     LaunchedEffect(bookId) {
-        viewModel.loadBook(bookId, context)
+        viewModel.loadBook(bookId, context, isReadAloud)
     }
 
     // UI State for Controls
-    var showControls by remember { mutableStateOf(true) }
+    var showControls by remember { mutableStateOf(false) } // Default false for immersion
     var showSettings by remember { mutableStateOf(false) }
     
     // Selection State
@@ -67,7 +75,7 @@ fun ReaderScreen(
     // Search State
     var showSearch by remember { mutableStateOf(false) }
 
-    // WebView reference to inject JS
+    // WebView reference
     var webViewRef by remember { mutableStateOf<WebView?>(null) }
 
     // JS Interface
@@ -79,95 +87,78 @@ fun ReaderScreen(
                 selectedRange = range
                 showSelectionMenu = true
             }
+            @android.webkit.JavascriptInterface
+            fun nextChapter() { viewModel.nextChapter() }
+            @android.webkit.JavascriptInterface
+            fun prevChapter() { viewModel.previousChapter() }
         }
     }
     
-    // Effect to update styles when settings change
+    // Effects
     LaunchedEffect(uiState.theme, uiState.fontSize, uiState.fontFamily, uiState.lineHeight, uiState.margin, webViewRef) {
-        webViewRef?.let { wv ->
-            injectStyles(wv, uiState)
-            // Re-inject highlights if needed
-        }
+        webViewRef?.let { injectStyles(it, uiState) }
     }
-    
-    // Effect to load content when chapter changes
     LaunchedEffect(uiState.book, uiState.currentChapterIndex, webViewRef) {
         if (uiState.book != null && webViewRef != null) {
             val chapter = uiState.book!!.chapters.getOrNull(uiState.currentChapterIndex)
             if (chapter != null) {
-                // We use localhost to allow WebViewClient to intercept
-                val url = "http://localhost/${uiState.book!!.basePath}${chapter.href}"
-                webViewRef?.loadUrl(url)
+                webViewRef?.loadUrl("http://localhost/${chapter.href}")
             }
         }
     }
-
-    Scaffold(
-        topBar = {
-            AnimatedVisibility(
-                visible = showControls,
-                enter = slideInVertically(),
-                exit = slideOutVertically()
-            ) {
-                TopAppBar(
-                    title = { Text(uiState.book?.title ?: "Reader") },
-                    navigationIcon = {
-                        IconButton(onClick = onBack) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
-                        }
-                    },
-                    actions = {
-                        IconButton(onClick = { showSearch = true }) {
-                            Icon(Icons.Default.Search, "Search")
-                        }
-                        IconButton(onClick = { showSettings = true }) {
-                            Icon(Icons.Default.Settings, "Settings")
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = Color(android.graphics.Color.parseColor(uiState.theme.backgroundColor)).copy(alpha = 0.9f)
-                    )
-                )
-            }
-        },
-        bottomBar = {
-            AnimatedVisibility(
-                 visible = showControls,
-                 enter = slideInVertically { it },
-                 exit = slideOutVertically { it }
-            ) {
-                val totalChapters = uiState.book?.chapters?.size ?: 0
-                BottomAppBar(
-                    containerColor = Color(android.graphics.Color.parseColor(uiState.theme.backgroundColor)).copy(alpha = 0.9f)
-                ) {
-                    IconButton(onClick = { viewModel.previousChapter() }) {
-                        Text("<", style = MaterialTheme.typography.titleLarge)
-                    }
-                    Spacer(Modifier.weight(1f))
-                    Text("Chapter ${uiState.currentChapterIndex + 1}/$totalChapters")
-                    Spacer(Modifier.weight(1f))
-                    IconButton(onClick = { viewModel.nextChapter() }) {
-                        Text(">", style = MaterialTheme.typography.titleLarge)
-                    }
-                }
-            }
+    LaunchedEffect(uiState.activeSmilHighlightId) {
+        uiState.activeSmilHighlightId?.let { id ->
+            webViewRef?.evaluateJavascript("applySmilHighlight('$id');", null)
         }
-    ) { padding ->
+    }
+
+    // Animation States
+    val contentScale by androidx.compose.animation.core.animateFloatAsState(
+        targetValue = if (showControls) 0.85f else 1f,
+        label = "contentScale"
+    )
+    val contentRadius by androidx.compose.animation.core.animateDpAsState(
+        targetValue = if (showControls) 16.dp else 0.dp,
+        label = "contentRadius"
+    )
+    val chromeAlpha by androidx.compose.animation.core.animateFloatAsState(
+        targetValue = if (showControls) 1f else 0f,
+        label = "chromeAlpha"
+    )
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.surfaceVariant) // "Stage" background
+    ) {
+        // --- 1. Book Content Layer ---
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
+                .statusBarsPadding() // Keep away from notches even in immersive mode? Maybe.
+                .padding(if (showControls) 16.dp else 0.dp) // Add padding when shrunk
                 .background(Color(android.graphics.Color.parseColor(uiState.theme.backgroundColor)))
         ) {
-             if (uiState.isLoading) {
-                 CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-             } else if (uiState.error != null) {
-                 Text(
-                     text = uiState.error!!,
-                     color = MaterialTheme.colorScheme.error,
-                     modifier = Modifier.align(Alignment.Center)
-                 )
-             } else {
+            // DEBUG INFO OVERLAY
+            Text(
+                text = "DEBUG MODE: Ch=${uiState.currentChapterIndex}",
+                color = Color.Red,
+                modifier = Modifier
+                    .zIndex(100f)
+                    .align(Alignment.TopStart)
+                    .padding(40.dp)
+                    .background(Color.White)
+            )
+
+            if (uiState.isLoading) {
+                CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+            } else if (uiState.error != null) {
+                Text(
+                    text = uiState.error!!,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.align(Alignment.Center)
+                )
+            } else {
                  AndroidView(
                      modifier = Modifier.fillMaxSize(),
                      factory = { ctx ->
@@ -186,11 +177,6 @@ fun ReaderScreen(
                                             val mimeType = when {
                                                 url.endsWith(".css", true) -> "text/css"
                                                 url.endsWith(".js", true) -> "text/javascript"
-                                                url.endsWith(".jpg", true) || url.endsWith(".jpeg", true) -> "image/jpeg"
-                                                url.endsWith(".png", true) -> "image/png"
-                                                url.endsWith(".gif", true) -> "image/gif"
-                                                url.endsWith(".svg", true) -> "image/svg+xml"
-                                                url.endsWith(".xhtml", true) || url.endsWith(".html", true) -> "application/xhtml+xml"
                                                 else -> "application/octet-stream"
                                             }
                                             return WebResourceResponse(mimeType, "UTF-8", stream)
@@ -198,25 +184,10 @@ fun ReaderScreen(
                                      }
                                      return super.shouldInterceptRequest(view, request)
                                  }
-                                 
                                  override fun onPageFinished(view: WebView?, url: String?) {
-                                     super.onPageFinished(view, url)
                                      injectStyles(view!!, uiState)
                                      injectSelectionScript(view)
-                                     // TODO: Restore highlights
                                  }
-                             }
-                             
-                             setOnScrollChangeListener { v, _, scrollY, _, _ ->
-                                 val wv = v as WebView
-                                 val contentHeight = wv.contentHeight * wv.scale
-                                 val viewHeight = wv.height
-                                 val progress = if (contentHeight > viewHeight) {
-                                     scrollY.toFloat() / (contentHeight - viewHeight)
-                                 } else {
-                                     1f
-                                 }
-                                 viewModel.onProgressChanged(uiState.currentChapterIndex, progress)
                              }
                              
                              setOnTouchListener { v, event ->
@@ -224,8 +195,14 @@ fun ReaderScreen(
                                      val width = v.width
                                      val x = event.x
                                      when {
-                                        x < width * 0.3 -> viewModel.previousChapter()
-                                        x > width * 0.7 -> viewModel.nextChapter()
+                                        x < width * 0.3 -> {
+                                            if (uiState.isVerticalScroll) viewModel.previousChapter() 
+                                            else webViewRef?.evaluateJavascript( "if (window.scrollX > 0) { window.scrollBy(-window.innerWidth, 0); } else { Android.prevChapter(); }", null)
+                                        }
+                                        x > width * 0.7 -> {
+                                            if (uiState.isVerticalScroll) viewModel.nextChapter()
+                                            else webViewRef?.evaluateJavascript( "if ((window.scrollX + window.innerWidth) < document.body.scrollWidth) { window.scrollBy(window.innerWidth, 0); } else { Android.nextChapter(); }", null)
+                                        }
                                         else -> showControls = !showControls
                                      }
                                  }
@@ -233,81 +210,196 @@ fun ReaderScreen(
                              }
                          }
                      },
-                     update = { webView ->
-                         webViewRef = webView
-                     }
+                     update = { webViewRef = it }
                  )
-                 
-                 // Selection Menu
-                 if (showSelectionMenu && selectedText != null) {
-                     AlertDialog(
-                         onDismissRequest = { showSelectionMenu = false },
-                         title = { Text("Selected Text") },
-                         text = { Text(selectedText!!) },
-                         confirmButton = {
-                             TextButton(onClick = {
-                                 viewModel.addHighlight(
-                                     uiState.currentChapterIndex,
-                                     selectedRange ?: "",
-                                     selectedText!!
-                                 )
-                                 showSelectionMenu = false
-                                 webViewRef?.evaluateJavascript("highlightSelection('${selectedRange}', 'yellow');", null)
-                             }) {
-                                 Text("Highlight")
-                             }
-                         },
-                         dismissButton = {
-                             TextButton(onClick = { showSelectionMenu = false }) {
-                                 Text("Cancel")
-                             }
-                         }
-                     )
-                 }
-                 
-                 // Search Dialog
-                 if (showSearch) {
-                     SearchDialog(
-                         onDismiss = { showSearch = false; viewModel.clearSearch() },
-                         onSearch = { query -> viewModel.searchBook(query) },
-                         results = uiState.searchResults,
-                         isSearching = uiState.isSearching,
-                         onResultClick = { result ->
-                             // Navigate to chapter
-                             // TODO: Scroll to text logic
-                             showSearch = false
-                         }
-                     )
-                 }
-                 
-                 // Settings Sheet
-                 if (showSettings) {
-                     ModalBottomSheet(
-                         onDismissRequest = { showSettings = false },
-                         containerColor = MaterialTheme.colorScheme.surface
+            }
+            
+            // Interaction blocker when controls shown (optional, prevents scrolling while in menu)
+            if (showControls) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {
+                            showControls = false // Tap outside/on book to close
+                        }
+                )
+            }
+        }
+
+        // --- 2. Chrome Layer (Controls) ---
+        if (showControls) {
+             // Top Bar
+             TopAppBar(
+                 title = { Text(uiState.book?.title ?: "Reader") },
+                 navigationIcon = {
+                     IconButton(onClick = onBack) {
+                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
+                     }
+                 },
+                 actions = {
+                     IconButton(onClick = { showSearch = true }) {
+                         Icon(Icons.Default.Search, "Search")
+                     }
+                     IconButton(onClick = { showSettings = true }) {
+                         Icon(Icons.Default.Settings, "Settings")
+                     }
+                 },
+                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
+                 modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding()
+             )
+             
+             // Bottom Control Strip
+             Column(
+                 modifier = Modifier
+                     .align(Alignment.BottomCenter)
+                     .fillMaxWidth()
+                     .navigationBarsPadding()
+                     .padding(bottom = 24.dp),
+                 horizontalAlignment = Alignment.CenterHorizontally // Center existing items
+             ) {
+                 // Playback Controls (if available) - Centered and prominent
+                 if (uiState.isReadAloudAvailable) {
+                     Card(
+                         shape = RoundedCornerShape(50), // Pill shape
+                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+                         modifier = Modifier.padding(bottom = 16.dp)
                      ) {
-                          ReaderSettingsSheet(
-                              fontSize = uiState.fontSize,
-                              currentTheme = uiState.theme,
-                              fontFamily = uiState.fontFamily,
-                              lineHeight = uiState.lineHeight,
-                              margin = uiState.margin,
-                              onFontSizeChanged = viewModel::setFontSize,
-                              onThemeChanged = viewModel::setTheme,
-                              onFontFamilyChanged = viewModel::setFontFamily,
-                              onLineHeightChanged = viewModel::setLineHeight,
-                              onMarginChanged = viewModel::setMargin
-                          )
-                      }
-                  }
+                         Row(
+                             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                             verticalAlignment = Alignment.CenterVertically,
+                             horizontalArrangement = Arrangement.spacedBy(16.dp)
+                         ) {
+                             IconButton(onClick = { /* Previous Track */ }) { // Optional
+                                Icon(androidx.compose.ui.res.painterResource(R.drawable.ic_storyteller), contentDescription = null, modifier = Modifier.size(20.dp)) // Placeholder icon
+                             }
+                             
+                             IconButton(
+                                 onClick = { viewModel.toggleAudioPlay() },
+                                 modifier = Modifier.size(48.dp).background(MaterialTheme.colorScheme.primary, androidx.compose.foundation.shape.CircleShape).padding(8.dp) // Custom play button style
+                             ) {
+                                 Icon(
+                                     if (uiState.isPlayingAudio) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                     "Toggle Audio",
+                                     tint = MaterialTheme.colorScheme.onPrimary
+                                 )
+                             }
+
+                             Text("${String.format("%.1f", uiState.playbackSpeed)}x", style = MaterialTheme.typography.labelLarge)
+                         }
+                     }
+                 }
+                 
+                 // Bottom Navigation (Chapters)
+                 BottomAppBar(
+                      containerColor = Color.Transparent,
+                      contentPadding = PaddingValues(0.dp)
+                 ) {
+                     IconButton(onClick = { viewModel.previousChapter() }) {
+                         Text("<", style = MaterialTheme.typography.titleLarge)
+                     }
+                     Spacer(Modifier.weight(1f))
+                     Text("Chapter ${uiState.currentChapterIndex + 1}/${uiState.book?.chapters?.size ?: 0}")
+                     Spacer(Modifier.weight(1f))
+                     IconButton(onClick = { viewModel.nextChapter() }) {
+                         Text(">", style = MaterialTheme.typography.titleLarge)
+                     }
+                 }
              }
         }
+        
+         // Dialogs and Sheets (Overlay)
+         if (uiState.isLoading.not() && uiState.error == null) {
+             // ... (Keep existing dialog logic: Selection, Search, SettingsSheet)
+             if (showSelectionMenu && selectedText != null) {
+                  AlertDialog(
+                      onDismissRequest = { showSelectionMenu = false },
+                      title = { Text("Selected Text") },
+                      text = { Text(selectedText!!) },
+                      confirmButton = {
+                          TextButton(onClick = {
+                              viewModel.addHighlight(
+                                  uiState.currentChapterIndex,
+                                  selectedRange ?: "",
+                                  selectedText!!
+                              )
+                              showSelectionMenu = false
+                              webViewRef?.evaluateJavascript("highlightSelection('${selectedRange}', 'yellow');", null)
+                          }) {
+                              Text("Highlight")
+                          }
+                      },
+                      dismissButton = {
+                          TextButton(onClick = { showSelectionMenu = false }) {
+                              Text("Cancel")
+                          }
+                      }
+                  )
+             }
+             
+             if (showSearch) {
+                 SearchDialog(
+                     onDismiss = { showSearch = false; viewModel.clearSearch() },
+                     onSearch = { query -> viewModel.searchBook(query) },
+                     results = uiState.searchResults,
+                     isSearching = uiState.isSearching,
+                     onResultClick = { result ->
+                         showSearch = false
+                         // Todo: Navigation logic
+                     }
+                 )
+             }
+             
+             if (showSettings) {
+                 ModalBottomSheet(
+                     onDismissRequest = { showSettings = false },
+                     containerColor = MaterialTheme.colorScheme.surface
+                 ) {
+                      ReaderSettingsSheet(
+                          fontSize = uiState.fontSize,
+                          currentTheme = uiState.theme,
+                          fontFamily = uiState.fontFamily,
+                          lineHeight = uiState.lineHeight,
+                          margin = uiState.margin,
+                          onFontSizeChanged = viewModel::setFontSize,
+                          onThemeChanged = viewModel::setTheme,
+                          onFontFamilyChanged = viewModel::setFontFamily,
+                          onLineHeightChanged = viewModel::setLineHeight,
+                          onMarginChanged = viewModel::setMargin,
+                          isVerticalScroll = uiState.isVerticalScroll,
+                          onScrollModeChanged = viewModel::setScrollMode
+                      )
+                  }
+              }
+         }
     }
 }
 
 private fun injectStyles(webView: WebView, state: ReaderUiState) {
     val marginVal = if (state.margin == 0) "10px" else "${state.margin}rem"
+    
+    val css = if (state.isVerticalScroll) {
+        // Vertical Scroll Mode
+        """
+        document.body.style.height = 'auto';
+        document.body.style.overflowY = 'scroll';
+        document.body.style.overflowX = 'hidden';
+        document.body.style.columnWidth = 'auto';
+        document.body.style.columnGap = 'normal';
+        document.documentElement.style.scrollBehavior = 'smooth';
+        """
+    } else {
+        // Horizontal Pagination Mode (CSS Columns)
+        """
+        document.body.style.height = '100vh';
+        document.body.style.overflowY = 'hidden';
+        document.body.style.overflowX = 'hidden'; // Hide scrollbar, scroll via JS
+        document.body.style.columnWidth = '100vw';
+        document.body.style.columnGap = '100px'; // Gap between columns off-screen
+        """
+    }
+
     val js = """
+        $css
         document.body.style.fontSize = '${state.fontSize}%';
         document.body.style.backgroundColor = '${state.theme.backgroundColor}';
         document.body.style.color = '${state.theme.textColor}';
@@ -316,6 +408,12 @@ private fun injectStyles(webView: WebView, state: ReaderUiState) {
         document.body.style.maxWidth = '100%';
         document.body.style.padding = '0 10px';
         document.body.style.fontFamily = '${state.fontFamily}, serif';
+        document.body.style.padding = '0 10px';
+        document.body.style.fontFamily = '${state.fontFamily}, serif';
+        
+        var style = document.createElement('style');
+        style.innerHTML = '.smil-active { background-color: #fff176 !important; color: black !important; border-radius: 4px; box-shadow: 0 0 4px #fff176; }';
+        document.head.appendChild(style);
     """.trimIndent()
     webView.evaluateJavascript(js, null)
 }
@@ -331,6 +429,23 @@ private fun injectSelectionScript(webView: WebView) {
                  Android.onSelection(selection.toString(), "range_placeholder");
             }
         });
+        
+        
+        var currentActiveId = null;
+        
+        function applySmilHighlight(id) {
+            if (currentActiveId) {
+                 var oldEl = document.getElementById(currentActiveId);
+                 if (oldEl) oldEl.classList.remove('smil-active');
+            }
+            
+            var el = document.getElementById(id);
+            if (el) {
+                el.classList.add('smil-active');
+                el.scrollIntoView({behavior: "smooth", block: "center"});
+                currentActiveId = id;
+            }
+        }
         
         function highlightSelection(rangeId, color) {
              var selection = window.getSelection();
@@ -429,7 +544,9 @@ fun ReaderSettingsSheet(
     onThemeChanged: (ReaderTheme) -> Unit,
     onFontFamilyChanged: (String) -> Unit,
     onLineHeightChanged: (Float) -> Unit,
-    onMarginChanged: (Int) -> Unit
+    onMarginChanged: (Int) -> Unit,
+    isVerticalScroll: Boolean,
+    onScrollModeChanged: (Boolean) -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -502,15 +619,7 @@ fun ReaderSettingsSheet(
             }
         }
         
-        HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
 
-        // Font Size
-        Text("Size: $fontSize%", style = MaterialTheme.typography.titleMedium)
-        Slider(
-            value = fontSize.toFloat(),
-            onValueChange = { onFontSizeChanged(it.toInt()) },
-            valueRange = 50f..200f
-        )
         
         // Line Height
         Text("Line Height: ${String.format("%.1f", lineHeight)}", style = MaterialTheme.typography.titleMedium)
@@ -528,6 +637,26 @@ fun ReaderSettingsSheet(
             valueRange = 0f..10f,
             steps = 9
         )
+        
+        Spacer(modifier = Modifier.height(24.dp))
+        
+        // Scroll Mode Toggle
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("Scroll Mode", style = MaterialTheme.typography.titleMedium)
+            
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(if (isVerticalScroll) "Vertical" else "Pagination")
+                Spacer(modifier = Modifier.width(8.dp))
+                Switch(
+                    checked = isVerticalScroll,
+                    onCheckedChange = { onScrollModeChanged(it) }
+                )
+            }
+        }
         
         Spacer(modifier = Modifier.height(32.dp)) // Padding for bottom nav bar
     }

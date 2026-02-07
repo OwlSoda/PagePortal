@@ -66,10 +66,11 @@ fun MiniPlayerBar(
     AnimatedVisibility(
         visible = isVisible,
         enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
-        exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
+        exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
+        modifier = modifier
     ) {
         Surface(
-            modifier = modifier
+            modifier = Modifier
                 .fillMaxWidth()
                 .padding(8.dp)
                 .height(72.dp)

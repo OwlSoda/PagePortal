@@ -110,6 +110,10 @@ class ServiceManager @Inject constructor(
         services[serverId] = service
         return service
     }
+
+    suspend fun getServiceEntity(serverId: Long): ServerEntity? {
+        return serverDao.getServerById(serverId)
+    }
     
     /**
      * Get all books from all active servers.
@@ -188,6 +192,7 @@ class ServiceManager @Inject constructor(
             ServiceType.STORYTELLER -> com.owlsoda.pageportal.services.storyteller.StorytellerService(okHttpClient)
             ServiceType.AUDIOBOOKSHELF -> com.owlsoda.pageportal.services.audiobookshelf.AudiobookshelfService(serverUrl, okHttpClient)
             ServiceType.BOOKLORE -> com.owlsoda.pageportal.services.booklore.BookloreService(okHttpClient)
+            ServiceType.LOCAL -> com.owlsoda.pageportal.services.local.LocalService()
         }
     }
 }

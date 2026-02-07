@@ -98,7 +98,8 @@ class LibraryViewModel @Inject constructor(
     private val preferencesRepository: PreferencesRepository,
     private val serviceManager: ServiceManager,
     private val libraryRepository: com.owlsoda.pageportal.data.repository.LibraryRepository,
-    private val downloadRepository: com.owlsoda.pageportal.data.repository.DownloadRepository
+    private val downloadRepository: com.owlsoda.pageportal.data.repository.DownloadRepository,
+    private val localBookImporter: com.owlsoda.pageportal.data.importer.LocalBookImporter
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(LibraryUiState(isLoading = true))
@@ -304,7 +305,7 @@ class LibraryViewModel @Inject constructor(
             
             tabs.add(ServerTab(
                 id = server.id,
-                name = server.displayName ?: server.serviceType,
+                name = server.displayName,
                 serviceType = sType,
                 isConnected = true,
                 bookCount = count
@@ -393,16 +394,16 @@ class LibraryViewModel @Inject constructor(
             result = result.filter { it.isDownloaded }
         }
         
-        if (state.filterHasAudiobook) {
-            result = result.filter { it.hasAudiobook }
-        }
+        // If any format filter is active, we filter by the union of selected formats.
+        // If no format filter is active, we show all formats.
+        val hasFormatFilter = state.filterHasAudiobook || state.filterHasEbook || state.filterHasReadAloud
         
-        if (state.filterHasEbook) {
-            result = result.filter { it.hasEbook }
-        }
-        
-        if (state.filterHasReadAloud) {
-            result = result.filter { it.hasReadAloud }
+        if (hasFormatFilter) {
+            result = result.filter { book ->
+                (state.filterHasAudiobook && book.hasAudiobook) ||
+                (state.filterHasEbook && book.hasEbook) ||
+                (state.filterHasReadAloud && book.hasReadAloud)
+            }
         }
         
         return result
@@ -439,6 +440,19 @@ class LibraryViewModel @Inject constructor(
             lower.startsWith("a ") -> lower.removePrefix("a ")
             lower.startsWith("an ") -> lower.removePrefix("an ")
             else -> lower
+        }
+    }
+
+    fun importBook(uri: android.net.Uri) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true) }
+            val result = localBookImporter.importBook(uri)
+            if (result.isSuccess) {
+                // Refresh list handling is automatic via Flow, but we might want to trigger a "server" refresh or just wait for DB emission
+                _uiState.update { it.copy(isLoading = false) }
+            } else {
+                _uiState.update { it.copy(isLoading = false, error = "Import failed: ${result.exceptionOrNull()?.message}") }
+            }
         }
     }
 }

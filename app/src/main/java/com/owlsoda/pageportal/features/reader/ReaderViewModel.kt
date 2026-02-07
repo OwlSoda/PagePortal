@@ -8,7 +8,7 @@ import com.owlsoda.pageportal.core.database.dao.ProgressDao
 import com.owlsoda.pageportal.core.database.dao.ServerDao
 import com.owlsoda.pageportal.core.database.entity.HighlightEntity
 import com.owlsoda.pageportal.data.preferences.PreferencesRepository
-import com.owlsoda.pageportal.download.DownloadService
+import com.owlsoda.pageportal.data.repository.DownloadRepository
 import com.owlsoda.pageportal.reader.epub.EpubBook
 import com.owlsoda.pageportal.reader.epub.EpubParser
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -22,6 +22,15 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.InputStream
 import javax.inject.Inject
+import androidx.media3.common.MediaItem
+import androidx.media3.common.Player
+import androidx.media3.exoplayer.ExoPlayer
+import com.owlsoda.pageportal.reader.epub.SmilData
+import com.owlsoda.pageportal.reader.epub.SmilPar
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.isActive
+import java.net.URLDecoder
 
 data class SearchResult(
     val chapterIndex: Int,
@@ -43,12 +52,22 @@ data class ReaderUiState(
     val margin: Int = 1,
     val highlights: List<HighlightEntity> = emptyList(),
     val searchResults: List<SearchResult> = emptyList(),
-    val isSearching: Boolean = false
+    val isSearching: Boolean = false,
+    val isVerticalScroll: Boolean = true,
+
+    val pdfFile: File? = null,
+    // ReadAloud State
+    val isReadAloudAvailable: Boolean = false,
+    val isPlayingAudio: Boolean = false,
+    val activeSmilHighlightId: String? = null, // The text ID to highlight
+    val playbackSpeed: Float = 1.0f,
+    val debugLog: String = ""
 )
 
 enum class ReaderTheme(val backgroundColor: String, val textColor: String) {
     LIGHT("#FFFFFF", "#000000"),
     DARK("#121212", "#E0E0E0"),
+    AMOLED("#000000", "#FFFFFF"),
     SEPIA("#F4ECD8", "#5B4636");
     
     companion object {
@@ -83,7 +102,15 @@ class ReaderViewModel @Inject constructor(
     private val parser = EpubParser()
     private var currentBookId: Long? = null
     
-    fun loadBook(bookId: String, context: android.content.Context) {
+    // Audio Player
+    private var exoPlayer: ExoPlayer? = null
+    private var syncTickerJob: Job? = null
+    private var appContext: android.content.Context? = null
+    
+    // Cache for extracted audio files
+    private var audioCacheDir: File? = null
+    
+    fun loadBook(bookId: String, context: android.content.Context, preferReadAloud: Boolean = false) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
             
@@ -101,61 +128,281 @@ class ReaderViewModel @Inject constructor(
                 return@launch
             }
             
-            // Get server to determine service type
-            val server = serverDao.getServerById(bookEntity.serverId)
-            if (server == null) {
-                _uiState.value = _uiState.value.copy(isLoading = false, error = "Server not found for this book")
-                return@launch
+            // 1. Check if we have a direct local path (e.g. from Import)
+            if (!bookEntity.localFilePath.isNullOrBlank()) {
+                val file = File(bookEntity.localFilePath!!)
+                if (file.exists()) {
+                    parseAndLoad(file, id)
+                    
+                    // Initialize audio context
+                    appContext = context.applicationContext
+                    return@launch
+                }
             }
             
-            // Match DownloadService pattern: downloads/{serviceType}/{title}.bin
-            val baseDir = context.getExternalFilesDir(null) ?: context.filesDir
-            val serviceTypeName = server.serviceType.lowercase()
-            val fileName = "${bookEntity.title}.bin"
-            val file = File(baseDir, "downloads/$serviceTypeName/$fileName")
+            // 2. Fallback to standard download location
+            val baseDir = context.filesDir
+            var file: File? = null
             
-            if (!file.exists()) {
-                 _uiState.value = _uiState.value.copy(isLoading = false, error = "Book not downloaded. Please download it first from the book details page.")
+            // If preferReadAloud, try that first
+            if (preferReadAloud) {
+                val raFile = com.owlsoda.pageportal.util.DownloadUtils.getFilePath(
+                    baseDir, bookEntity, com.owlsoda.pageportal.util.DownloadUtils.DownloadFormat.READALOUD
+                )
+                if (raFile.exists()) file = raFile
+            }
+            
+            // Then EBOOK
+            if (file == null) {
+                 val ebookFile = com.owlsoda.pageportal.util.DownloadUtils.getFilePath(
+                    baseDir, bookEntity, com.owlsoda.pageportal.util.DownloadUtils.DownloadFormat.EBOOK
+                )
+                if (ebookFile.exists()) file = ebookFile
+            }
+            
+            // Then try ReadAloud if we didn't check it yet
+            if (file == null && !preferReadAloud) {
+                 val raFile = com.owlsoda.pageportal.util.DownloadUtils.getFilePath(
+                    baseDir, bookEntity, com.owlsoda.pageportal.util.DownloadUtils.DownloadFormat.READALOUD
+                )
+                if (raFile.exists()) file = raFile
+            }
+            
+            // Fallback: PDF
+            if (file == null) {
+                 val pdfFile = com.owlsoda.pageportal.util.DownloadUtils.getFilePath(
+                    baseDir, 
+                    bookEntity, 
+                    com.owlsoda.pageportal.util.DownloadUtils.DownloadFormat.PDF
+                )
+                if (pdfFile.exists()) {
+                    _uiState.value = _uiState.value.copy(
+                         pdfFile = pdfFile,
+                         isLoading = false
+                    )
+                     // Load saved progress
+                     val progress = progressDao.getProgressByBookId(id)
+                     if (progress != null) {
+                         _uiState.update { it.copy(currentChapterIndex = progress.currentChapter) }
+                     }
+                    return@launch
+                }
+            }
+            
+            if (file == null || !file.exists()) {
+                 // Try legacy/fallback location if any
+                 val server = serverDao.getServerById(bookEntity.serverId.toLong())
+                 if (server != null) {
+                     val serviceTypeName = server.serviceType.lowercase()
+                     val fileName = "${bookEntity.title}.bin"
+                     val legacyFile = File(baseDir, "downloads/$serviceTypeName/$fileName")
+                     if (legacyFile.exists()) {
+                         file = legacyFile
+                     }
+                 }
+            }
+            
+            if (file == null || !file.exists()) {
+                 _uiState.value = _uiState.value.copy(isLoading = false, error = "Book file not found. Please download, import, or fix the file path.")
                  return@launch
             }
             
-            val result = parser.parse(file)
+            val validFile = file!!
+            parseAndLoad(validFile, id)
             
-            result.fold(
-                onSuccess = { epubBook ->
-                     _uiState.value = _uiState.value.copy(
-                         book = epubBook,
-                         isLoading = false
-                     )
-                     // Load saved progress
-                     viewModelScope.launch {
-                         val progress = progressDao.getProgressByBookId(id)
-                         if (progress != null) {
-                             _uiState.update { it.copy(currentChapterIndex = progress.currentChapter) }
-                             // Note: granular scroll restoration would require injecting JS after onPageFinished
+            // Initialize audio context
+            appContext = context.applicationContext
+            
+            // Auto-play if requested and available
+            if (preferReadAloud) {
+                if (_uiState.value.isReadAloudAvailable) {
+                     delay(500) // Small buffer
+                     toggleAudioPlay()
+                }
+            }
+        }
+    }
+
+    // ... (rest of loadBook)
+
+    private suspend fun parseAndLoad(file: File, bookId: Long) {
+        val result = parser.parse(file)
+        
+        result.fold(
+            onSuccess = { epubBook ->
+                 val hasAudio = epubBook.hasMediaOverlays
+                 _uiState.value = _uiState.value.copy(
+                     book = epubBook,
+                     isLoading = false,
+                     isReadAloudAvailable = hasAudio
+                 )
+                 
+                 // Load saved progress
+                 val progress = progressDao.getProgressByBookId(bookId)
+                 if (progress != null) {
+                     val safeIndex = progress.currentChapter.coerceAtLeast(0)
+                     _uiState.update { it.copy(currentChapterIndex = safeIndex) }
+                 }
+                 
+                 if (hasAudio) {
+                     prepareReadAloudFiles(file, bookId)
+                 }
+            },
+            onFailure = { error ->
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    error = "Failed to parse EPUB: ${error.message}"
+                )
+            }
+        )
+    }
+
+    private suspend fun prepareReadAloudFiles(epubFile: File, bookId: Long) {
+        // We reuse the cache structure from ReadAloudPlayerViewModel
+        // This ensures shared cache if user plays via different screens
+        val cacheDir = File(appContext?.cacheDir, "readaloud/$bookId")
+        audioCacheDir = cacheDir
+        
+        if (!cacheDir.exists() || cacheDir.listFiles()?.isEmpty() == true) {
+             withContext(Dispatchers.IO) {
+                 try {
+                     com.owlsoda.pageportal.util.DownloadUtils.unzipFile(epubFile, cacheDir)
+                 } catch (e: Exception) {
+                     e.printStackTrace()
+                 }
+             }
+        }
+        
+        // Initialize player if not already
+        if (exoPlayer == null && appContext != null) {
+            withContext(Dispatchers.Main) {
+                initializePlayer(appContext!!)
+            }
+        }
+        
+        // Load initial track
+        loadAudioForChapter(_uiState.value.currentChapterIndex)
+    }
+
+    private fun initializePlayer(context: android.content.Context) {
+        exoPlayer = ExoPlayer.Builder(context).build().apply {
+            addListener(object : Player.Listener {
+                override fun onIsPlayingChanged(isPlaying: Boolean) {
+                    _uiState.update { it.copy(isPlayingAudio = isPlaying) }
+                    if (isPlaying) startSyncTicker() else stopSyncTicker()
+                }
+                
+                override fun onPlaybackStateChanged(playbackState: Int) {
+                     if (playbackState == Player.STATE_ENDED) {
+                         // Auto-advance chapter?
+                         if (_uiState.value.isPlayingAudio) {
+                             nextChapter()
                          }
                      }
-                },
-                onFailure = { error ->
-                    _uiState.value = _uiState.value.copy(
-                        isLoading = false,
-                        error = "Failed to parse EPUB: ${error.message}"
-                    )
                 }
-            )
+            })
+        }
+    }
+    
+    private fun loadAudioForChapter(chapterIndex: Int, autoPlay: Boolean = false) {
+        val book = _uiState.value.book ?: return
+        val chapter = book.chapters.getOrNull(chapterIndex) ?: return
+        val smilData = book.smilData[chapter.id] ?: return
+        
+        // We assume the SMIL has ONE audio file reference for simplicity, 
+        // or we take the first one. 
+        // In complex SMIL, multiple audio files map to one text.
+        // But usually it's 1-to-1 per chapter.
+        
+        val firstPar = smilData.parList.firstOrNull() ?: return
+        val audioPath = firstPar.audioSrc // Relative path in zip, e.g. "audio/01.mp3"
+        
+        // Resolve absolute path in cache
+        val audioFile = File(audioCacheDir, audioPath)
+        val canonicalFile = audioFile.canonicalFile
+        
+        appendLog("Audio: Resolving $audioPath -> ${canonicalFile.path}. Exists: ${canonicalFile.exists()}")
+        
+        if (canonicalFile.exists()) {
+             val mediaItem = MediaItem.fromUri(canonicalFile.path)
+             exoPlayer?.let { player ->
+                 player.setMediaItem(mediaItem)
+                 player.prepare()
+                 if (autoPlay) player.play()
+             }
+        } else {
+             appendLog("Audio file missing!")
+        }
+    }
+    
+    private fun appendLog(msg: String) {
+        _uiState.update { it.copy(debugLog = it.debugLog + "\n" + msg) }
+    }
+    
+    private fun startSyncTicker() {
+        syncTickerJob?.cancel()
+        syncTickerJob = viewModelScope.launch {
+             while (isActive) {
+                 exoPlayer?.let { player ->
+                     if (player.isPlaying) {
+                         val currentPosSeconds = player.currentPosition / 1000.0
+                         updateHighlight(currentPosSeconds)
+                     }
+                 }
+                 delay(100) // 10Hz update
+             }
+        }
+    }
+    
+    private fun stopSyncTicker() {
+        syncTickerJob?.cancel()
+    }
+    
+    private fun updateHighlight(time: Double) {
+        val book = _uiState.value.book ?: return
+        val chapter = book.chapters.getOrNull(_uiState.value.currentChapterIndex) ?: return
+        val smilData = book.smilData[chapter.id] ?: return
+        
+        // Find matching par
+        // Optimization: Could cache last index and search forward
+        val match = smilData.parList.find { par ->
+             time >= par.clipBegin && time < par.clipEnd
+        }
+        
+        if (match != null) {
+            // Extract ID from textSrc ("file.xhtml#para1" -> "para1")
+            val id = match.textSrc.substringAfter("#", "")
+            if (id.isNotEmpty() && id != _uiState.value.activeSmilHighlightId) {
+                _uiState.update { it.copy(activeSmilHighlightId = id) }
+            }
+        }
+    }
+    
+    fun toggleAudioPlay() {
+        exoPlayer?.let {
+            if (it.isPlaying) it.pause() else it.play()
         }
     }
 
     private fun observePreferences() {
         viewModelScope.launch {
             kotlinx.coroutines.flow.combine(
-                preferencesRepository.readerFontSize,
-                preferencesRepository.readerTheme,
-                preferencesRepository.readerFontFamily,
-                preferencesRepository.readerLineHeight,
-                preferencesRepository.readerMargin
-            ) { size, theme, family, height, margin ->
-                ReaderPreferences(size, theme, family, height, margin)
+                kotlinx.coroutines.flow.combine(
+                    preferencesRepository.readerFontSize,
+                    preferencesRepository.readerTheme,
+                    preferencesRepository.readerFontFamily
+                ) { size, theme, family ->
+                    Triple(size, theme, family)
+                },
+                kotlinx.coroutines.flow.combine(
+                    preferencesRepository.readerLineHeight,
+                    preferencesRepository.readerMargin,
+                    preferencesRepository.readerVerticalScroll
+                ) { height, margin, vertical ->
+                     Triple(height, margin, vertical)
+                }
+            ) { (size, theme, family), (height, margin, vertical) ->
+                ReaderPreferences(size, theme, family, height, margin, vertical)
             }.collect { prefs ->
                 _uiState.update { 
                     it.copy(
@@ -163,7 +410,8 @@ class ReaderViewModel @Inject constructor(
                         theme = ReaderTheme.fromString(prefs.theme),
                         fontFamily = prefs.fontFamily,
                         lineHeight = prefs.lineHeight,
-                        margin = prefs.margin
+                        margin = prefs.margin,
+                        isVerticalScroll = prefs.isVerticalScroll
                     ) 
                 }
             }
@@ -175,7 +423,8 @@ class ReaderViewModel @Inject constructor(
         val theme: String,
         val fontFamily: String,
         val lineHeight: Float,
-        val margin: Int
+        val margin: Int,
+        val isVerticalScroll: Boolean
     )
 
     private fun loadHighlights(bookId: Long) {
@@ -271,7 +520,12 @@ class ReaderViewModel @Inject constructor(
         val book = _uiState.value.book ?: return null
         
         // Remove localhost base
-        val path = url.removePrefix("http://localhost/")
+        var path = url.removePrefix("http://localhost/")
+        try {
+            path = URLDecoder.decode(path, "UTF-8")
+        } catch (e: Exception) {
+            // ignore
+        }
         
         // If path matches a chapter href, we get that.
         // But internal resources (css, images) in HTML might be relative.
@@ -289,13 +543,23 @@ class ReaderViewModel @Inject constructor(
         val currentState = _uiState.value
         val book = currentState.book ?: return
         if (currentState.currentChapterIndex < book.chapters.size - 1) {
-            _uiState.value = currentState.copy(currentChapterIndex = currentState.currentChapterIndex + 1)
+            val nextIndex = currentState.currentChapterIndex + 1
+            _uiState.value = currentState.copy(currentChapterIndex = nextIndex)
+            
+            if (currentState.isReadAloudAvailable) {
+                loadAudioForChapter(nextIndex, autoPlay = currentState.isPlayingAudio)
+            }
         }
     }
     
     fun previousChapter() {
         if (_uiState.value.currentChapterIndex > 0) {
-            _uiState.value = _uiState.value.copy(currentChapterIndex = _uiState.value.currentChapterIndex - 1)
+            val prevIndex = _uiState.value.currentChapterIndex - 1
+            _uiState.value = _uiState.value.copy(currentChapterIndex = prevIndex)
+            
+            if (_uiState.value.isReadAloudAvailable) {
+                loadAudioForChapter(prevIndex, autoPlay = _uiState.value.isPlayingAudio)
+            }
         }
     }
     
@@ -326,6 +590,12 @@ class ReaderViewModel @Inject constructor(
     fun setMargin(margin: Int) {
         viewModelScope.launch {
             preferencesRepository.setReaderMargin(margin)
+        }
+    }
+
+    fun setScrollMode(isVertical: Boolean) {
+        viewModelScope.launch {
+            preferencesRepository.setReaderVerticalScroll(isVertical)
         }
     }
 
@@ -372,5 +642,8 @@ class ReaderViewModel @Inject constructor(
             }
         }
         parser.close()
+        exoPlayer?.release()
+        exoPlayer = null
     }
+
 }
