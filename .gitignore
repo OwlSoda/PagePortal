@@ -19,6 +19,16 @@ local.properties
 
 # Log Files
 *.log
+*_log.txt
+*_log_*.txt
+logcat_*.txt
+build_*.txt
+debug_*.txt
+compile_*.txt
+install_*.txt
+final_log.txt
+reader_build_errors.txt
+build_errors*.txt
 
 # Android NDK
 obj/
