@@ -27,6 +27,10 @@ import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Sort
 import com.owlsoda.pageportal.features.library.SortOption
+import com.owlsoda.pageportal.ui.components.EmptyState
+import androidx.compose.material.icons.automirrored.filled.LibraryBooks
+import androidx.compose.material.icons.filled.PersonOff
+import androidx.compose.material.icons.filled.FolderOff
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -98,7 +102,11 @@ fun RecentPage(books: List<UnifiedBookDisplay>, onBookClick: (String) -> Unit) {
     val recent = books.sortedByDescending { it.id }.take(50) // Placeholder sort
     
     if (recent.isEmpty()) {
-        EmptyStateMessage("No books found")
+        EmptyState(
+            icon = Icons.AutoMirrored.Filled.LibraryBooks,
+            title = "No Recent Books",
+            message = "Recently added books will appear here."
+        )
         return
     }
 
@@ -117,7 +125,11 @@ fun RecentPage(books: List<UnifiedBookDisplay>, onBookClick: (String) -> Unit) {
 @Composable
 fun AllBooksPage(books: List<UnifiedBookDisplay>, onBookClick: (String) -> Unit) {
      if (books.isEmpty()) {
-        EmptyStateMessage("No books found")
+        EmptyState(
+            icon = Icons.AutoMirrored.Filled.LibraryBooks,
+            title = "No Books Found",
+            message = "This service has no books available."
+        )
         return
     }
     
@@ -138,7 +150,11 @@ fun AuthorsPage(books: List<UnifiedBookDisplay>, viewModel: LibraryViewModel) {
     val authors = remember(books) { books.map { it.authors }.distinct().sorted() }
     
     if (authors.isEmpty()) {
-        EmptyStateMessage("No authors found")
+        EmptyState(
+            icon = Icons.Filled.PersonOff,
+            title = "No Authors Found",
+            message = "Authors will appear here once books are synced."
+        )
         return
     }
 
@@ -168,7 +184,11 @@ fun SeriesPage(books: List<UnifiedBookDisplay>, viewModel: LibraryViewModel) {
     val seriesList = remember(books) { books.mapNotNull { it.series }.distinct().sorted() }
     
      if (seriesList.isEmpty()) {
-        EmptyStateMessage("No series found")
+        EmptyState(
+            icon = Icons.Filled.FolderOff,
+            title = "No Series Found",
+            message = "Series will appear here once books are synced."
+        )
         return
     }
 
@@ -190,9 +210,3 @@ fun SeriesPage(books: List<UnifiedBookDisplay>, viewModel: LibraryViewModel) {
     }
 }
 
-@Composable
-fun EmptyStateMessage(msg: String) {
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Text(msg, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
-}
