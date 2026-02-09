@@ -8,17 +8,15 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.FormatSize
-import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Remove
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -27,7 +25,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -71,6 +68,27 @@ fun ReaderScreen(
                 val url = "http://localhost/${uiState.book!!.basePath}${chapter.href}"
                 webViewRef?.loadUrl(url)
             }
+        }
+    }
+
+    // Effect to update highlight
+    LaunchedEffect(uiState.highlightedElementId, webViewRef) {
+        val id = uiState.highlightedElementId
+        if (id != null && webViewRef != null) {
+            val js = """
+                // Remove existing highlights
+                document.querySelectorAll('.highlight').forEach(el => el.classList.remove('highlight'));
+                // Add highlight to new element
+                var el = document.getElementById('$id');
+                if (el) {
+                    el.classList.add('highlight');
+                    el.scrollIntoView({behavior: "smooth", block: "center"});
+                }
+            """.trimIndent()
+            webViewRef?.evaluateJavascript(js, null)
+        } else if (id == null && webViewRef != null) {
+            // Clear highlight
+             webViewRef?.evaluateJavascript("document.querySelectorAll('.highlight').forEach(el => el.classList.remove('highlight'));", null)
         }
     }
 
@@ -143,14 +161,6 @@ fun ReaderScreen(
                                     }
                                 }
                             }
-                            // Return true allows WebView to handle scrolling, but we might steal taps. 
-                            // Returning false lets WebView handle it, but then we might miss custom taps.
-                            // For paginated webview (Play Books style), we usually disable scroll and use columns + clicks.
-                            // For V1 scrolling, we let WebView scroll.
-                            // We return false to allow scrolling, but true if we consumed the tap for controls?
-                            // This is tricky. For now, rely on a simpler overlay or let standard scroll happen.
-                            // Actually, standard WebView scrolling is good for V0.
-                            // We will use a dedicated Overlay Box for tap detection if we want custom navigation.
                             false 
                         }
                     }
@@ -159,12 +169,6 @@ fun ReaderScreen(
                     webViewRef = webView
                 }
             )
-            
-            // Tap Zone Overlay for better control (Center Toggle)
-            // We only overlay the center so scrolling still works on sides?
-            // Or we just use a floating menu button if gesture is hard.
-            // Let's stick to standard scrolling for now + Menu Button overlaid if needed, 
-            // OR use the Top/Bottom bars visibility logic tied to a specific area.
             
             // Controls
             AnimatedVisibility(
@@ -189,8 +193,11 @@ fun ReaderScreen(
                 ReaderBottomBar(
                     currentChapter = uiState.currentChapterIndex + 1,
                     totalChapters = uiState.book?.chapters?.size ?: 0,
+                    isPlaying = uiState.isPlaying,
+                    hasAudio = uiState.hasAudio,
                     onPrev = viewModel::previousChapter,
                     onNext = viewModel::nextChapter,
+                    onPlayPause = viewModel::toggleAudio,
                     onToggleControls = { showControls = false } // Hide button
                 )
             }
@@ -219,6 +226,14 @@ private fun injectStyles(webView: WebView, state: ReaderUiState) {
         document.body.style.color = '${state.theme.textColor}';
         document.body.style.lineHeight = '1.6';
         document.body.style.margin = '20px';
+
+        // Add highlight style if not exists
+        if (!document.getElementById('highlight-style')) {
+            var style = document.createElement('style');
+            style.id = 'highlight-style';
+            style.innerHTML = '.highlight { background-color: yellow; color: black; }';
+            document.head.appendChild(style);
+        }
     """.trimIndent()
     webView.evaluateJavascript(js, null)
 }
@@ -258,8 +273,11 @@ fun ReaderTopBar(
 fun ReaderBottomBar(
     currentChapter: Int,
     totalChapters: Int,
+    isPlaying: Boolean,
+    hasAudio: Boolean,
     onPrev: () -> Unit,
     onNext: () -> Unit,
+    onPlayPause: () -> Unit,
     onToggleControls: () -> Unit
 ) {
     Surface(
@@ -277,6 +295,18 @@ fun ReaderBottomBar(
                 Text("Previous")
             }
             
+            if (hasAudio) {
+                IconButton(onClick = onPlayPause) {
+                    Icon(
+                        imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                        contentDescription = if (isPlaying) "Pause" else "Play"
+                    )
+                }
+            } else {
+                // Placeholder for alignment
+                Spacer(modifier = Modifier.width(48.dp))
+            }
+
             Text(
                 text = "Chapter $currentChapter of $totalChapters",
                 style = MaterialTheme.typography.bodyMedium
