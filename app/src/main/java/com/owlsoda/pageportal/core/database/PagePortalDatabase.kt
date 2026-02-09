@@ -4,11 +4,13 @@ import androidx.room.Database
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 import com.owlsoda.pageportal.core.database.dao.BookDao
+import com.owlsoda.pageportal.core.database.dao.BookmarkDao
 import com.owlsoda.pageportal.core.database.dao.CollectionDao
 import com.owlsoda.pageportal.core.database.dao.ProgressDao
 import com.owlsoda.pageportal.core.database.dao.ServerDao
 import com.owlsoda.pageportal.core.database.dao.UnifiedBookDao
 import com.owlsoda.pageportal.core.database.entity.BookEntity
+import com.owlsoda.pageportal.core.database.entity.BookmarkEntity
 import com.owlsoda.pageportal.core.database.entity.CollectionEntity
 import com.owlsoda.pageportal.core.database.entity.ProgressEntity
 import com.owlsoda.pageportal.core.database.entity.ServerEntity
@@ -25,9 +27,10 @@ import com.owlsoda.pageportal.core.database.entity.UnifiedBookEntity
         ProgressEntity::class,
         com.owlsoda.pageportal.core.database.entity.UnifiedBookEntity::class,
         com.owlsoda.pageportal.core.database.entity.HighlightEntity::class,
-        CollectionEntity::class
+        CollectionEntity::class,
+        BookmarkEntity::class
     ],
-    version = 5,  // Incremented for Highlights
+    version = 6,  // Incremented for Bookmarks
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -38,4 +41,5 @@ abstract class PagePortalDatabase : RoomDatabase() {
     abstract fun unifiedBookDao(): com.owlsoda.pageportal.core.database.dao.UnifiedBookDao
     abstract fun highlightDao(): com.owlsoda.pageportal.core.database.dao.HighlightDao
     abstract fun collectionDao(): CollectionDao
+    abstract fun bookmarkDao(): BookmarkDao
 }

@@ -14,6 +14,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.first
 import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -39,6 +40,14 @@ class PreferencesRepository @Inject constructor(
         val READER_MARGIN = intPreferencesKey("reader_margin") // e.g. 2 (rem or %)
         val READER_THEME = stringPreferencesKey("reader_theme") // Light, Sepia, Dark, Black
         val READER_VERTICAL_SCROLL = booleanPreferencesKey("reader_vertical_scroll") // true = vertical, false = horizontal
+        val READER_TEXT_ALIGNMENT = stringPreferencesKey("reader_text_alignment") // "LEFT", "JUSTIFY", "CENTER"
+        val READER_PARAGRAPH_SPACING = floatPreferencesKey("reader_paragraph_spacing") // Scale factor
+        val READER_BRIGHTNESS = floatPreferencesKey("reader_brightness") // -1.0 = system, 0.0-1.0 = manual
+        
+        // Gesture Settings
+        val GESTURE_TAP_LEFT = stringPreferencesKey("gesture_tap_left") // "PREV", "NEXT", "MENU", "NONE"
+        val GESTURE_TAP_CENTER = stringPreferencesKey("gesture_tap_center")
+        val GESTURE_TAP_RIGHT = stringPreferencesKey("gesture_tap_right")
     }
 
     val isOfflineModeEnabled: Flow<Boolean> = context.dataStore.data
@@ -153,5 +162,127 @@ class PreferencesRepository @Inject constructor(
 
     suspend fun setReaderVerticalScroll(isVertical: Boolean) {
         context.dataStore.edit { it[PreferencesKeys.READER_VERTICAL_SCROLL] = isVertical }
+    }
+    
+    val readerTextAlignment: Flow<String> = context.dataStore.data
+        .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
+        .map { it[PreferencesKeys.READER_TEXT_ALIGNMENT] ?: "LEFT" }
+
+    suspend fun setReaderTextAlignment(alignment: String) {
+        context.dataStore.edit { it[PreferencesKeys.READER_TEXT_ALIGNMENT] = alignment }
+    }
+    
+    val readerParagraphSpacing: Flow<Float> = context.dataStore.data
+        .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
+        .map { it[PreferencesKeys.READER_PARAGRAPH_SPACING] ?: 1.0f }
+
+    suspend fun setReaderParagraphSpacing(spacing: Float) {
+        context.dataStore.edit { it[PreferencesKeys.READER_PARAGRAPH_SPACING] = spacing }
+    }
+    
+    val readerBrightness: Flow<Float> = context.dataStore.data
+        .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
+        .map { it[PreferencesKeys.READER_BRIGHTNESS] ?: -1.0f }
+
+    suspend fun setReaderBrightness(brightness: Float) {
+        context.dataStore.edit { it[PreferencesKeys.READER_BRIGHTNESS] = brightness }
+    }
+    
+    // Gesture Accessors
+    val gestureTapLeft: Flow<String> = context.dataStore.data
+        .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
+        .map { it[PreferencesKeys.GESTURE_TAP_LEFT] ?: "PREV" }
+
+    suspend fun setGestureTapLeft(action: String) {
+        context.dataStore.edit { it[PreferencesKeys.GESTURE_TAP_LEFT] = action }
+    }
+    
+    val gestureTapCenter: Flow<String> = context.dataStore.data
+        .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
+        .map { it[PreferencesKeys.GESTURE_TAP_CENTER] ?: "MENU" }
+
+    suspend fun setGestureTapCenter(action: String) {
+        context.dataStore.edit { it[PreferencesKeys.GESTURE_TAP_CENTER] = action }
+    }
+    
+    val gestureTapRight: Flow<String> = context.dataStore.data
+        .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
+        .map { it[PreferencesKeys.GESTURE_TAP_RIGHT] ?: "NEXT" }
+
+    suspend fun setGestureTapRight(action: String) {
+        context.dataStore.edit { it[PreferencesKeys.GESTURE_TAP_RIGHT] = action }
+    }
+
+    suspend fun getPreferencesBackup(): AppPreferencesBackup {
+        var backup = AppPreferencesBackup()
+        context.dataStore.data.collect { prefs ->
+            backup = AppPreferencesBackup(
+                offlineMode = prefs[PreferencesKeys.OFFLINE_MODE] ?: false,
+                themeMode = prefs[PreferencesKeys.THEME_MODE] ?: "SYSTEM",
+                playbackSpeed = prefs[PreferencesKeys.PLAYBACK_SPEED] ?: 1.0f,
+                sleepTimerMinutes = prefs[PreferencesKeys.SLEEP_TIMER_MINUTES] ?: 0,
+                gridMinWidth = prefs[PreferencesKeys.GRID_MIN_WIDTH] ?: 120,
+                readerFontFamily = prefs[PreferencesKeys.READER_FONT_FAMILY] ?: "Serif",
+                readerFontSize = prefs[PreferencesKeys.READER_FONT_SIZE] ?: 1.0f,
+                readerLineHeight = prefs[PreferencesKeys.READER_LINE_HEIGHT] ?: 1.5f,
+                readerMargin = prefs[PreferencesKeys.READER_MARGIN] ?: 1,
+                readerTheme = prefs[PreferencesKeys.READER_THEME] ?: "Sepia",
+                readerVerticalScroll = prefs[PreferencesKeys.READER_VERTICAL_SCROLL] ?: true,
+                readerTextAlignment = prefs[PreferencesKeys.READER_TEXT_ALIGNMENT] ?: "LEFT",
+                readerParagraphSpacing = prefs[PreferencesKeys.READER_PARAGRAPH_SPACING] ?: 1.0f,
+                readerBrightness = prefs[PreferencesKeys.READER_BRIGHTNESS] ?: -1.0f,
+                gestureTapLeft = prefs[PreferencesKeys.GESTURE_TAP_LEFT] ?: "PREV",
+                gestureTapCenter = prefs[PreferencesKeys.GESTURE_TAP_CENTER] ?: "MENU",
+                gestureTapRight = prefs[PreferencesKeys.GESTURE_TAP_RIGHT] ?: "NEXT"
+            )
+            throw kotlinx.coroutines.CancellationException("Backup collected") // Break collection
+        }
+        return backup
+    }
+
+    // Helper to get backup without exception trickery
+    suspend fun exportPreferences(): AppPreferencesBackup {
+        val prefs = context.dataStore.data.first()
+        return AppPreferencesBackup(
+            offlineMode = prefs[PreferencesKeys.OFFLINE_MODE] ?: false,
+            themeMode = prefs[PreferencesKeys.THEME_MODE] ?: "SYSTEM",
+            playbackSpeed = prefs[PreferencesKeys.PLAYBACK_SPEED] ?: 1.0f,
+            sleepTimerMinutes = prefs[PreferencesKeys.SLEEP_TIMER_MINUTES] ?: 0,
+            gridMinWidth = prefs[PreferencesKeys.GRID_MIN_WIDTH] ?: 120,
+            readerFontFamily = prefs[PreferencesKeys.READER_FONT_FAMILY] ?: "Serif",
+            readerFontSize = prefs[PreferencesKeys.READER_FONT_SIZE] ?: 1.0f,
+            readerLineHeight = prefs[PreferencesKeys.READER_LINE_HEIGHT] ?: 1.5f,
+            readerMargin = prefs[PreferencesKeys.READER_MARGIN] ?: 1,
+            readerTheme = prefs[PreferencesKeys.READER_THEME] ?: "Sepia",
+            readerVerticalScroll = prefs[PreferencesKeys.READER_VERTICAL_SCROLL] ?: true,
+            readerTextAlignment = prefs[PreferencesKeys.READER_TEXT_ALIGNMENT] ?: "LEFT",
+            readerParagraphSpacing = prefs[PreferencesKeys.READER_PARAGRAPH_SPACING] ?: 1.0f,
+            readerBrightness = prefs[PreferencesKeys.READER_BRIGHTNESS] ?: -1.0f,
+            gestureTapLeft = prefs[PreferencesKeys.GESTURE_TAP_LEFT] ?: "PREV",
+            gestureTapCenter = prefs[PreferencesKeys.GESTURE_TAP_CENTER] ?: "MENU",
+            gestureTapRight = prefs[PreferencesKeys.GESTURE_TAP_RIGHT] ?: "NEXT"
+        )
+    }
+
+    suspend fun importPreferences(backup: AppPreferencesBackup) {
+        context.dataStore.edit { prefs ->
+            prefs[PreferencesKeys.OFFLINE_MODE] = backup.offlineMode
+            prefs[PreferencesKeys.THEME_MODE] = backup.themeMode
+            prefs[PreferencesKeys.PLAYBACK_SPEED] = backup.playbackSpeed
+            prefs[PreferencesKeys.SLEEP_TIMER_MINUTES] = backup.sleepTimerMinutes
+            prefs[PreferencesKeys.GRID_MIN_WIDTH] = backup.gridMinWidth
+            prefs[PreferencesKeys.READER_FONT_FAMILY] = backup.readerFontFamily
+            prefs[PreferencesKeys.READER_FONT_SIZE] = backup.readerFontSize
+            prefs[PreferencesKeys.READER_LINE_HEIGHT] = backup.readerLineHeight
+            prefs[PreferencesKeys.READER_MARGIN] = backup.readerMargin
+            prefs[PreferencesKeys.READER_THEME] = backup.readerTheme
+            prefs[PreferencesKeys.READER_VERTICAL_SCROLL] = backup.readerVerticalScroll
+            prefs[PreferencesKeys.READER_TEXT_ALIGNMENT] = backup.readerTextAlignment
+            prefs[PreferencesKeys.READER_PARAGRAPH_SPACING] = backup.readerParagraphSpacing
+            prefs[PreferencesKeys.READER_BRIGHTNESS] = backup.readerBrightness
+            prefs[PreferencesKeys.GESTURE_TAP_LEFT] = backup.gestureTapLeft
+            prefs[PreferencesKeys.GESTURE_TAP_CENTER] = backup.gestureTapCenter
+            prefs[PreferencesKeys.GESTURE_TAP_RIGHT] = backup.gestureTapRight
+        }
     }
 }

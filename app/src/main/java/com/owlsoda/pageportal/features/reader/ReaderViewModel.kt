@@ -27,6 +27,8 @@ import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import com.owlsoda.pageportal.reader.epub.SmilData
 import com.owlsoda.pageportal.reader.epub.SmilPar
+import com.owlsoda.pageportal.reader.epub.SmilSynchronizer
+import com.owlsoda.pageportal.reader.audio.AudioEqualizerManager
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.isActive
@@ -54,6 +56,13 @@ data class ReaderUiState(
     val searchResults: List<SearchResult> = emptyList(),
     val isSearching: Boolean = false,
     val isVerticalScroll: Boolean = true,
+    val textAlignment: String = "LEFT",
+    val paragraphSpacing: Float = 1.0f,
+    val brightness: Float = -1.0f,
+    
+    val gestureTapLeft: String = "PREV",
+    val gestureTapCenter: String = "MENU",
+    val gestureTapRight: String = "NEXT",
 
     val pdfFile: File? = null,
     // ReadAloud State
@@ -61,6 +70,10 @@ data class ReaderUiState(
     val isPlayingAudio: Boolean = false,
     val activeSmilHighlightId: String? = null, // The text ID to highlight
     val playbackSpeed: Float = 1.0f,
+    val sleepTimerMinutes: Int = 0,
+    val sleepTimerRemaining: Long = 0, // Seconds remaining
+    val skipSilenceEnabled: Boolean = false,
+    val currentEqualizerPreset: String = "Spoken Word",  // Active EQ preset
     val debugLog: String = ""
 )
 
@@ -87,6 +100,7 @@ class ReaderViewModel @Inject constructor(
     private val progressDao: ProgressDao,
     private val serverDao: ServerDao,
     private val highlightDao: HighlightDao,
+    private val bookmarkDao: com.owlsoda.pageportal.core.database.dao.BookmarkDao,
     private val preferencesRepository: PreferencesRepository,
     private val libraryRepository: com.owlsoda.pageportal.data.repository.LibraryRepository
 ) : ViewModel() {
@@ -106,6 +120,16 @@ class ReaderViewModel @Inject constructor(
     private var exoPlayer: ExoPlayer? = null
     private var syncTickerJob: Job? = null
     private var appContext: android.content.Context? = null
+    
+    // SMIL Synchronization
+    private var smilSynchronizer: SmilSynchronizer? = null
+    private var currentChapterId: String? = null
+    
+    // Auto-rewind
+    private var lastPausePosition: Long? = null
+    
+    // Audio Equalizer
+    private var equalizerManager: AudioEqualizerManager? = null
     
     // Cache for extracted audio files
     private var audioCacheDir: File? = null
@@ -285,7 +309,9 @@ class ReaderViewModel @Inject constructor(
     }
 
     private fun initializePlayer(context: android.content.Context) {
+        android.util.Log.d("ReaderViewModel", "initializePlayer: Creating ExoPlayer...")
         exoPlayer = ExoPlayer.Builder(context).build().apply {
+            android.util.Log.d("ReaderViewModel", "ExoPlayer created, audio session ID: $audioSessionId")
             addListener(object : Player.Listener {
                 override fun onIsPlayingChanged(isPlaying: Boolean) {
                     _uiState.update { it.copy(isPlayingAudio = isPlaying) }
@@ -302,12 +328,37 @@ class ReaderViewModel @Inject constructor(
                 }
             })
         }
+        
+        // Initialize equalizer
+        exoPlayer?.let { player ->
+            equalizerManager = AudioEqualizerManager(player.audioSessionId).apply {
+                initialize()
+                applyPreset("Spoken Word")
+            }
+        }
     }
     
     private fun loadAudioForChapter(chapterIndex: Int, autoPlay: Boolean = false) {
         val book = _uiState.value.book ?: return
         val chapter = book.chapters.getOrNull(chapterIndex) ?: return
         val smilData = book.smilData[chapter.id] ?: return
+        
+        // Initialize SmilSynchronizer for this chapter
+        currentChapterId = chapter.id
+        smilSynchronizer = SmilSynchronizer(
+            smilData = smilData,
+            onHighlight = { fragmentId, chapterHref ->
+                // Update UI state with highlighted fragment
+                if (fragmentId != _uiState.value.activeSmilHighlightId) {
+                    _uiState.update { it.copy(activeSmilHighlightId = fragmentId) }
+                    appendLog("Highlight: $fragmentId in $chapterHref")
+                }
+            },
+            onChapterChange = { newChapterHref, fragmentId ->
+                // Handle chapter boundary crossing (future enhancement)
+                appendLog("Chapter change needed: $newChapterHref#$fragmentId")
+            }
+        )
         
         // We assume the SMIL has ONE audio file reference for simplicity, 
         // or we take the first one. 
@@ -359,72 +410,189 @@ class ReaderViewModel @Inject constructor(
     }
     
     private fun updateHighlight(time: Double) {
-        val book = _uiState.value.book ?: return
-        val chapter = book.chapters.getOrNull(_uiState.value.currentChapterIndex) ?: return
-        val smilData = book.smilData[chapter.id] ?: return
-        
-        // Find matching par
-        // Optimization: Could cache last index and search forward
-        val match = smilData.parList.find { par ->
-             time >= par.clipBegin && time < par.clipEnd
-        }
-        
-        if (match != null) {
-            // Extract ID from textSrc ("file.xhtml#para1" -> "para1")
-            val id = match.textSrc.substringAfter("#", "")
-            if (id.isNotEmpty() && id != _uiState.value.activeSmilHighlightId) {
-                _uiState.update { it.copy(activeSmilHighlightId = id) }
-            }
-        }
+        // Use SmilSynchronizer for efficient position tracking
+        smilSynchronizer?.updatePlaybackPosition((time * 1000).toLong())
+        // Note: The highlight update is handled by the synchronizer's callback
+        // which updates _uiState.activeSmilHighlightId
     }
     
     fun toggleAudioPlay() {
+        android.util.Log.d("ReaderViewModel", "toggleAudioPlay called")
+        
+        // Lazy initialization if player is missing
+        if (exoPlayer == null) {
+             android.util.Log.d("ReaderViewModel", "exoPlayer is null, attempting lazy initialization...")
+             if (appContext != null) {
+                 initializePlayer(appContext!!)
+                 // Try to load audio for current chapter
+                 loadAudioForChapter(_uiState.value.currentChapterIndex, autoPlay = true)
+             } else {
+                 android.util.Log.e("ReaderViewModel", "Cannot initialize player: context is null")
+             }
+             return
+        }
+
+        exoPlayer?.let { player ->
+            android.util.Log.d("ReaderViewModel", "ExoPlayer exists, isPlaying = ${player.isPlaying}")
+            if (player.isPlaying) {
+                // Pause and remember position
+                player.pause()
+                lastPausePosition = player.currentPosition
+                android.util.Log.d("ReaderViewModel", "Paused at position $lastPausePosition")
+            } else {
+                // Check if we have media
+                if (player.duration == androidx.media3.common.C.TIME_UNSET || player.duration <= 0) {
+                     android.util.Log.d("ReaderViewModel", "Player has no media, loading info for chapter ${_uiState.value.currentChapterIndex}")
+                     loadAudioForChapter(_uiState.value.currentChapterIndex, autoPlay = true)
+                     return@let
+                }
+
+                // Auto-rewind 5 seconds on resume
+                if (lastPausePosition != null) {
+                    val rewindPosition = (lastPausePosition!! - 5000).coerceAtLeast(0)
+                    player.seekTo(rewindPosition)
+                    lastPausePosition = null
+                    android.util.Log.d("ReaderViewModel", "Rewound to position $rewindPosition")
+                }
+                android.util.Log.d("ReaderViewModel", "Calling player.play()")
+                player.play()
+            }
+        }
+    }
+    
+    fun rewindAudio(seconds: Int = 10) {
         exoPlayer?.let {
-            if (it.isPlaying) it.pause() else it.play()
+            val newPosition = (it.currentPosition - seconds * 1000).coerceAtLeast(0)
+            it.seekTo(newPosition)
+        }
+    }
+    
+    fun forwardAudio(seconds: Int = 30) {
+        exoPlayer?.let {
+            val newPosition = (it.currentPosition + seconds * 1000).coerceAtMost(it.duration)
+            it.seekTo(newPosition)
+        }
+    }
+    
+    fun toggleSkipSilence() {
+        exoPlayer?.let {
+            it.skipSilenceEnabled = !it.skipSilenceEnabled
+            _uiState.update { state -> state.copy(skipSilenceEnabled = it.skipSilenceEnabled) }
         }
     }
 
+    private var sleepTimerJob: Job? = null
+
     private fun observePreferences() {
         viewModelScope.launch {
-            kotlinx.coroutines.flow.combine(
+            // Part 1: Visual Settings
+            launch {
                 kotlinx.coroutines.flow.combine(
                     preferencesRepository.readerFontSize,
                     preferencesRepository.readerTheme,
-                    preferencesRepository.readerFontFamily
-                ) { size, theme, family ->
-                    Triple(size, theme, family)
-                },
-                kotlinx.coroutines.flow.combine(
+                    preferencesRepository.readerFontFamily,
                     preferencesRepository.readerLineHeight,
-                    preferencesRepository.readerMargin,
-                    preferencesRepository.readerVerticalScroll
-                ) { height, margin, vertical ->
-                     Triple(height, margin, vertical)
+                    preferencesRepository.readerMargin
+                ) { size, theme, family, lineHeight, margin ->
+                    ReaderPreferencesPart1(size, theme, family, lineHeight, margin)
+                }.collect { p1 ->
+                    _uiState.update { it.copy(
+                        fontSize = (p1.fontSize * 100).toInt(),
+                        theme = ReaderTheme.fromString(p1.theme),
+                        fontFamily = p1.fontFamily,
+                        lineHeight = p1.lineHeight,
+                        margin = p1.margin
+                    ) }
                 }
-            ) { (size, theme, family), (height, margin, vertical) ->
-                ReaderPreferences(size, theme, family, height, margin, vertical)
-            }.collect { prefs ->
-                _uiState.update { 
-                    it.copy(
-                        fontSize = (prefs.fontSize * 100).toInt(),
-                        theme = ReaderTheme.fromString(prefs.theme),
-                        fontFamily = prefs.fontFamily,
-                        lineHeight = prefs.lineHeight,
-                        margin = prefs.margin,
-                        isVerticalScroll = prefs.isVerticalScroll
-                    ) 
+            }
+            
+            // Part 2: Layout & Brightness
+            launch {
+                kotlinx.coroutines.flow.combine(
+                    preferencesRepository.readerVerticalScroll,
+                    preferencesRepository.readerTextAlignment,
+                    preferencesRepository.readerParagraphSpacing,
+                    preferencesRepository.readerBrightness
+                ) { vertical, align, spacing, bright ->
+                    ReaderPreferencesPart2(vertical, align, spacing, bright)
+                }.collect { p2 ->
+                    _uiState.update { it.copy(
+                        isVerticalScroll = p2.isVerticalScroll,
+                        textAlignment = p2.textAlignment,
+                        paragraphSpacing = p2.paragraphSpacing,
+                        brightness = p2.brightness
+                    ) }
+                }
+            }
+            
+            // Part 3: Audio Settings (Speed & Sleep Timer)
+            launch {
+                kotlinx.coroutines.flow.combine(
+                     preferencesRepository.playbackSpeed,
+                     preferencesRepository.sleepTimerMinutes
+                ) { speed, minutes -> 
+                     Pair(speed, minutes)
+                }.collect { (speed, minutes) ->
+                     _uiState.update { it.copy(playbackSpeed = speed) }
+                     
+                     // Apply speed to player
+                     exoPlayer?.setPlaybackSpeed(speed)
+                     
+                     // Handle Sleep Timer
+                     handleSleepTimer(minutes)
+                }
+            }
+            // Part 4: Gestures
+            launch {
+                kotlinx.coroutines.flow.combine(
+                    preferencesRepository.gestureTapLeft,
+                    preferencesRepository.gestureTapCenter,
+                    preferencesRepository.gestureTapRight
+                ) { left, center, right ->
+                    Triple(left, center, right)
+                }.collect { (left, center, right) ->
+                    _uiState.update { it.copy(
+                        gestureTapLeft = left,
+                        gestureTapCenter = center,
+                        gestureTapRight = right
+                    ) }
                 }
             }
         }
     }
     
-    data class ReaderPreferences(
+    private fun handleSleepTimer(minutes: Int) {
+        sleepTimerJob?.cancel()
+        
+        if (minutes > 0) {
+            sleepTimerJob = viewModelScope.launch {
+                 val durationMillis = minutes * 60 * 1000L
+                 delay(durationMillis)
+                 
+                 // Timer finished
+                 if (_uiState.value.isPlayingAudio) {
+                     toggleAudioPlay() // Pause
+                 }
+                 
+                 // Reset timer in prefs
+                 preferencesRepository.setSleepTimerMinutes(0)
+            }
+        }
+    }
+    
+    data class ReaderPreferencesPart1(
         val fontSize: Float,
         val theme: String,
         val fontFamily: String,
         val lineHeight: Float,
-        val margin: Int,
-        val isVerticalScroll: Boolean
+        val margin: Int
+    )
+    
+    data class ReaderPreferencesPart2(
+        val isVerticalScroll: Boolean,
+        val textAlignment: String,
+        val paragraphSpacing: Float,
+        val brightness: Float
     )
 
     private fun loadHighlights(bookId: Long) {
@@ -539,6 +707,18 @@ class ReaderViewModel @Inject constructor(
         return parser.getInputStream(path) ?: parser.getInputStream(book.basePath + path)
     }
     
+    fun getChapterHtml(chapterIndex: Int): String? {
+        val book = _uiState.value.book ?: return null
+        val chapter = book.chapters.getOrNull(chapterIndex) ?: return null
+        
+        return try {
+            val stream = parser.getInputStream(chapter.href)
+            stream?.bufferedReader()?.use { it.readText() }
+        } catch (e: Exception) {
+            null
+        }
+    }
+    
     fun nextChapter() {
         val currentState = _uiState.value
         val book = currentState.book ?: return
@@ -598,9 +778,39 @@ class ReaderViewModel @Inject constructor(
             preferencesRepository.setReaderVerticalScroll(isVertical)
         }
     }
+    
+    fun setTextAlignment(alignment: String) {
+        viewModelScope.launch {
+            preferencesRepository.setReaderTextAlignment(alignment)
+        }
+    }
+    
+    fun setParagraphSpacing(spacing: Float) {
+        viewModelScope.launch {
+            preferencesRepository.setReaderParagraphSpacing(spacing)
+        }
+    }
+    
+    fun setBrightness(brightness: Float) {
+        viewModelScope.launch {
+            preferencesRepository.setReaderBrightness(brightness)
+        }
+    }
 
     private var syncJob: kotlinx.coroutines.Job? = null
 
+    fun setPlaybackSpeed(speed: Float) {
+        viewModelScope.launch {
+            preferencesRepository.setPlaybackSpeed(speed)
+        }
+    }
+    
+    fun setSleepTimer(minutes: Int) {
+        viewModelScope.launch {
+            preferencesRepository.setSleepTimerMinutes(minutes)
+        }
+    }
+    
     fun onProgressChanged(chapterIndex: Int, progressInChapter: Float) {
         val bookId = currentBookId ?: return
         val book = _uiState.value.book ?: return
@@ -629,6 +839,64 @@ class ReaderViewModel @Inject constructor(
         }
     }
 
+    
+    fun setEqualizerPreset(presetName: String) {
+        equalizerManager?.applyPreset(presetName)
+        _uiState.update { it.copy(currentEqualizerPreset = presetName) }
+    }
+    
+    // Bookmarks
+    fun addBookmark(note: String? = null) {
+        viewModelScope.launch {
+            val bookId = currentBookId ?: return@launch
+            val book = _uiState.value.book ?: return@launch
+            val chapterIndex = _uiState.value.currentChapterIndex
+            val chapter = book.chapters.getOrNull(chapterIndex) ?: return@launch
+            val audioPosition = exoPlayer?.currentPosition ?: 0L
+            val fragmentId = _uiState.value.activeSmilHighlightId ?: ""
+            
+            val bookmark = com.owlsoda.pageportal.core.database.entity.BookmarkEntity(
+                bookId = bookId,
+                chapterId = chapter.id,
+                fragmentId = fragmentId,
+                audioPosition = audioPosition,
+                note = note
+            )
+            
+            bookmarkDao.insertBookmark(bookmark)
+        }
+    }
+    
+    fun jumpToBookmark(bookmark: com.owlsoda.pageportal.core.database.entity.BookmarkEntity) {
+        viewModelScope.launch {
+            val book = _uiState.value.book ?: return@launch
+            
+            // Find chapter index by ID
+            val chapterIndex = book.chapters.indexOfFirst { it.id == bookmark.chapterId }
+            if (chapterIndex == -1) return@launch
+            
+            // Navigate to chapter if different
+            if (chapterIndex != _uiState.value.currentChapterIndex) {
+                _uiState.update { it.copy(currentChapterIndex = chapterIndex) }
+                loadAudioForChapter(chapterIndex)
+            }
+            
+            // Seek to audio position
+            exoPlayer?.seekTo(bookmark.audioPosition)
+            
+            // Auto-play
+            exoPlayer?.play()
+        }
+    }
+    
+    fun getBookmarks(bookId: Long) = bookmarkDao.getBookmarksForBook(bookId)
+    
+    fun deleteBookmark(bookmark: com.owlsoda.pageportal.core.database.entity.BookmarkEntity) {
+        viewModelScope.launch {
+            bookmarkDao.deleteBookmark(bookmark)
+        }
+    }
+    
     override fun onCleared() {
         super.onCleared()
         // Try to sync one last time if there's a pending job

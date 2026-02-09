@@ -24,6 +24,9 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.Timer
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -57,6 +60,7 @@ fun ReaderScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
+    val view = androidx.compose.ui.platform.LocalView.current
     
     // Load book on entry
     LaunchedEffect(bookId) {
@@ -74,6 +78,14 @@ fun ReaderScreen(
     
     // Search State
     var showSearch by remember { mutableStateOf(false) }
+    
+    // Equalizer State  
+    var showEqualizerSheet by remember { mutableStateOf(false) }
+    
+    // Bookmarks State
+    var showBookmarkDialog by remember { mutableStateOf(false) }
+    var bookmarkNote by remember { mutableStateOf("") }
+    var showBookmarksSheet by remember { mutableStateOf(false) }
 
     // WebView reference
     var webViewRef by remember { mutableStateOf<WebView?>(null) }
@@ -95,14 +107,64 @@ fun ReaderScreen(
     }
     
     // Effects
-    LaunchedEffect(uiState.theme, uiState.fontSize, uiState.fontFamily, uiState.lineHeight, uiState.margin, webViewRef) {
-        webViewRef?.let { injectStyles(it, uiState) }
-    }
-    LaunchedEffect(uiState.book, uiState.currentChapterIndex, webViewRef) {
+    // Style injection disabled - using raw EPUB HTML styling
+    // LaunchedEffect(uiState.theme, uiState.fontSize, uiState.fontFamily, uiState.lineHeight, uiState.margin, webViewRef) {
+    //     webViewRef?.let { injectStyles(it, uiState) }
+    // }
+    LaunchedEffect(uiState.book?.title, uiState.currentChapterIndex) {
         if (uiState.book != null && webViewRef != null) {
             val chapter = uiState.book!!.chapters.getOrNull(uiState.currentChapterIndex)
             if (chapter != null) {
-                webViewRef?.loadUrl("http://localhost/${chapter.href}")
+                val rawHtml = viewModel.getChapterHtml(uiState.currentChapterIndex)
+                android.util.Log.d("ReaderScreen", "Loading chapter ${uiState.currentChapterIndex}: HTML ${if (rawHtml != null) "${rawHtml.length} chars" else "NULL"}")
+                
+                if (rawHtml != null) {
+                    // Inject CSS to fix layout issues while preserving EPUB styling
+                    val cssOverride = """
+                        <style>
+                            html, body {
+                                height: auto !important;
+                                width: 100% !important;
+                                margin: 0 !important;
+                                padding: 16px !important;
+                                overflow-x: hidden !important;
+                                position: static !important;
+                            }
+                            * {
+                                max-width: 100% !important;
+                                position: static !important;
+                            }
+                            body {
+                                background-color: ${uiState.theme.backgroundColor} !important;
+                                color: ${uiState.theme.textColor} !important;
+                            }
+                            p, div, span, h1, h2, h3, h4, h5, h6 {
+                                color: ${uiState.theme.textColor} !important;
+                            }
+                        </style>
+                    """.trimIndent()
+                    
+                    // Inject CSS into HTML head
+                    val htmlWithCss = if (rawHtml.contains("</head>", ignoreCase = true)) {
+                        rawHtml.replace("</head>", "$cssOverride</head>", ignoreCase = true)
+                    } else if (rawHtml.contains("<body", ignoreCase = true)) {
+                        rawHtml.replace("<body", "<head>$cssOverride</head><body", ignoreCase = true)
+                    } else {
+                        "<html><head>$cssOverride</head><body>$rawHtml</body></html>"
+                    }
+                    
+                    android.util.Log.d("ReaderScreen", "HTML with CSS: ${htmlWithCss.take(400)}")
+                    val baseUrl = "http://localhost/${chapter.href.substringBeforeLast('/')}/"
+                    webViewRef?.loadDataWithBaseURL(
+                        baseUrl,
+                        htmlWithCss,
+                        "text/html",
+                        "UTF-8",
+                        null
+                    )
+                } else {
+                    android.util.Log.e("ReaderScreen", "HTML is NULL for chapter ${uiState.currentChapterIndex}")
+                }
             }
         }
     }
@@ -139,17 +201,15 @@ fun ReaderScreen(
                 .padding(if (showControls) 16.dp else 0.dp) // Add padding when shrunk
                 .background(Color(android.graphics.Color.parseColor(uiState.theme.backgroundColor)))
         ) {
-            // DEBUG INFO OVERLAY
-            Text(
-                text = "DEBUG MODE: Ch=${uiState.currentChapterIndex}",
-                color = Color.Red,
-                modifier = Modifier
-                    .zIndex(100f)
-                    .align(Alignment.TopStart)
-                    .padding(40.dp)
-                    .background(Color.White)
-            )
-
+            // Error display only
+            if (uiState.error != null) {
+                Text(
+                    text = uiState.error!!,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.align(Alignment.Center)
+                )
+            }
+            
             if (uiState.isLoading) {
                 CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
             } else if (uiState.error != null) {
@@ -194,16 +254,24 @@ fun ReaderScreen(
                                  if (event.action == android.view.MotionEvent.ACTION_UP) {
                                      val width = v.width
                                      val x = event.x
-                                     when {
-                                        x < width * 0.3 -> {
+                                     
+                                     val action = when {
+                                        x < width * 0.3 -> uiState.gestureTapLeft
+                                        x > width * 0.7 -> uiState.gestureTapRight
+                                        else -> uiState.gestureTapCenter
+                                     }
+                                     
+                                     when (action) {
+                                         "PREV" -> {
                                             if (uiState.isVerticalScroll) viewModel.previousChapter() 
                                             else webViewRef?.evaluateJavascript( "if (window.scrollX > 0) { window.scrollBy(-window.innerWidth, 0); } else { Android.prevChapter(); }", null)
-                                        }
-                                        x > width * 0.7 -> {
+                                         }
+                                         "NEXT" -> {
                                             if (uiState.isVerticalScroll) viewModel.nextChapter()
                                             else webViewRef?.evaluateJavascript( "if ((window.scrollX + window.innerWidth) < document.body.scrollWidth) { window.scrollBy(window.innerWidth, 0); } else { Android.nextChapter(); }", null)
-                                        }
-                                        else -> showControls = !showControls
+                                         }
+                                         "MENU" -> showControls = !showControls
+                                         else -> {} // NONE
                                      }
                                  }
                                  false
@@ -214,16 +282,16 @@ fun ReaderScreen(
                  )
             }
             
-            // Interaction blocker when controls shown (optional, prevents scrolling while in menu)
-            if (showControls) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {
-                            showControls = false // Tap outside/on book to close
-                        }
-                )
-            }
+            // Interaction blocker DISABLED for debugging
+            // if (showControls) {
+            //     Box(
+            //         modifier = Modifier
+            //             .fillMaxSize()
+            //             .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {
+            //                 showControls = false
+            //             }
+            //     )
+            // }
         }
 
         // --- 2. Chrome Layer (Controls) ---
@@ -257,37 +325,134 @@ fun ReaderScreen(
                      .padding(bottom = 24.dp),
                  horizontalAlignment = Alignment.CenterHorizontally // Center existing items
              ) {
-                 // Playback Controls (if available) - Centered and prominent
-                 if (uiState.isReadAloudAvailable) {
-                     Card(
-                         shape = RoundedCornerShape(50), // Pill shape
-                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
-                         modifier = Modifier.padding(bottom = 16.dp)
-                     ) {
-                         Row(
-                             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                             verticalAlignment = Alignment.CenterVertically,
-                             horizontalArrangement = Arrangement.spacedBy(16.dp)
-                         ) {
-                             IconButton(onClick = { /* Previous Track */ }) { // Optional
-                                Icon(androidx.compose.ui.res.painterResource(R.drawable.ic_storyteller), contentDescription = null, modifier = Modifier.size(20.dp)) // Placeholder icon
-                             }
-                             
-                             IconButton(
-                                 onClick = { viewModel.toggleAudioPlay() },
-                                 modifier = Modifier.size(48.dp).background(MaterialTheme.colorScheme.primary, androidx.compose.foundation.shape.CircleShape).padding(8.dp) // Custom play button style
-                             ) {
-                                 Icon(
-                                     if (uiState.isPlayingAudio) Icons.Default.Pause else Icons.Default.PlayArrow,
-                                     "Toggle Audio",
-                                     tint = MaterialTheme.colorScheme.onPrimary
-                                 )
-                             }
+                  // Playback Controls (if available) - Centered and prominent
+                  androidx.compose.animation.AnimatedVisibility(
+                      visible = uiState.isReadAloudAvailable,
+                      enter = androidx.compose.animation.slideInVertically(
+                          initialOffsetY = { it },
+                          animationSpec = androidx.compose.animation.core.spring(
+                              dampingRatio = androidx.compose.animation.core.Spring.DampingRatioMediumBouncy,
+                              stiffness = androidx.compose.animation.core.Spring.StiffnessLow
+                          )
+                      ) + androidx.compose.animation.fadeIn(),
+                      exit = androidx.compose.animation.slideOutVertically(
+                          targetOffsetY = { it }
+                      ) + androidx.compose.animation.fadeOut()
+                  ) {
+                      Card(
+                          shape = RoundedCornerShape(50), // Pill shape
+                          colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+                          modifier = Modifier.padding(bottom = 16.dp)
+                      ) {
+                          Row(
+                              modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                              verticalAlignment = Alignment.CenterVertically,
+                              horizontalArrangement = Arrangement.spacedBy(12.dp)
+                          ) {
+                              // Rewind button
+                              IconButton(onClick = { 
+                                  view.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
+                                  viewModel.rewindAudio(10) 
+                              }) {
+                                  Icon(
+                                      painter = androidx.compose.ui.res.painterResource(android.R.drawable.ic_media_rew),
+                                      contentDescription = "Rewind 10s",
+                                      modifier = Modifier.size(24.dp)
+                                  )
+                              }
+                              
+                              // Play/Pause button (larger, central)
+                              IconButton(
+                                  onClick = { 
+                                      view.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
+                                      viewModel.toggleAudioPlay() 
+                                  },
+                                  modifier = Modifier
+                                      .size(56.dp)
+                                      .background(MaterialTheme.colorScheme.primary, androidx.compose.foundation.shape.CircleShape)
+                              ) {
+                                  Icon(
+                                      if (uiState.isPlayingAudio) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                      "Toggle Audio",
+                                      tint = MaterialTheme.colorScheme.onPrimary,
+                                      modifier = Modifier.size(32.dp)
+                                  )
+                              }
+                              
+                              // Forward button
+                              IconButton(onClick = { 
+                                  view.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
+                                  viewModel.forwardAudio(30) 
+                              }) {
+                                  Icon(
+                                      painter = androidx.compose.ui.res.painterResource(android.R.drawable.ic_media_ff),
+                                      contentDescription = "Forward 30s",
+                                      modifier = Modifier.size(24.dp)
+                                  )
+                              }
+                              
+                              // Bookmark Button
+                              IconButton(onClick = { 
+                                  view.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
+                                  showBookmarkDialog = true
+                              }) {
+                                  Icon(
+                                      imageVector = Icons.Default.Bookmark,
+                                      contentDescription = "Add Bookmark",
+                                      modifier = Modifier.size(20.dp)
+                                  )
+                              }
+                              
+                              Spacer(Modifier.width(8.dp))
 
-                             Text("${String.format("%.1f", uiState.playbackSpeed)}x", style = MaterialTheme.typography.labelLarge)
-                         }
-                     }
-                 }
+                              Text("${String.format("%.1f", uiState.playbackSpeed)}x", style = MaterialTheme.typography.labelLarge)
+                              
+                              // Sleep Timer Button
+                              var showSleepMenu by remember { mutableStateOf(false) }
+                             Box {
+                                 IconButton(onClick = { showSleepMenu = true }) {
+                                     // Use Timer icon (needs import or vector resource)
+                                     // Using Settings placeholder if needed, but preferable to use Timer
+                                     Icon(
+                                         imageVector = Icons.Default.Timer ?: Icons.Default.Settings, 
+                                         contentDescription = "Sleep Timer",
+                                         tint = if (uiState.sleepTimerMinutes > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                     )
+                                 }
+                                 
+                                 DropdownMenu(
+                                     expanded = showSleepMenu,
+                                     onDismissRequest = { showSleepMenu = false }
+                                 ) {
+                                     listOf(0, 15, 30, 45, 60).forEach { mins ->
+                                         DropdownMenuItem(
+                                             text = { Text(if (mins == 0) "Off" else "$mins min") },
+                                             onClick = { 
+                                                 viewModel.setSleepTimer(mins)
+                                                 showSleepMenu = false
+                                             },
+                                             leadingIcon = if (uiState.sleepTimerMinutes == mins) {
+                                                 { Icon(Icons.Default.Check, null) }
+                                             } else null
+                                         )
+                                     }
+                                  }
+                              }
+                              
+                              // Equalizer Button
+                              IconButton(onClick = { 
+                                  view.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
+                                  showEqualizerSheet = true
+                              }) {
+                                  Icon(
+                                      painter = androidx.compose.ui.res.painterResource(android.R.drawable.ic_menu_manage),
+                                      contentDescription = "Equalizer",
+                                      modifier = Modifier.size(20.dp)
+                                  )
+                              }
+                          }
+                      }
+                  }
                  
                  // Bottom Navigation (Chapters)
                  BottomAppBar(
@@ -365,10 +530,73 @@ fun ReaderScreen(
                           onFontFamilyChanged = viewModel::setFontFamily,
                           onLineHeightChanged = viewModel::setLineHeight,
                           onMarginChanged = viewModel::setMargin,
+                          textAlignment = uiState.textAlignment,
+                          onTextAlignmentChanged = viewModel::setTextAlignment,
+                          paragraphSpacing = uiState.paragraphSpacing,
+                          onParagraphSpacingChanged = viewModel::setParagraphSpacing,
+                          brightness = uiState.brightness,
+                          onBrightnessChanged = viewModel::setBrightness,
                           isVerticalScroll = uiState.isVerticalScroll,
                           onScrollModeChanged = viewModel::setScrollMode
                       )
                   }
+              }
+              
+              // Equalizer Bottom Sheet
+              if (showEqualizerSheet) {
+                  EqualizerBottomSheet(
+                      currentPreset = uiState.currentEqualizerPreset,
+                      onPresetSelected = { preset ->
+                          viewModel.setEqualizerPreset(preset)
+                      },
+                      onDismiss = { showEqualizerSheet = false }
+                  )
+              }
+              
+              // Bookmark Dialog
+              if (showBookmarkDialog) {
+                  androidx.compose.material3.AlertDialog(
+                      onDismissRequest = { showBookmarkDialog = false },
+                      title = { Text("Add Bookmark") },
+                      text = {
+                          androidx.compose.material3.TextField(
+                              value = bookmarkNote,
+                              onValueChange = { bookmarkNote = it },
+                              label = { Text("Note (optional)") },
+                              singleLine = true
+                          )
+                      },
+                      confirmButton = {
+                          TextButton(onClick = {
+                              viewModel.addBookmark(bookmarkNote.ifBlank { null })
+                              bookmarkNote = ""
+                              showBookmarkDialog = false
+                          }) {
+                              Text("Save")
+                          }
+                      },
+                      dismissButton = {
+                          TextButton(onClick = { showBookmarkDialog = false }) {
+                              Text("Cancel")
+                          }
+                      }
+                  )
+              }
+              
+              // Bookmarks Bottom Sheet
+              if (showBookmarksSheet && bookId.toLongOrNull() != null) {
+                  val bookmarks by viewModel.getBookmarks(bookId.toLong()).collectAsState(initial = emptyList())
+                  BookmarksBottomSheet(
+                      bookmarks = bookmarks,
+                      onBookmarkClick = { bookmark ->
+                          viewModel.jumpToBookmark(bookmark)
+                          showBookmarksSheet = false
+                      },
+                      onDeleteBookmark = { bookmark ->
+                          viewModel.deleteBookmark(bookmark)
+                      },
+                      onDismiss = { showBookmarksSheet = false }
+                  )
               }
          }
     }
@@ -398,22 +626,54 @@ private fun injectStyles(webView: WebView, state: ReaderUiState) {
         """
     }
 
+    // Paragraph Spacing CSS
+    val paragraphSpacingCss = if (state.paragraphSpacing != 1.0f) {
+        // Default is usually 1em or so. We scale it.
+        "p { margin-bottom: ${state.paragraphSpacing}em !important; }"
+    } else ""
+    
+    // Brightness Filter
+    val brightnessFilter = if (state.brightness >= 0) {
+        "html { filter: brightness(${state.brightness}); background-color: ${state.theme.backgroundColor}; } body { background-color: transparent; }"
+    } else {
+        "html { filter: none; } body { background-color: ${state.theme.backgroundColor}; }"
+    }
+
     val js = """
         $css
-        document.body.style.fontSize = '${state.fontSize}%';
-        document.body.style.backgroundColor = '${state.theme.backgroundColor}';
-        document.body.style.color = '${state.theme.textColor}';
-        document.body.style.lineHeight = '${state.lineHeight}';
-        document.body.style.margin = '0 $marginVal';
-        document.body.style.maxWidth = '100%';
-        document.body.style.padding = '0 10px';
-        document.body.style.fontFamily = '${state.fontFamily}, serif';
-        document.body.style.padding = '0 10px';
-        document.body.style.fontFamily = '${state.fontFamily}, serif';
-        
-        var style = document.createElement('style');
-        style.innerHTML = '.smil-active { background-color: #fff176 !important; color: black !important; border-radius: 4px; box-shadow: 0 0 4px #fff176; }';
-        document.head.appendChild(style);
+        var styleTag = document.getElementById('reader-style');
+        if (!styleTag) {
+            styleTag = document.createElement('style');
+            styleTag.id = 'reader-style';
+            document.head.appendChild(styleTag);
+        }
+        styleTag.innerHTML = `
+            body {
+                font-size: ${state.fontSize}%;
+                color: ${state.theme.textColor};
+                line-height: ${state.lineHeight};
+                margin: 0 $marginVal;
+                max-width: 100%;
+                padding: 0 10px;
+                font-family: '${state.fontFamily}', serif;
+                text-align: ${state.textAlignment.lowercase()};
+            }
+            $paragraphSpacingCss
+            $brightnessFilter
+            .smil-active { 
+                background: linear-gradient(135deg, #fff176 0%, #ffeb3b 100%) !important;
+                color: black !important; 
+                border-radius: 6px;
+                padding: 2px 4px;
+                box-shadow: 0 2px 8px rgba(255, 235, 59, 0.4);
+                transition: all 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
+                animation: smilPulse 2s ease-in-out infinite;
+            }
+            @keyframes smilPulse {
+                0%, 100% { box-shadow: 0 2px 8px rgba(255, 235, 59, 0.4); }
+                50% { box-shadow: 0 2px 12px rgba(255, 235, 59, 0.6); }
+            }
+        `;
     """.trimIndent()
     webView.evaluateJavascript(js, null)
 }
@@ -540,11 +800,17 @@ fun ReaderSettingsSheet(
     fontFamily: String,
     lineHeight: Float,
     margin: Int,
+    textAlignment: String,
+    paragraphSpacing: Float,
+    brightness: Float,
     onFontSizeChanged: (Int) -> Unit,
     onThemeChanged: (ReaderTheme) -> Unit,
     onFontFamilyChanged: (String) -> Unit,
     onLineHeightChanged: (Float) -> Unit,
     onMarginChanged: (Int) -> Unit,
+    onTextAlignmentChanged: (String) -> Unit,
+    onParagraphSpacingChanged: (Float) -> Unit,
+    onBrightnessChanged: (Float) -> Unit,
     isVerticalScroll: Boolean,
     onScrollModeChanged: (Boolean) -> Unit
 ) {
@@ -552,46 +818,9 @@ fun ReaderSettingsSheet(
         modifier = Modifier
             .padding(16.dp)
             .fillMaxWidth()
+            .verticalScroll(androidx.compose.foundation.rememberScrollState())
     ) {
         Text("Appearance", style = MaterialTheme.typography.titleLarge)
-        Spacer(modifier = Modifier.height(24.dp))
-        
-        // Font Size
-        Text("Font Size: $fontSize%", style = MaterialTheme.typography.bodyMedium)
-        Row(
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(
-                onClick = { onFontSizeChanged(fontSize - 10) },
-                enabled = fontSize > 50
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Remove,
-                    contentDescription = "Decrease font size"
-                )
-            }
-
-            Slider(
-                value = fontSize.toFloat(),
-                onValueChange = { onFontSizeChanged(it.toInt()) },
-                valueRange = 50f..200f,
-                steps = 14,
-                modifier = Modifier
-                    .weight(1f)
-                    .semantics { contentDescription = "Font size adjustment" }
-            )
-
-            IconButton(
-                onClick = { onFontSizeChanged(fontSize + 10) },
-                enabled = fontSize < 200
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Add,
-                    contentDescription = "Increase font size"
-                )
-            }
-        }
-        
         Spacer(modifier = Modifier.height(24.dp))
         
         // Theme
@@ -607,10 +836,58 @@ fun ReaderSettingsSheet(
         
         HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
         
+        // Brightness
+        Text("Brightness", style = MaterialTheme.typography.titleMedium)
+        val isAuto = brightness < 0
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(if (isAuto) "System" else "${(brightness * 100).toInt()}%")
+            Spacer(Modifier.weight(1f))
+            Switch(
+                checked = isAuto,
+                onCheckedChange = { 
+                     if (it) onBrightnessChanged(-1.0f) 
+                     else onBrightnessChanged(0.5f)
+                }
+            )
+        }
+        if (!isAuto) {
+            Slider(
+                value = brightness,
+                onValueChange = { onBrightnessChanged(it) },
+                valueRange = 0.0f..1.0f
+            )
+        }
+        
+        HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
+
+        // Font Size
+        Text("Font Size: $fontSize%", style = MaterialTheme.typography.bodyMedium)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            IconButton(
+                onClick = { onFontSizeChanged(fontSize - 10) },
+                enabled = fontSize > 50
+            ) {
+                Icon(Icons.Default.Remove, "Decrease font size")
+            }
+            Slider(
+                value = fontSize.toFloat(),
+                onValueChange = { onFontSizeChanged(it.toInt()) },
+                valueRange = 50f..200f,
+                steps = 14,
+                modifier = Modifier.weight(1f)
+            )
+            IconButton(
+                onClick = { onFontSizeChanged(fontSize + 10) },
+                enabled = fontSize < 200
+            ) {
+                Icon(Icons.Default.Add, "Increase font size")
+            }
+        }
+        
         // Font Family
         Text("Font: $fontFamily", style = MaterialTheme.typography.titleMedium)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            listOf("Serif", "Sans-Serif", "Monospace", "Cursive").forEach { font ->
+            listOf("Serif", "Sans-Serif", "Monospace").forEach { font ->
                 FilterChip(
                     selected = fontFamily.equals(font, ignoreCase = true),
                     onClick = { onFontFamilyChanged(font) },
@@ -619,18 +896,37 @@ fun ReaderSettingsSheet(
             }
         }
         
-
+        HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
         
-        // Line Height
-        Text("Line Height: ${String.format("%.1f", lineHeight)}", style = MaterialTheme.typography.titleMedium)
+        // Formatting
+        Text("Formatting", style = MaterialTheme.typography.titleMedium)
+        
+        Text("Alignment", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 8.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf("LEFT", "JUSTIFY", "CENTER").forEach { align ->
+                FilterChip(
+                    selected = textAlignment == align,
+                    onClick = { onTextAlignmentChanged(align) },
+                    label = { Text(align.substring(0, 1) + align.substring(1).lowercase()) }
+                )
+            }
+        }
+
+        Text("Line Height: ${String.format("%.1f", lineHeight)}", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 8.dp))
         Slider(
             value = lineHeight,
             onValueChange = { onLineHeightChanged(it) },
             valueRange = 1.0f..2.5f
         )
         
-        // Margin
-        Text("Margin: $margin", style = MaterialTheme.typography.titleMedium)
+        Text("Paragraph Spacing: ${String.format("%.1f", paragraphSpacing)}", style = MaterialTheme.typography.bodyMedium)
+        Slider(
+            value = paragraphSpacing,
+            onValueChange = { onParagraphSpacingChanged(it) },
+            valueRange = 0.0f..2.0f
+        )
+        
+        Text("Margin: $margin", style = MaterialTheme.typography.bodyMedium)
         Slider(
             value = margin.toFloat(),
             onValueChange = { onMarginChanged(it.toInt()) },

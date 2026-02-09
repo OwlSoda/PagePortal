@@ -3,310 +3,853 @@ package com.owlsoda.pageportal.features.settings
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.compose.ui.platform.LocalContext
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import com.owlsoda.pageportal.ui.components.ListDetailLayout
+import com.owlsoda.pageportal.ui.components.WindowSizeClass
+import com.owlsoda.pageportal.ui.components.rememberWindowSizeClass
+
+/**
+ * Settings category for navigation
+ */
+data class SettingsCategory(
+    val id: String,
+    val title: String,
+    val icon: ImageVector,
+    val description: String
+)
+
+val settingsCategories = listOf(
+    SettingsCategory("general", "General", Icons.Default.Settings, "App-wide preferences"),
+    SettingsCategory("reading", "Reading", Icons.Default.MenuBook, "Reader customization"),
+    SettingsCategory("audio", "Audio", Icons.Default.Headphones, "Playback settings"),
+    SettingsCategory("library", "Library", Icons.Default.Dns, "Server management"),
+    SettingsCategory("storage", "Storage", Icons.Default.SdStorage, "Cache and downloads"),
+    SettingsCategory("accessibility", "Accessibility", Icons.Default.Accessibility, "Accessibility options"),
+    SettingsCategory("about", "About", Icons.Default.Info, "Version and info")
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     onBack: () -> Unit,
-    onServersClick: () -> Unit,
-    onMatchReviewClick: () -> Unit,
-    onStorageClick: () -> Unit,
+    onServersClick: () -> Unit = {},
+    onMatchReviewClick: () -> Unit = {},
+    onStorageClick: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsState()
+    val windowSizeClass = rememberWindowSizeClass()
+    
+    // Selected category state
+    var selectedCategory by remember { 
+        mutableStateOf(
+            if (windowSizeClass == WindowSizeClass.COMPACT) null else "general"
+        )
+    }
+
+    val context = LocalContext.current
+    LaunchedEffect(state.toastMessage) {
+        state.toastMessage?.let { message ->
+            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+            viewModel.clearToastMessage()
+        }
+    }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Settings") },
+                title = { 
+                    Text(
+                        if (windowSizeClass == WindowSizeClass.COMPACT && selectedCategory != null) {
+                            settingsCategories.find { it.id == selectedCategory }?.title ?: "Settings"
+                        } else {
+                            "Settings"
+                        }
+                    )
+                },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(onClick = {
+                        if (windowSizeClass == WindowSizeClass.COMPACT && selectedCategory != null) {
+                            // On compact, back button goes to category list
+                            selectedCategory = null
+                        } else {
+                            onBack()
+                        }
+                    }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 }
             )
         }
     ) { padding ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-        ) {
-            item {
-                SettingsSectionHeader("Library")
-                SettingsItem(
-                    icon = Icons.Default.Dns,
-                    title = "Manage Servers",
-                    subtitle = "Connect specific services",
-                    onClick = onServersClick
+        ListDetailLayout(
+            windowSizeClass = windowSizeClass,
+            showDetail = selectedCategory != null,
+            modifier = Modifier.padding(padding),
+            listContent = {
+                SettingsCategoriesList(
+                    categories = settingsCategories,
+                    selectedCategory = selectedCategory,
+                    onCategoryClick = { selectedCategory = it.id }
                 )
-                SettingsItem(
-                    icon = Icons.Default.Merge,
-                    title = "Match Review",
-                    subtitle = "Fix incorrect book matches",
-                    onClick = onMatchReviewClick
-                )
-            }
-            
-            item {
-                SettingsSectionHeader("Offline")
-                SwitchSettingsItem(
-                    icon = Icons.Default.WifiOff,
-                    title = "Offline Mode",
-                    subtitle = "Disable network access",
-                    checked = state.isOfflineMode,
-                    onCheckedChange = { viewModel.toggleOfflineMode(it) }
-                )
-                SettingsItem(
-                    icon = Icons.Default.DeleteSweep,
-                    title = "Clear Cache",
-                    subtitle = "${state.cacheSize} used",
-                    showChevron = false,
-                    onClick = { viewModel.clearCache() }
-                )
-                SettingsItem(
-                    icon = Icons.Default.SdStorage,
-                    title = "Storage Management",
-                    subtitle = "Manage downloads",
-                    onClick = onStorageClick
-                )
-            }
-            
-            item {
-                SettingsSectionHeader("Playback")
-                
-                // Playback Speed
-                var showSpeedDialog by remember { mutableStateOf(false) }
-                SettingsItem(
-                    icon = Icons.Default.Speed,
-                    title = "Playback Speed",
-                    subtitle = String.format("%.2fx", state.playbackSpeed),
-                    onClick = { showSpeedDialog = true }
-                )
-                
-                if (showSpeedDialog) {
-                    AlertDialog(
-                        onDismissRequest = { showSpeedDialog = false },
-                        title = { Text("Playback Speed") },
-                        text = {
-                            Column {
-                                Text(
-                                    text = String.format("%.2fx", state.playbackSpeed), 
-                                    style = MaterialTheme.typography.headlineMedium, 
-                                    modifier = Modifier.align(Alignment.CenterHorizontally)
-                                )
-                                Slider(
-                                    value = state.playbackSpeed,
-                                    onValueChange = { viewModel.setPlaybackSpeed(it) },
-                                    valueRange = 0.5f..3.0f,
-                                    steps = 49 // (3.0 - 0.5) / 0.05 - 1 = 49 steps
-                                )
-                            }
-                        },
-                        confirmButton = {
-                            TextButton(onClick = { showSpeedDialog = false }) {
-                                Text("Done")
-                            }
-                        }
-                    )
-                }
-
-                // Grid Size
-                var showGridDialog by remember { mutableStateOf(false) }
-                SettingsItem(
-                    icon = Icons.Default.GridView,
-                    title = "Grid Item Size",
-                    subtitle = when {
-                        state.gridMinWidth < 110 -> "Small"
-                        state.gridMinWidth < 140 -> "Normal"
-                        state.gridMinWidth < 180 -> "Large"
-                        else -> "Extra Large"
-                    },
-                    onClick = { showGridDialog = true }
-                )
-
-                if (showGridDialog) {
-                    AlertDialog(
-                        onDismissRequest = { showGridDialog = false },
-                        title = { Text("Grid Item Size") },
-                        text = {
-                            Column {
-                                Text(
-                                    text = "${state.gridMinWidth}dp",
-                                    style = MaterialTheme.typography.headlineMedium,
-                                    modifier = Modifier.align(Alignment.CenterHorizontally)
-                                )
-                                Text(
-                                    text = "Larger items = fewer columns",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    modifier = Modifier.align(Alignment.CenterHorizontally).padding(bottom = 16.dp)
-                                )
-                                Slider(
-                                    value = state.gridMinWidth.toFloat(),
-                                    onValueChange = { viewModel.setGridMinWidth(it.toInt()) },
-                                    valueRange = 100f..300f,
-                                    steps = 19 
-                                )
-                            }
-                        },
-                        confirmButton = {
-                            TextButton(onClick = { showGridDialog = false }) {
-                                Text("Done")
-                            }
-                        }
-                    )
-                }
-                
-                // Sleep Timer
-                var showTimerDialog by remember { mutableStateOf(false) }
-                val timerOptions = listOf(0, 15, 30, 45, 60, 90, 120)
-                SettingsItem(
-                    icon = Icons.Default.Timer,
-                    title = "Default Sleep Timer",
-                    subtitle = if (state.sleepTimerMinutes == 0) "Disabled" else "${state.sleepTimerMinutes} minutes",
-                    onClick = { showTimerDialog = true }
-                )
-                
-                if (showTimerDialog) {
-                    AlertDialog(
-                        onDismissRequest = { showTimerDialog = false },
-                        title = { Text("Default Sleep Timer") },
-                        text = {
-                            Column {
-                                timerOptions.forEach { minutes ->
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clickable {
-                                                viewModel.setSleepTimerMinutes(minutes)
-                                                showTimerDialog = false
-                                            }
-                                            .padding(vertical = 12.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.SpaceBetween
-                                    ) {
-                                        Text(if (minutes == 0) "Disabled" else "$minutes minutes")
-                                        RadioButton(
-                                            selected = state.sleepTimerMinutes == minutes,
-                                            onClick = {
-                                                viewModel.setSleepTimerMinutes(minutes)
-                                                showTimerDialog = false
-                                            }
-                                        )
-                                    }
-                                }
-                            }
-                        },
-                        confirmButton = {
-                            TextButton(onClick = { showTimerDialog = false }) {
-                                Text("Cancel")
-                            }
-                        }
+            },
+            detailContent = {
+                selectedCategory?.let { categoryId ->
+                    SettingsCategoryDetail(
+                        category = categoryId,
+                        state = state,
+                        viewModel = viewModel,
+                        onServersClick = onServersClick,
+                        onMatchReviewClick = onMatchReviewClick,
+                        onStorageClick = onStorageClick
                     )
                 }
             }
+        )
+    }
+}
 
-            item {
-                SettingsSectionHeader("Appearance")
-                
-                var showThemeDialog by remember { mutableStateOf(false) }
-                
-                SettingsItem(
-                    icon = Icons.Default.DarkMode,
-                    title = "Theme",
-                    subtitle = when (state.themeMode) {
-                        "LIGHT" -> "Light"
-                        "DARK" -> "Dark"
-                        else -> "System Default"
-                    },
-                    onClick = { showThemeDialog = true }
-                )
-                
-                if (showThemeDialog) {
-                    AlertDialog(
-                        onDismissRequest = { showThemeDialog = false },
-                        title = { Text("Choose Theme") },
-                        text = {
-                            Column {
-                                ThemeOption(
-                                    title = "System Default",
-                                    selected = state.themeMode == "SYSTEM",
-                                    onClick = {
-                                        viewModel.updateTheme("SYSTEM")
-                                        showThemeDialog = false
-                                    }
-                                )
-                                ThemeOption(
-                                    title = "Light",
-                                    selected = state.themeMode == "LIGHT",
-                                    onClick = {
-                                        viewModel.updateTheme("LIGHT")
-                                        showThemeDialog = false
-                                    }
-                                )
-                                ThemeOption(
-                                    title = "Dark",
-                                    selected = state.themeMode == "DARK",
-                                    onClick = {
-                                        viewModel.updateTheme("DARK")
-                                        showThemeDialog = false
-                                    }
-                                )
-                                ThemeOption(
-                                    title = "AMOLED Black",
-                                    selected = state.themeMode == "AMOLED",
-                                    onClick = {
-                                        viewModel.updateTheme("AMOLED")
-                                        showThemeDialog = false
-                                    }
-                                )
-                            }
-                        },
-                        confirmButton = {
-                            TextButton(onClick = { showThemeDialog = false }) {
-                                Text("Cancel")
-                            }
-                        }
+@Composable
+fun SettingsCategoriesList(
+    categories: List<SettingsCategory>,
+    selectedCategory: String?,
+    onCategoryClick: (SettingsCategory) -> Unit
+) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize()
+    ) {
+        items(categories) { category ->
+            ListItem(
+                headlineContent = { Text(category.title) },
+                supportingContent = { Text(category.description) },
+                leadingContent = {
+                    Icon(
+                        imageVector = category.icon,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary
                     )
+                },
+                trailingContent = {
+                    Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null)
+                },
+                modifier = Modifier.clickable { onCategoryClick(category) },
+                colors = if (selectedCategory == category.id) {
+                    ListItemDefaults.colors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                    )
+                } else {
+                    ListItemDefaults.colors()
                 }
-            }
-
-            item {
-                SettingsSectionHeader("About")
-                SettingsItem(
-                    icon = Icons.Default.Info,
-                    title = "Version",
-                    subtitle = "1.0.0 (Alpha)",
-                    showChevron = false,
-                    onClick = { }
-                )
-            }
+            )
         }
     }
 }
 
+@Composable
+fun SettingsCategoryDetail(
+    category: String,
+    state: SettingsState,
+    viewModel: SettingsViewModel,
+    onServersClick: () -> Unit,
+    onMatchReviewClick: () -> Unit,
+    onStorageClick: () -> Unit
+) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(16.dp)
+    ) {
+        when (category) {
+            "general" -> item { GeneralSettings(state, viewModel) }
+            "reading" -> item { ReadingSettings(state, viewModel) }
+            "audio" -> item { AudioSettings(state, viewModel) }
+            "library" -> item { LibrarySettings(state, onServersClick, onMatchReviewClick) }
+            "storage" -> item { StorageSettings(state, viewModel, onStorageClick) }
+            "accessibility" -> item { AccessibilitySettings(state, viewModel) }
+            "about" -> item { AboutSettings(state) }
+        }
+    }
+}
+
+// GENERAL SETTINGS
+@Composable
+fun GeneralSettings(state: SettingsState, viewModel: SettingsViewModel) {
+    Column {
+        var showThemeDialog by remember { mutableStateOf(false) }
+        
+        SettingsSectionHeader("Appearance")
+        SettingsItem(
+            icon = Icons.Default.DarkMode,
+            title = "Theme",
+            subtitle = when (state.themeMode) {
+                "LIGHT" -> "Light"
+                "DARK" -> "Dark"
+                "AMOLED" -> "AMOLED Black"
+                else -> "System Default"
+            },
+            onClick = { showThemeDialog = true }
+        )
+        
+        if (showThemeDialog) {
+            ThemeSelectionDialog(
+                currentTheme = state.themeMode,
+                onThemeSelected = { viewModel.updateTheme(it) },
+                onDismiss = { showThemeDialog = false }
+            )
+        }
+        
+        Spacer(Modifier.height(16.dp))
+        SettingsSectionHeader("Library Display")
+        
+        var showGridDialog by remember { mutableStateOf(false) }
+        SettingsItem(
+            icon = Icons.Default.GridView,
+            title = "Grid Item Size",
+            subtitle = when {
+                state.gridMinWidth < 110 -> "Small"
+                state.gridMinWidth < 140 -> "Normal"
+                state.gridMinWidth < 180 -> "Large"
+                else -> "Extra Large"
+            },
+            onClick = { showGridDialog = true }
+        )
+        
+        if (showGridDialog) {
+            GridSizeDialog(
+                currentWidth = state.gridMinWidth,
+                onWidthChanged = { viewModel.setGridMinWidth(it) },
+                onDismiss = { showGridDialog = false }
+            )
+        }
+        
+        SwitchSettingsItem(
+            icon = Icons.Default.WifiOff,
+            title = "Offline Mode",
+            subtitle = "Disable network access",
+            checked = state.isOfflineMode,
+            onCheckedChange = { viewModel.toggleOfflineMode(it) }
+        )
+        
+        Spacer(Modifier.height(16.dp))
+        SettingsSectionHeader("Backup & Restore")
+        
+        val exportLauncher = rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.CreateDocument("application/json"),
+            onResult = { uri -> uri?.let { viewModel.exportSettings(it) } }
+        )
+
+        val importLauncher = rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.GetContent(),
+            onResult = { uri -> uri?.let { viewModel.importSettings(it) } }
+        )
+        
+        SettingsItem(
+            icon = Icons.Default.Upload,
+            title = "Export Settings",
+            subtitle = "Save preferences to a file",
+            showChevron = false,
+            onClick = { exportLauncher.launch("pageportal_settings_backup.json") }
+        )
+        
+        SettingsItem(
+            icon = Icons.Default.Download,
+            title = "Import Settings",
+            subtitle = "Restore preferences from a file",
+            showChevron = false,
+            onClick = { importLauncher.launch("application/json") }
+        )
+    }
+}
+
+// READING SETTINGS
+@Composable
+fun ReadingSettings(state: SettingsState, viewModel: SettingsViewModel) {
+    Column {
+        SettingsSectionHeader("Display")
+        
+        // Theme Selection
+        Text(
+            text = "Reading Theme",
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            val themes = listOf("Light", "Sepia", "Dark", "Black")
+            themes.forEach { theme ->
+                FilterChip(
+                    selected = state.readerTheme.equals(theme, ignoreCase = true),
+                    onClick = { viewModel.setReaderTheme(theme) },
+                    label = { Text(theme) }
+                )
+            }
+        }
+        
+        HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
+        
+        // Brightness
+        Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+            Text("Brightness", style = MaterialTheme.typography.titleMedium)
+            
+            val isAuto = state.readerBrightness < 0
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(if (isAuto) "System Default" else "${(state.readerBrightness * 100).toInt()}%")
+                Spacer(Modifier.weight(1f))
+                Switch(
+                    checked = isAuto,
+                    onCheckedChange = { 
+                        if (it) viewModel.setReaderBrightness(-1.0f)
+                        else viewModel.setReaderBrightness(0.5f)
+                    }
+                )
+            }
+            
+            if (!isAuto) {
+                Slider(
+                    value = state.readerBrightness,
+                    onValueChange = { viewModel.setReaderBrightness(it) },
+                    valueRange = 0.0f..1.0f
+                )
+            }
+        }
+        
+        HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
+        
+        SettingsSectionHeader("Typography")
+        
+        // Font Family
+        Text(
+            text = "Font Family",
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            val fonts = listOf("Serif", "Sans", "Mono")
+            fonts.forEach { font ->
+                FilterChip(
+                    selected = state.readerFontFamily.startsWith(font, ignoreCase = true),
+                    onClick = { viewModel.setReaderFontFamily(if (font == "Sans") "Sans-Serif" else if (font == "Mono") "Monospace" else "Serif") },
+                    label = { Text(font) }
+                )
+            }
+        }
+        
+        Spacer(Modifier.height(16.dp))
+        
+        // Font Size
+        Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+            Text("Font Size: ${(state.readerFontSize * 100).toInt()}%")
+            Slider(
+                value = state.readerFontSize,
+                onValueChange = { viewModel.setReaderFontSize(it) },
+                valueRange = 0.5f..2.0f,
+                steps = 14
+            )
+        }
+        
+        Spacer(Modifier.height(16.dp))
+        
+        // Line Height
+        Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+             Text("Line Spacing: ${String.format("%.1f", state.readerLineHeight)}")
+             Slider(
+                 value = state.readerLineHeight,
+                 onValueChange = { viewModel.setReaderLineHeight(it) },
+                 valueRange = 1.0f..2.5f,
+                 steps = 14
+             )
+        }
+        
+        Spacer(Modifier.height(16.dp))
+        
+        // Text Alignment
+        Text(
+            text = "Alignment",
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            val alignments = listOf("LEFT", "JUSTIFY", "CENTER")
+            alignments.forEach { align ->
+                FilterChip(
+                    selected = state.readerTextAlignment == align,
+                    onClick = { viewModel.setReaderTextAlignment(align) },
+                    label = { Text(align.lowercase().replaceFirstChar { it.uppercase() }) }
+                )
+            }
+        }
+        
+        HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
+        
+        SettingsSectionHeader("Layout")
+        
+        // Margins
+        Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+            Text("Margins: ${state.readerMargin}")
+            Slider(
+                value = state.readerMargin.toFloat(),
+                onValueChange = { viewModel.setReaderMargin(it.toInt()) },
+                valueRange = 0f..10f,
+                steps = 9
+            )
+        }
+        
+        // Paragraph Spacing
+        Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+            Text("Paragraph Spacing: ${String.format("%.1f", state.readerParagraphSpacing)}x")
+            Slider(
+                value = state.readerParagraphSpacing,
+                onValueChange = { viewModel.setReaderParagraphSpacing(it) },
+                valueRange = 0.0f..2.0f,
+                steps = 19
+            )
+        }
+        
+        // Scroll Mode
+        Row(
+             modifier = Modifier
+                 .fillMaxWidth()
+                 .padding(horizontal = 16.dp, vertical = 8.dp),
+             horizontalArrangement = Arrangement.SpaceBetween,
+             verticalAlignment = Alignment.CenterVertically
+         ) {
+             Text("Vertical Scroll", style = MaterialTheme.typography.titleMedium)
+             Switch(
+                 checked = state.readerVerticalScroll,
+                 onCheckedChange = { viewModel.setReaderVerticalScroll(it) }
+             )
+         }
+
+        HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
+        
+        SettingsSectionHeader("Gestures")
+        
+        val gestureLabels = mapOf(
+            "PREV" to "Previous Page",
+            "NEXT" to "Next Page",
+            "MENU" to "Toggle Menu",
+            "NONE" to "None"
+        )
+        
+        // Left Tap
+        var showLeftTapDialog by remember { mutableStateOf(false) }
+        SettingsItem(
+            icon = Icons.Default.TouchApp,
+            title = "Left Tap Action",
+            subtitle = gestureLabels[state.gestureTapLeft] ?: state.gestureTapLeft,
+            onClick = { showLeftTapDialog = true }
+        )
+        if (showLeftTapDialog) {
+            GestureActionDialog(
+                currentAction = state.gestureTapLeft,
+                onActionSelected = { viewModel.setGestureTapLeft(it) },
+                onDismiss = { showLeftTapDialog = false }
+            )
+        }
+        
+        // Center Tap
+        var showCenterTapDialog by remember { mutableStateOf(false) }
+        SettingsItem(
+            icon = Icons.Default.TouchApp,
+            title = "Center Tap Action",
+            subtitle = gestureLabels[state.gestureTapCenter] ?: state.gestureTapCenter,
+            onClick = { showCenterTapDialog = true }
+        )
+        if (showCenterTapDialog) {
+            GestureActionDialog(
+                currentAction = state.gestureTapCenter,
+                onActionSelected = { viewModel.setGestureTapCenter(it) },
+                onDismiss = { showCenterTapDialog = false }
+            )
+        }
+        
+        // Right Tap
+        var showRightTapDialog by remember { mutableStateOf(false) }
+        SettingsItem(
+            icon = Icons.Default.TouchApp,
+            title = "Right Tap Action",
+            subtitle = gestureLabels[state.gestureTapRight] ?: state.gestureTapRight,
+            onClick = { showRightTapDialog = true }
+        )
+        if (showRightTapDialog) {
+            GestureActionDialog(
+                currentAction = state.gestureTapRight,
+                onActionSelected = { viewModel.setGestureTapRight(it) },
+                onDismiss = { showRightTapDialog = false }
+            )
+        }
+    }
+}
+
+
+// AUDIO SETTINGS
+@Composable
+fun AudioSettings(state: SettingsState, viewModel: SettingsViewModel) {
+    Column {
+        SettingsSectionHeader("Playback")
+        
+        var showSpeedDialog by remember { mutableStateOf(false) }
+        SettingsItem(
+            icon = Icons.Default.Speed,
+            title = "Default Playback Speed",
+            subtitle = String.format("%.2fx", state.playbackSpeed),
+            onClick = { showSpeedDialog = true }
+        )
+        
+        if (showSpeedDialog) {
+            PlaybackSpeedDialog(
+                currentSpeed = state.playbackSpeed,
+                onSpeedChanged = { viewModel.setPlaybackSpeed(it) },
+                onDismiss = { showSpeedDialog = false }
+            )
+        }
+        
+        var showTimerDialog by remember { mutableStateOf(false) }
+        SettingsItem(
+            icon = Icons.Default.Timer,
+            title = "Default Sleep Timer",
+            subtitle = if (state.sleepTimerMinutes == 0) "Disabled" else "${state.sleepTimerMinutes} minutes",
+            onClick = { showTimerDialog = true }
+        )
+        
+        if (showTimerDialog) {
+            SleepTimerDialog(
+                currentMinutes = state.sleepTimerMinutes,
+                onMinutesSelected = { viewModel.setSleepTimerMinutes(it) },
+                onDismiss = { showTimerDialog = false }
+            )
+        }
+        
+        Spacer(Modifier.height(16.dp))
+        Text(
+            "Audio enhancements (equalizer, pitch control) coming in Phase 3",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+// LIBRARY SETTINGS
+@Composable
+fun LibrarySettings(
+    state: SettingsState,
+    onServersClick: () -> Unit,
+    onMatchReviewClick: () -> Unit
+) {
+    Column {
+        SettingsSectionHeader("Management")
+        SettingsItem(
+            icon = Icons.Default.Dns,
+            title = "Manage Servers",
+            subtitle = "Connect specific services",
+            onClick = onServersClick
+        )
+        SettingsItem(
+            icon = Icons.Default.Merge,
+            title = "Match Review",
+            subtitle = "Fix incorrect book matches",
+            onClick = onMatchReviewClick
+        )
+    }
+}
+
+// STORAGE SETTINGS
+@Composable
+fun StorageSettings(
+    state: SettingsState,
+    viewModel: SettingsViewModel,
+    onStorageClick: () -> Unit
+) {
+    Column {
+        SettingsSectionHeader("Cache")
+        SettingsItem(
+            icon = Icons.Default.DeleteSweep,
+            title = "Clear Cache",
+            subtitle = "${state.cacheSize} used",
+            showChevron = false,
+            onClick = { viewModel.clearCache() }
+        )
+        SettingsItem(
+            icon = Icons.Default.SdStorage,
+            title = "Storage Management",
+            subtitle = "Manage downloads",
+            onClick = onStorageClick
+        )
+    }
+}
+
+// ACCESSIBILITY SETTINGS (Placeholder for Phase 4)
+@Composable
+fun AccessibilitySettings(state: SettingsState, viewModel: SettingsViewModel) {
+    Column {
+        Text(
+            "Accessibility features coming in Phase 4",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            "• High contrast mode\n• Font size presets\n• TalkBack optimizations\n• Color blindness filters",
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.padding(top = 8.dp)
+        )
+    }
+}
+
+// ABOUT SETTINGS
+@Composable
+fun AboutSettings(state: SettingsState) {
+    Column {
+        SettingsSectionHeader("App Information")
+        SettingsItem(
+            icon = Icons.Default.Info,
+            title = "Version",
+            subtitle = "1.0.0 (Alpha)",
+            showChevron = false,
+            onClick = { }
+        )
+    }
+}
+
+// DIALOGS
+@Composable
+fun ThemeSelectionDialog(
+    currentTheme: String,
+    onThemeSelected: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Choose Theme") },
+        text = {
+            Column {
+                ThemeOption("System Default", currentTheme == "SYSTEM") {
+                    onThemeSelected("SYSTEM")
+                    onDismiss()
+                }
+                ThemeOption("Light", currentTheme == "LIGHT") {
+                    onThemeSelected("LIGHT")
+                    onDismiss()
+                }
+                ThemeOption("Dark", currentTheme == "DARK") {
+                    onThemeSelected("DARK")
+                    onDismiss()
+                }
+                ThemeOption("AMOLED Black", currentTheme == "AMOLED") {
+                    onThemeSelected("AMOLED")
+                    onDismiss()
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
+}
+
+@Composable
+fun PlaybackSpeedDialog(
+    currentSpeed: Float,
+    onSpeedChanged: (Float) -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Playback Speed") },
+        text = {
+            Column {
+                Text(
+                    text = String.format("%.2fx", currentSpeed),
+                    style = MaterialTheme.typography.headlineMedium,
+                    modifier = Modifier.align(Alignment.CenterHorizontally)
+                )
+                Slider(
+                    value = currentSpeed,
+                    onValueChange = onSpeedChanged,
+                    valueRange = 0.5f..3.0f,
+                    steps = 49
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Done")
+            }
+        }
+    )
+}
+
+@Composable
+fun GridSizeDialog(
+    currentWidth: Int,
+    onWidthChanged: (Int) -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Grid Item Size") },
+        text = {
+            Column {
+                Text(
+                    text = "${currentWidth}dp",
+                    style = MaterialTheme.typography.headlineMedium,
+                    modifier = Modifier.align(Alignment.CenterHorizontally)
+                )
+                Text(
+                    text = "Larger items = fewer columns",
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.align(Alignment.CenterHorizontally).padding(bottom = 16.dp)
+                )
+                Slider(
+                    value = currentWidth.toFloat(),
+                    onValueChange = { onWidthChanged(it.toInt()) },
+                    valueRange = 100f..300f,
+                    steps = 19
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Done")
+            }
+        }
+    )
+}
+
+@Composable
+fun SleepTimerDialog(
+    currentMinutes: Int,
+    onMinutesSelected: (Int) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val timerOptions = listOf(0, 15, 30, 45, 60, 90, 120)
+    
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Default Sleep Timer") },
+        text = {
+            Column {
+                timerOptions.forEach { minutes ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                onMinutesSelected(minutes)
+                                onDismiss()
+                            }
+                            .padding(vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(if (minutes == 0) "Disabled" else "$minutes minutes")
+                        RadioButton(
+                            selected = currentMinutes == minutes,
+                            onClick = {
+                                onMinutesSelected(minutes)
+                                onDismiss()
+                            }
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
+}
+
+
+
+@Composable
+fun GestureActionDialog(
+    currentAction: String,
+    onActionSelected: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val options = listOf(
+        "PREV" to "Previous Page",
+        "NEXT" to "Next Page",
+        "MENU" to "Toggle Menu",
+        "NONE" to "None"
+    )
+    
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Select Action") },
+        text = {
+            Column {
+                options.forEach { (action, label) ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                onActionSelected(action)
+                                onDismiss()
+                            }
+                            .padding(vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(label)
+                        RadioButton(
+                            selected = currentAction == action,
+                            onClick = {
+                                onActionSelected(action)
+                                onDismiss()
+                            }
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
+}
+
+// REUSABLE COMPONENTS
 @Composable
 fun SettingsSectionHeader(title: String) {
     Text(
         text = title,
         style = MaterialTheme.typography.labelLarge,
         color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(start = 16.dp, top = 24.dp, bottom = 8.dp)
+        modifier = Modifier.padding(vertical = 12.dp)
     )
 }
 
@@ -321,12 +864,12 @@ fun SettingsItem(
     ListItem(
         headlineContent = { Text(title) },
         supportingContent = subtitle?.let { { Text(it) } },
-        leadingContent = { 
+        leadingContent = {
             Icon(
-                imageVector = icon, 
+                imageVector = icon,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant
-            ) 
+            )
         },
         trailingContent = if (showChevron) {
             { Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null) }
@@ -346,12 +889,12 @@ fun SwitchSettingsItem(
     ListItem(
         headlineContent = { Text(title) },
         supportingContent = subtitle?.let { { Text(it) } },
-        leadingContent = { 
+        leadingContent = {
             Icon(
-                imageVector = icon, 
+                imageVector = icon,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant
-            ) 
+            )
         },
         trailingContent = {
             Switch(checked = checked, onCheckedChange = onCheckedChange)

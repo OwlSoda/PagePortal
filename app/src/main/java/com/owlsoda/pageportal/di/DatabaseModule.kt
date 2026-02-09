@@ -27,13 +27,20 @@ object DatabaseModule {
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_highlights_bookId` ON `highlights` (`bookId`)")
             }
         }
+        
+        val MIGRATION_5_6 = object : androidx.room.migration.Migration(5, 6) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("CREATE TABLE IF NOT EXISTS `bookmarks` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `bookId` INTEGER NOT NULL, `chapterId` TEXT NOT NULL, `fragmentId` TEXT NOT NULL, `audioPosition` INTEGER NOT NULL, `note` TEXT, `createdAt` INTEGER NOT NULL, FOREIGN KEY(`bookId`) REFERENCES `books`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_bookmarks_bookId` ON `bookmarks` (`bookId`)")
+            }
+        }
 
         return Room.databaseBuilder(
             context,
             PagePortalDatabase::class.java,
             "pageportal_db"
         )
-            .addMigrations(MIGRATION_4_5)
+            .addMigrations(MIGRATION_4_5, MIGRATION_5_6)
             .fallbackToDestructiveMigration()
             .build()
     }
@@ -66,5 +73,10 @@ object DatabaseModule {
     @Provides
     fun provideCollectionDao(database: PagePortalDatabase): com.owlsoda.pageportal.core.database.dao.CollectionDao {
         return database.collectionDao()
+    }
+    
+    @Provides
+    fun provideBookmarkDao(database: PagePortalDatabase): com.owlsoda.pageportal.core.database.dao.BookmarkDao {
+        return database.bookmarkDao()
     }
 }
