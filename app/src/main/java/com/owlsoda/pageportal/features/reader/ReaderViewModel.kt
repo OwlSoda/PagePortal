@@ -282,26 +282,39 @@ class ReaderViewModel @Inject constructor(
     }
 
     private suspend fun prepareReadAloudFiles(epubFile: File, bookId: Long) {
+        // BUG-06 FIX: Null-safe context access
+        val ctx = appContext
+        if (ctx == null) {
+            android.util.Log.e("ReaderViewModel", "prepareReadAloudFiles: context is null!")
+            _uiState.update { it.copy(error = "App context not available") }
+            return
+        }
+        
         // We reuse the cache structure from ReadAloudPlayerViewModel
         // This ensures shared cache if user plays via different screens
-        val cacheDir = File(appContext?.cacheDir, "readaloud/$bookId")
+        val cacheDir = File(ctx.cacheDir, "readaloud/$bookId")
         audioCacheDir = cacheDir
         
         if (!cacheDir.exists() || cacheDir.listFiles()?.isEmpty() == true) {
              withContext(Dispatchers.IO) {
                  try {
+                     android.util.Log.d("ReaderViewModel", "Extracting EPUB to $cacheDir")
                      com.owlsoda.pageportal.util.DownloadUtils.unzipFile(epubFile, cacheDir)
+                     android.util.Log.d("ReaderViewModel", "Extraction complete. Files: ${cacheDir.listFiles()?.size ?: 0}")
                  } catch (e: Exception) {
+                     android.util.Log.e("ReaderViewModel", "Unzip failed: ${e.message}")
                      e.printStackTrace()
                  }
              }
         }
         
-        // Initialize player if not already
-        if (exoPlayer == null && appContext != null) {
+        // BUG-01 FIX: Initialize player if not already, with proper sequencing
+        if (exoPlayer == null) {
             withContext(Dispatchers.Main) {
-                initializePlayer(appContext!!)
+                initializePlayer(ctx)
             }
+            // Give ExoPlayer a moment to fully initialize
+            delay(100)
         }
         
         // Load initial track
@@ -339,9 +352,63 @@ class ReaderViewModel @Inject constructor(
     }
     
     private fun loadAudioForChapter(chapterIndex: Int, autoPlay: Boolean = false) {
-        val book = _uiState.value.book ?: return
-        val chapter = book.chapters.getOrNull(chapterIndex) ?: return
-        val smilData = book.smilData[chapter.id] ?: return
+        val book = _uiState.value.book ?: run {
+            appendLog("ERROR: No book loaded")
+            _uiState.update { it.copy(error = "No book loaded") }
+            return
+        }
+        val chapter = book.chapters.getOrNull(chapterIndex) ?: run {
+            appendLog("ERROR: Invalid chapter index $chapterIndex")
+            _uiState.update { it.copy(error = "Invalid chapter") }
+            return
+        }
+        
+        appendLog("Loading audio for chapter $chapterIndex (id=${chapter.id}, href=${chapter.href})")
+        appendLog("Available SMIL keys: ${book.smilData.keys.joinToString()}")
+        
+        // BUG-02 FIX: Try multiple lookup strategies
+        var smilData = book.smilData[chapter.id]
+        
+        if (smilData == null) {
+            appendLog("SMIL lookup by chapter.id failed, trying href basename...")
+            // Fallback: try matching by href basename (without path)
+            val hrefBasename = chapter.href.substringAfterLast("/").substringBefore(".")
+            smilData = book.smilData.values.firstOrNull { data ->
+                data.parList.any { par ->
+                    par.textSrc.contains(hrefBasename, ignoreCase = true)
+                }
+            }
+            if (smilData != null) {
+                appendLog("Found SMIL via href matching: $hrefBasename")
+            }
+        }
+        
+        if (smilData == null) {
+            // Try direct key lookup with common variations
+            val altKeys = listOf(
+                chapter.id,
+                chapter.href,
+                chapter.href.substringAfterLast("/"),
+                "chapter${chapterIndex + 1}",
+                "ch${chapterIndex + 1}"
+            )
+            for (key in altKeys) {
+                smilData = book.smilData[key]
+                if (smilData != null) {
+                    appendLog("Found SMIL via alternate key: $key")
+                    break
+                }
+            }
+        }
+        
+        if (smilData == null) {
+            val errorMsg = "No SMIL data for chapter ${chapter.id}. Book may not have audio overlays."
+            appendLog("ERROR: $errorMsg")
+            _uiState.update { it.copy(error = errorMsg) }
+            return
+        }
+        
+        appendLog("Found SMIL with ${smilData.parList.size} entries")
         
         // Initialize SmilSynchronizer for this chapter
         currentChapterId = chapter.id
@@ -360,29 +427,64 @@ class ReaderViewModel @Inject constructor(
             }
         )
         
-        // We assume the SMIL has ONE audio file reference for simplicity, 
-        // or we take the first one. 
-        // In complex SMIL, multiple audio files map to one text.
-        // But usually it's 1-to-1 per chapter.
+        val firstPar = smilData.parList.firstOrNull() ?: run {
+            appendLog("ERROR: SMIL has no entries")
+            _uiState.update { it.copy(error = "SMIL file is empty") }
+            return
+        }
         
-        val firstPar = smilData.parList.firstOrNull() ?: return
-        val audioPath = firstPar.audioSrc // Relative path in zip, e.g. "audio/01.mp3"
+        // BUG-03 FIX: audioPath from SmilParser is already resolved relative to SMIL dir
+        // It should be a path like "OEBPS/audio/ch01.mp3" - use it directly against cache root
+        val audioPath = firstPar.audioSrc
+        appendLog("Audio path from SMIL: $audioPath")
         
-        // Resolve absolute path in cache
-        val audioFile = File(audioCacheDir, audioPath)
-        val canonicalFile = audioFile.canonicalFile
+        // Try multiple resolutions
+        val candidatePaths = listOf(
+            File(audioCacheDir, audioPath),
+            File(audioCacheDir, audioPath.substringAfterLast("/")),  // Just filename
+            // If path has OEBPS prefix but cache doesn't, try without
+            File(audioCacheDir, audioPath.removePrefix("OEBPS/").removePrefix("oebps/")),
+            // Search recursively as last resort
+        )
         
-        appendLog("Audio: Resolving $audioPath -> ${canonicalFile.path}. Exists: ${canonicalFile.exists()}")
+        var audioFile: File? = null
+        for (candidate in candidatePaths) {
+            val canonicalFile = try { candidate.canonicalFile } catch (e: Exception) { candidate }
+            appendLog("Trying: ${canonicalFile.path} - Exists: ${canonicalFile.exists()}")
+            if (canonicalFile.exists()) {
+                audioFile = canonicalFile
+                break
+            }
+        }
         
-        if (canonicalFile.exists()) {
-             val mediaItem = MediaItem.fromUri(canonicalFile.path)
-             exoPlayer?.let { player ->
-                 player.setMediaItem(mediaItem)
-                 player.prepare()
-                 if (autoPlay) player.play()
-             }
+        // Fallback: recursive search for audio file
+        if (audioFile == null && audioCacheDir != null) {
+            appendLog("Falling back to recursive audio search...")
+            val audioFilename = audioPath.substringAfterLast("/")
+            audioFile = audioCacheDir!!.walkTopDown()
+                .filter { it.isFile && it.name.equals(audioFilename, ignoreCase = true) }
+                .firstOrNull()
+            if (audioFile != null) {
+                appendLog("Found via recursive search: ${audioFile.path}")
+            }
+        }
+        
+        if (audioFile != null && audioFile.exists()) {
+            appendLog("SUCCESS: Loading audio from ${audioFile.path}")
+            val mediaItem = MediaItem.fromUri(audioFile.path)
+            exoPlayer?.let { player ->
+                player.setMediaItem(mediaItem)
+                player.prepare()
+                if (autoPlay) player.play()
+            } ?: run {
+                appendLog("ERROR: ExoPlayer is null!")
+                _uiState.update { it.copy(error = "Audio player not initialized") }
+            }
         } else {
-             appendLog("Audio file missing!")
+            val errorMsg = "Audio file not found: $audioPath"
+            appendLog("ERROR: $errorMsg")
+            appendLog("Cache dir contents: ${audioCacheDir?.listFiles()?.joinToString { it.name } ?: "N/A"}")
+            _uiState.update { it.copy(error = errorMsg) }
         }
     }
     
