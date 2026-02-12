@@ -9,3 +9,7 @@
 ## 2024-05-24 - Slider Precision Controls
 **Learning:** Touch sliders are often imprecise, making it difficult for users to select specific values (like an exact font size). Adding incremental +/- buttons alongside the slider significantly improves usability and accessibility for fine-tuning.
 **Action:** When using `Slider` for precise adjustments, always consider wrapping it in a `Row` with decrement/increment buttons. Ensure these buttons have proper `contentDescription` and `enabled` states based on the slider's range to prevent crashes or invalid states.
+
+## 2024-05-25 - Standardized Empty States
+**Learning:** Inconsistent empty states (text-only vs icon+text) create a disjointed experience. Users rely on consistent visual cues (like a large icon) to quickly understand system status.
+**Action:** Audit screens for local empty state implementations and replace them with the shared `EmptyState` component. Ensure the component supports flexible content (like `ImageVector`) to accommodate diverse use cases.
