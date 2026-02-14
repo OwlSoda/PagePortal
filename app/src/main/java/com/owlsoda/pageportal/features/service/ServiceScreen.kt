@@ -1,32 +1,32 @@
 package com.owlsoda.pageportal.features.service
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.filled.Archive
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.owlsoda.pageportal.features.library.BookCard
 import com.owlsoda.pageportal.features.library.LibraryViewModel
+import com.owlsoda.pageportal.features.library.SortOption
 import com.owlsoda.pageportal.features.library.UnifiedBookDisplay
 import com.owlsoda.pageportal.features.library.ViewMode
+import com.owlsoda.pageportal.ui.components.EmptyState
 import kotlinx.coroutines.launch
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.text.style.TextAlign
-import com.owlsoda.pageportal.features.library.BookCard
-import androidx.compose.foundation.clickable
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Archive
-import androidx.compose.material.icons.filled.Folder
-import androidx.compose.material.icons.automirrored.filled.List
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Sort
-import com.owlsoda.pageportal.features.library.SortOption
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -51,7 +51,7 @@ fun ServiceScreen(
 
     val pagerState = rememberPagerState(pageCount = { 4 })
     val titles = listOf("Recent", "Authors", "Series", "All")
-    val icons = listOf(Icons.Default.Archive, Icons.Default.Person, Icons.Default.Folder, Icons.AutoMirrored.Filled.List)
+    val icons = listOf(Icons.Filled.Archive, Icons.Filled.Person, Icons.Filled.Folder, Icons.AutoMirrored.Filled.List)
 
     Column(modifier = Modifier.fillMaxSize()) {
         // Top Bar
@@ -60,7 +60,7 @@ fun ServiceScreen(
             actions = {
                // Filter/Sort can go here
                IconButton(onClick = { /* TODO: Sort Dialog */ }) {
-                   Icon(Icons.Default.Sort, "Sort")
+                   Icon(Icons.Filled.Sort, "Sort")
                }
             }
         )
@@ -98,7 +98,11 @@ fun RecentPage(books: List<UnifiedBookDisplay>, onBookClick: (String) -> Unit) {
     val recent = books.sortedByDescending { it.id }.take(50) // Placeholder sort
     
     if (recent.isEmpty()) {
-        EmptyStateMessage("No books found")
+        EmptyState(
+            icon = Icons.Filled.Archive,
+            title = "No Recent Activity",
+            message = "Start reading or listening to see your history here."
+        )
         return
     }
 
@@ -117,7 +121,11 @@ fun RecentPage(books: List<UnifiedBookDisplay>, onBookClick: (String) -> Unit) {
 @Composable
 fun AllBooksPage(books: List<UnifiedBookDisplay>, onBookClick: (String) -> Unit) {
      if (books.isEmpty()) {
-        EmptyStateMessage("No books found")
+        EmptyState(
+            icon = Icons.AutoMirrored.Filled.List,
+            title = "No Books Found",
+            message = "This service has no books or they are being synced."
+        )
         return
     }
     
@@ -138,7 +146,11 @@ fun AuthorsPage(books: List<UnifiedBookDisplay>, viewModel: LibraryViewModel) {
     val authors = remember(books) { books.map { it.authors }.distinct().sorted() }
     
     if (authors.isEmpty()) {
-        EmptyStateMessage("No authors found")
+        EmptyState(
+            icon = Icons.Filled.Person,
+            title = "No Authors Found",
+            message = "No author information available."
+        )
         return
     }
 
@@ -151,7 +163,7 @@ fun AuthorsPage(books: List<UnifiedBookDisplay>, viewModel: LibraryViewModel) {
             val author = authors[index]
             ListItem(
                 headlineContent = { Text(author) },
-                leadingContent = { Icon(Icons.Default.Person, null) },
+                leadingContent = { Icon(Icons.Filled.Person, null) },
                 modifier = Modifier.clickable { 
                     // TODO: Navigate to author detail or filter
                     viewModel.selectFilter(author)
@@ -168,7 +180,11 @@ fun SeriesPage(books: List<UnifiedBookDisplay>, viewModel: LibraryViewModel) {
     val seriesList = remember(books) { books.mapNotNull { it.series }.distinct().sorted() }
     
      if (seriesList.isEmpty()) {
-        EmptyStateMessage("No series found")
+        EmptyState(
+            icon = Icons.Filled.Folder,
+            title = "No Series Found",
+            message = "No series information available."
+        )
         return
     }
 
@@ -179,7 +195,7 @@ fun SeriesPage(books: List<UnifiedBookDisplay>, viewModel: LibraryViewModel) {
             val series = seriesList[index]
             ListItem(
                 headlineContent = { Text(series) },
-                leadingContent = { Icon(Icons.Default.Folder, null) },
+                leadingContent = { Icon(Icons.Filled.Folder, null) },
                 modifier = Modifier.clickable { 
                    viewModel.selectFilter(series)
                    viewModel.setViewMode(ViewMode.Series)
@@ -187,12 +203,5 @@ fun SeriesPage(books: List<UnifiedBookDisplay>, viewModel: LibraryViewModel) {
             )
              HorizontalDivider()
         }
-    }
-}
-
-@Composable
-fun EmptyStateMessage(msg: String) {
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Text(msg, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }

@@ -9,3 +9,7 @@
 ## 2024-05-24 - Slider Precision Controls
 **Learning:** Touch sliders are often imprecise, making it difficult for users to select specific values (like an exact font size). Adding incremental +/- buttons alongside the slider significantly improves usability and accessibility for fine-tuning.
 **Action:** When using `Slider` for precise adjustments, always consider wrapping it in a `Row` with decrement/increment buttons. Ensure these buttons have proper `contentDescription` and `enabled` states based on the slider's range to prevent crashes or invalid states.
+
+## 2024-05-25 - Standardized Empty State & Icon Usage
+**Learning:** Inconsistent empty states (local implementations vs shared components) lead to fragmented UX and maintenance overhead. Also, using `Icons.Default` for directional icons (like `MenuBook`) can cause deprecation warnings; `Icons.AutoMirrored.Filled` is the correct usage for RTL support.
+**Action:** Always prefer the shared `EmptyState` component over local variants. When using directional icons, verify if an `AutoMirrored` version exists and use it to ensure future-proof accessibility.

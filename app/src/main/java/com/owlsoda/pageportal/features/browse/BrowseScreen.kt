@@ -4,6 +4,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.LibraryBooks
+import androidx.compose.material.icons.filled.CollectionsBookmark
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -18,6 +22,7 @@ fun BrowseScreen(
 ) {
     var selectedTab by remember { mutableIntStateOf(0) }
     val tabs = listOf("Authors", "Series", "Collections")
+    val icons = listOf(Icons.Filled.Person, Icons.AutoMirrored.Filled.LibraryBooks, Icons.Filled.CollectionsBookmark)
     
     // Update ViewModel when tab changes
     LaunchedEffect(selectedTab) {
@@ -36,7 +41,7 @@ fun BrowseScreen(
                         selected = selectedTab == index,
                         onClick = { selectedTab = index },
                         label = { Text(title) },
-                        icon = { /* TODO: Icons */ }
+                        icon = { Icon(icons[index], contentDescription = title) }
                     )
                 }
             }

@@ -1,51 +1,54 @@
 package com.owlsoda.pageportal.features.library
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.MenuBook
-import androidx.compose.material.icons.filled.Headphones
-import androidx.compose.material.icons.filled.OfflinePin
-import androidx.compose.material.icons.filled.CloudQueue
-import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material.icons.automirrored.filled.Sort
+import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material.icons.filled.Add
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.Category
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.GridView
-
+import androidx.compose.material.icons.filled.CloudOff
+import androidx.compose.material.icons.filled.CloudQueue
 import androidx.compose.material.icons.filled.Folder
-import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.filled.Headphones
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.OfflinePin
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.PowerOff
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.owlsoda.pageportal.services.ServiceType
-import androidx.compose.foundation.background
 import coil.compose.AsyncImage
 import com.owlsoda.pageportal.features.auth.LoginScreen
+import com.owlsoda.pageportal.services.ServiceType
 import com.owlsoda.pageportal.ui.components.EmptyState
 
 private data class EmptyStateInfo(
-    val icon: String,
+    val icon: ImageVector,
     val title: String,
     val message: String,
     val buttonText: String? = null,
@@ -106,10 +109,10 @@ fun LibraryScreen(
                     }) {
                         Icon(
                             when (uiState.viewMode) {
-                                ViewMode.Home -> Icons.Default.Home
-                                ViewMode.Grid -> Icons.Default.GridView
+                                ViewMode.Home -> Icons.Filled.Home
+                                ViewMode.Grid -> Icons.Filled.GridView
                                 ViewMode.List -> Icons.AutoMirrored.Filled.ViewList
-                                else -> Icons.Default.GridView
+                                else -> Icons.Filled.GridView
                             },
                             contentDescription = "View: ${uiState.viewMode.name}"
                         )
@@ -149,29 +152,29 @@ fun LibraryScreen(
                         onCheckedChange = { viewModel.toggleOfflineFilter() }
                     ) {
                         if (uiState.isOfflineFilterActive) {
-                            Icon(Icons.Default.OfflinePin, "Show All", tint = MaterialTheme.colorScheme.primary)
+                            Icon(Icons.Filled.OfflinePin, "Show All", tint = MaterialTheme.colorScheme.primary)
                         } else {
-                            Icon(Icons.Default.CloudQueue, "Show Downloaded Only")
+                            Icon(Icons.Filled.CloudQueue, "Show Downloaded Only")
                         }
                     }
                     IconButton(onClick = { viewModel.refresh() }) {
-                        Icon(Icons.Default.Refresh, contentDescription = "Refresh")
+                        Icon(Icons.Filled.Refresh, contentDescription = "Refresh")
                     }
                     IconButton(onClick = onBrowseClick) {
                         Icon(
-                            imageVector = Icons.Default.Category,
+                            imageVector = Icons.Filled.Category,
                             contentDescription = "Browse"
                         )
                     }
                     IconButton(onClick = onSettingsClick) {
-                        Icon(Icons.Default.Settings, contentDescription = "Settings")
+                        Icon(Icons.Filled.Settings, contentDescription = "Settings")
                     }
                     
                     // Import Button
                     IconButton(onClick = { 
                         importLauncher.launch(arrayOf("application/epub+zip", "audio/*"))
                     }) {
-                        Icon(Icons.Default.Add, contentDescription = "Import Book")
+                        Icon(Icons.Filled.Add, contentDescription = "Import Book")
                     }
                 }
             )
@@ -190,11 +193,11 @@ fun LibraryScreen(
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 8.dp),
                 placeholder = { Text("Search books...") },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
                 trailingIcon = {
                     if (uiState.searchQuery.isNotEmpty()) {
                         IconButton(onClick = { viewModel.updateSearchQuery("") }) {
-                            Icon(Icons.Default.Close, contentDescription = "Clear")
+                            Icon(Icons.Filled.Close, contentDescription = "Clear")
                         }
                     }
                 },
@@ -290,68 +293,10 @@ fun LibraryScreen(
             }
             
             // Content
-            // Content
-            when {
-                uiState.isLoading -> {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        CircularProgressIndicator()
-                    }
-                }
-                uiState.error != null -> {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
-                            modifier = Modifier.padding(16.dp)
-                        ) {
-                            Text(
-                                text = uiState.error!!,
-                                color = MaterialTheme.colorScheme.error,
-                                textAlign = TextAlign.Center
-                            )
-                            Button(onClick = { viewModel.refresh() }) {
-                                Text("Retry")
-                            }
-                        }
-                    }
-                }
-                uiState.books.isEmpty() -> {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            modifier = Modifier.padding(32.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.MenuBook,
-                                contentDescription = null,
-                                modifier = Modifier.size(72.dp),
-                                tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
-                            )
-                            Spacer(modifier = Modifier.height(16.dp))
-                            Text(
-                                text = "Your library is empty",
-                                style = MaterialTheme.typography.headlineSmall
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = "Connect to your servers to sync books",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                textAlign = TextAlign.Center
-=======
-=======
->>>>>>> 1e4d143 (Merge fix-login-crashes branch into main: Resolved LibraryScreen conflict by keeping new UI)
             Box(
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
             ) {
                  when {
                         // Error State
@@ -373,15 +318,15 @@ fun LibraryScreen(
                         uiState.books.isEmpty() && !uiState.isLoading -> {
                             val info = when {
                                 uiState.servers.isEmpty() -> {
-                                    EmptyStateInfo("🔌", "No Services Connected", "Go to Settings to add Storyteller or other services.", "Open Settings", onSettingsClick)
+                                    EmptyStateInfo(Icons.Filled.PowerOff, "No Services Connected", "Go to Settings to add Storyteller or other services.", "Open Settings", onSettingsClick)
                                 }
                                 
                                 uiState.isOfflineFilterActive -> {
-                                    EmptyStateInfo("☁️", "No Downloaded Books", "Download books while online to read them here.", null, null)
+                                    EmptyStateInfo(Icons.Filled.CloudOff, "No Downloaded Books", "Download books while online to read them here.", null, null)
                                 }
                                 
                                 else -> {
-                                    EmptyStateInfo("📚", "No Books Found", "Pull down to refresh or check your server connection.", null, null)
+                                    EmptyStateInfo(Icons.AutoMirrored.Filled.MenuBook, "No Books Found", "Pull down to refresh or check your server connection.", null, null)
                                 }
                             }
                             
@@ -395,7 +340,7 @@ fun LibraryScreen(
                             Spacer(modifier = Modifier.height(16.dp))
                             OutlinedButton(onClick = { viewModel.refresh() }) {
                                 Icon(
-                                    imageVector = Icons.Default.Refresh,
+                                    imageVector = Icons.Filled.Refresh,
                                     contentDescription = null,
                                     modifier = Modifier.size(18.dp)
                                 )
@@ -441,13 +386,13 @@ fun LibraryScreen(
                                                     }
                                                 }
                                             ) {
-                                                Icon(Icons.Default.CloudQueue, contentDescription = null, modifier = Modifier.size(18.dp))
+                                                Icon(Icons.Filled.CloudQueue, contentDescription = null, modifier = Modifier.size(18.dp))
                                                 Spacer(modifier = Modifier.width(8.dp))
                                                 Text("Download All")
                                             }
                                             
                                             IconButton(onClick = { viewModel.clearFilter() }) {
-                                                Icon(Icons.Default.Close, "Clear Selection")
+                                                Icon(Icons.Filled.Close, "Clear Selection")
                                             }
                                         }
                                     }
@@ -464,7 +409,7 @@ fun LibraryScreen(
                                             val series = uiState.uniqueSeries[index]
                                             ListItem(
                                                 headlineContent = { Text(series) },
-                                                leadingContent = { Icon(Icons.Default.Folder, contentDescription = null) },
+                                                leadingContent = { Icon(Icons.Filled.Folder, contentDescription = null) },
                                                 modifier = Modifier.clickable { viewModel.selectFilter(series) }
                                             )
                                             HorizontalDivider()
@@ -480,7 +425,7 @@ fun LibraryScreen(
                                             val author = uiState.uniqueAuthors[index]
                                             ListItem(
                                                 headlineContent = { Text(author) },
-                                                leadingContent = { Icon(Icons.Default.Person, contentDescription = null) },
+                                                leadingContent = { Icon(Icons.Filled.Person, contentDescription = null) },
                                                 modifier = Modifier.clickable { viewModel.selectFilter(author) }
                                             )
                                             HorizontalDivider()
@@ -695,7 +640,7 @@ fun BookCard(
                                 modifier = Modifier.padding(horizontal = 6.dp)
                             ) {
                                 Icon(
-                                    imageVector = Icons.Default.Headphones,
+                                    imageVector = Icons.Filled.Headphones,
                                     contentDescription = "Audiobook available",
                                     modifier = Modifier.size(14.dp),
                                     tint = MaterialTheme.colorScheme.onSecondaryContainer
