@@ -9,3 +9,7 @@
 ## 2024-05-24 - Slider Precision Controls
 **Learning:** Touch sliders are often imprecise, making it difficult for users to select specific values (like an exact font size). Adding incremental +/- buttons alongside the slider significantly improves usability and accessibility for fine-tuning.
 **Action:** When using `Slider` for precise adjustments, always consider wrapping it in a `Row` with decrement/increment buttons. Ensure these buttons have proper `contentDescription` and `enabled` states based on the slider's range to prevent crashes or invalid states.
+
+## 2024-05-25 - Standardizing Empty States with Icons
+**Learning:** The project used emoji strings for `EmptyState` icons, which are inconsistent and less screen-reader friendly (literal descriptions). Switching to standard `ImageVector`s allows for better theming (using `MaterialTheme.colorScheme.primary`) and ensures icons are decorative (null content description) when accompanied by text.
+**Action:** Refactor UI components like `EmptyState` to accept `ImageVector` instead of `String`. Ensure all usages pass meaningful Material Icons (e.g. `Icons.AutoMirrored.Filled.LibraryBooks`) and null content descriptions where appropriate.
