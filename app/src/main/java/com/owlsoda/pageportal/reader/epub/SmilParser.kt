@@ -75,10 +75,25 @@ object SmilParser {
     
     private fun resolvePath(baseDir: String, src: String?): String? {
         if (src == null) return null
-        if (src.startsWith("/") || src.contains(":")) return src // Absolute or protocol
+        // URL-decode the src (e.g. %20 -> space)
+        val decoded = try { java.net.URLDecoder.decode(src, "UTF-8") } catch (e: Exception) { src }
+        if (decoded.startsWith("/") || decoded.contains(":")) return decoded // Absolute or protocol
         
+        // Combine baseDir and src, then normalize ../  and ./ segments
         val separator = if (baseDir.isNotEmpty() && !baseDir.endsWith("/")) "/" else ""
-        return baseDir + separator + src
+        val combined = baseDir + separator + decoded
+        
+        // Normalize: resolve ".." and "." path components
+        val parts = combined.split("/").toMutableList()
+        val normalized = mutableListOf<String>()
+        for (part in parts) {
+            when (part) {
+                ".", "" -> if (normalized.isEmpty()) normalized.add(part) // preserve leading empty
+                ".." -> if (normalized.isNotEmpty() && normalized.last() != "..") normalized.removeAt(normalized.size - 1)
+                else -> normalized.add(part)
+            }
+        }
+        return normalized.joinToString("/")
     }
 
     private fun parseSmilTime(timeStr: String?): Float {

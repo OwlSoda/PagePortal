@@ -89,6 +89,7 @@ class EpubParser {
         val chapterSmilMap = mutableMapOf<String, String>() // Chapter ID -> SMIL ID
         var coverId: String? = null
         var hasMediaOverlays = false
+        var ncxHref: String? = null // NCX file for chapter titles
 
         while (parser.next() != XmlPullParser.END_DOCUMENT) {
             if (parser.eventType == XmlPullParser.START_TAG) {
@@ -114,6 +115,9 @@ class EpubParser {
                             if (mediaType == "application/smil+xml") {
                                 hasMediaOverlays = true
                                 smilFiles[id] = fullPath
+                            }
+                            if (mediaType == "application/x-dtbncx+xml") {
+                                ncxHref = fullPath
                             }
                             
                             if (mediaOverlay != null) {
@@ -141,13 +145,61 @@ class EpubParser {
             }
         }
         
+        // Parse NCX for chapter titles
+        val chapterTitles = mutableMapOf<String, String>() // href -> title
+        if (ncxHref != null) {
+            try {
+                val ncxEntry = zip.getEntry(ncxHref)
+                if (ncxEntry != null) {
+                    val ncxParser = Xml.newPullParser().apply {
+                        setInput(zip.getInputStream(ncxEntry), null)
+                        setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, false)
+                    }
+                    var currentTitle: String? = null
+                    var inNavLabel = false
+                    while (ncxParser.next() != XmlPullParser.END_DOCUMENT) {
+                        when (ncxParser.eventType) {
+                            XmlPullParser.START_TAG -> {
+                                when (ncxParser.name) {
+                                    "navLabel" -> inNavLabel = true
+                                    "text" -> {
+                                        if (inNavLabel && ncxParser.next() == XmlPullParser.TEXT) {
+                                            currentTitle = ncxParser.text
+                                        }
+                                    }
+                                    "content" -> {
+                                        val src = ncxParser.getAttributeValue(null, "src")
+                                        if (src != null && currentTitle != null) {
+                                            // Normalize: remove fragment, resolve path
+                                            val hrefNoFragment = src.substringBefore("#")
+                                            val fullHref = basePath + hrefNoFragment
+                                            chapterTitles[fullHref] = currentTitle!!
+                                            android.util.Log.d("EpubParser", "NCX title: '$currentTitle' -> '$fullHref'")
+                                        }
+                                    }
+                                }
+                            }
+                            XmlPullParser.END_TAG -> {
+                                when (ncxParser.name) {
+                                    "navLabel" -> inNavLabel = false
+                                    "navPoint" -> currentTitle = null
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("EpubParser", "Error parsing NCX: ${e.message}")
+            }
+        }
+        
         // Build chapters from spine
         val chapters = spine.mapNotNull { idref ->
             manifest[idref]?.let { href ->
                 EpubChapter(
                     id = idref,
                     href = href,
-                    title = null // Title usually requires parsing NCX, skipping for v0
+                    title = chapterTitles[href] // Look up title from NCX
                 )
             }
         }
@@ -159,6 +211,11 @@ class EpubParser {
         val smilDataMap = mutableMapOf<String, SmilData>()
         
         if (hasMediaOverlays) {
+            android.util.Log.d("EpubParser", "=== SMIL Mapping Debug ===")
+            android.util.Log.d("EpubParser", "smilFiles (${smilFiles.size}): ${smilFiles.entries.joinToString { "${it.key} -> ${it.value}" }}")
+            android.util.Log.d("EpubParser", "chapterSmilMap (${chapterSmilMap.size}): ${chapterSmilMap.entries.joinToString { "${it.key} -> ${it.value}" }}")
+            android.util.Log.d("EpubParser", "spine (${spine.size}): ${spine.joinToString()}")
+            
             // first parse all SMIL files by their own ID
             val rawSmilData = mutableMapOf<String, SmilData>()
             
@@ -172,8 +229,21 @@ class EpubParser {
                         // We use the SMIL ID for internal storage
                         val data = SmilParser.parse(zip.getInputStream(entry), smilId, smilDir)
                         rawSmilData[smilId] = data
+                        android.util.Log.d("EpubParser", "Parsed SMIL '$smilId' from '$href': ${data.parList.size} pars")
+                    } else {
+                        android.util.Log.e("EpubParser", "SMIL zip entry NOT FOUND: '$href'")
+                        // Try without basePath prefix in case it's already included
+                        val altHref = href.removePrefix(basePath)
+                        val altEntry = zip.getEntry(altHref)
+                        if (altEntry != null) {
+                            val smilDir = if (altHref.contains("/")) altHref.substringBeforeLast("/") else ""
+                            val data = SmilParser.parse(zip.getInputStream(altEntry), smilId, smilDir)
+                            rawSmilData[smilId] = data
+                            android.util.Log.d("EpubParser", "Found SMIL via alt path '$altHref': ${data.parList.size} pars")
+                        }
                     }
                 } catch (e: Exception) {
+                    android.util.Log.e("EpubParser", "Error parsing SMIL '$smilId': ${e.message}")
                     e.printStackTrace()
                 }
             }
@@ -183,8 +253,13 @@ class EpubParser {
                 val data = rawSmilData[smilId]
                 if (data != null) {
                     smilDataMap[chapterId] = data
+                    android.util.Log.d("EpubParser", "Mapped chapter '$chapterId' -> SMIL '$smilId' (${data.parList.size} pars)")
+                } else {
+                    android.util.Log.e("EpubParser", "No raw SMIL data for smilId='$smilId' (chapter='$chapterId')")
                 }
             }
+            
+            android.util.Log.d("EpubParser", "Final smilDataMap keys (${smilDataMap.size}): ${smilDataMap.keys.joinToString()}")
         }
         
         val coverImage = coverId?.let { manifest[it] }

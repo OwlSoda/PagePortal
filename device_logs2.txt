@@ -1,0 +1,66 @@
+--------- beginning of main
+02-10 09:05:06.977 17629 17675 D EpubParser: === SMIL Mapping Debug ===
+02-10 09:05:06.977 17629 17675 D EpubParser: smilFiles (4): p01_overlay -> MediaOverlays/King_9780385528832_epub_p01_r1.smil, c01_overlay -> MediaOverlays/King_9780385528832_epub_c01_r1.smil, c02_overlay -> MediaOverlays/King_9780385528832_epub_c02_r1.smil, c03_overlay -> MediaOverlays/King_9780385528832_epub_c03_r1.smil
+02-10 09:05:06.977 17629 17675 D EpubParser: chapterSmilMap (4): p01 -> p01_overlay, c01 -> c01_overlay, c02 -> c02_overlay, c03 -> c03_overlay
+02-10 09:05:06.977 17629 17675 D EpubParser: spine (15): cvi, tp, fip, toc, ded, fm, p01, c01, p02, c02, p03, c03, adc, ftn, cop
+02-10 09:05:06.978 17629 17675 D EpubParser: Parsed SMIL 'p01_overlay' from 'MediaOverlays/King_9780385528832_epub_p01_r1.smil': 0 pars
+02-10 09:05:07.110 17629 17675 D EpubParser: Parsed SMIL 'c01_overlay' from 'MediaOverlays/King_9780385528832_epub_c01_r1.smil': 2501 pars
+02-10 09:05:07.227 17629 17675 D EpubParser: Parsed SMIL 'c02_overlay' from 'MediaOverlays/King_9780385528832_epub_c02_r1.smil': 2761 pars
+02-10 09:05:07.232 17629 17675 D EpubParser: Parsed SMIL 'c03_overlay' from 'MediaOverlays/King_9780385528832_epub_c03_r1.smil': 106 pars
+02-10 09:05:07.232 17629 17675 D EpubParser: Mapped chapter 'p01' -> SMIL 'p01_overlay' (0 pars)
+02-10 09:05:07.232 17629 17675 D EpubParser: Mapped chapter 'c01' -> SMIL 'c01_overlay' (2501 pars)
+02-10 09:05:07.232 17629 17675 D EpubParser: Mapped chapter 'c02' -> SMIL 'c02_overlay' (2761 pars)
+02-10 09:05:07.232 17629 17675 D EpubParser: Mapped chapter 'c03' -> SMIL 'c03_overlay' (106 pars)
+02-10 09:05:07.232 17629 17675 D EpubParser: Final smilDataMap keys (4): p01, c01, c02, c03
+02-10 09:05:07.243 17629 17629 D ReaderViewModel: initializePlayer: Creating ExoPlayer...
+02-10 09:05:07.286 17629 17629 D ReaderViewModel: ExoPlayer created, audio session ID: 122825
+02-10 09:12:50.442 19842 19887 D EpubParser: === SMIL Mapping Debug ===
+02-10 09:12:50.442 19842 19887 D EpubParser: smilFiles (4): p01_overlay -> MediaOverlays/King_9780385528832_epub_p01_r1.smil, c01_overlay -> MediaOverlays/King_9780385528832_epub_c01_r1.smil, c02_overlay -> MediaOverlays/King_9780385528832_epub_c02_r1.smil, c03_overlay -> MediaOverlays/King_9780385528832_epub_c03_r1.smil
+02-10 09:12:50.442 19842 19887 D EpubParser: chapterSmilMap (4): p01 -> p01_overlay, c01 -> c01_overlay, c02 -> c02_overlay, c03 -> c03_overlay
+02-10 09:12:50.442 19842 19887 D EpubParser: spine (15): cvi, tp, fip, toc, ded, fm, p01, c01, p02, c02, p03, c03, adc, ftn, cop
+02-10 09:12:50.442 19842 19887 D EpubParser: Parsed SMIL 'p01_overlay' from 'MediaOverlays/King_9780385528832_epub_p01_r1.smil': 0 pars
+02-10 09:12:50.564 19842 19887 D EpubParser: Parsed SMIL 'c01_overlay' from 'MediaOverlays/King_9780385528832_epub_c01_r1.smil': 2501 pars
+02-10 09:12:50.680 19842 19887 D EpubParser: Parsed SMIL 'c02_overlay' from 'MediaOverlays/King_9780385528832_epub_c02_r1.smil': 2761 pars
+02-10 09:12:50.685 19842 19887 D EpubParser: Parsed SMIL 'c03_overlay' from 'MediaOverlays/King_9780385528832_epub_c03_r1.smil': 106 pars
+02-10 09:12:50.685 19842 19887 D EpubParser: Mapped chapter 'p01' -> SMIL 'p01_overlay' (0 pars)
+02-10 09:12:50.685 19842 19887 D EpubParser: Mapped chapter 'c01' -> SMIL 'c01_overlay' (2501 pars)
+02-10 09:12:50.685 19842 19887 D EpubParser: Mapped chapter 'c02' -> SMIL 'c02_overlay' (2761 pars)
+02-10 09:12:50.685 19842 19887 D EpubParser: Mapped chapter 'c03' -> SMIL 'c03_overlay' (106 pars)
+02-10 09:12:50.685 19842 19887 D EpubParser: Final smilDataMap keys (4): p01, c01, c02, c03
+02-10 09:12:50.690 19842 19842 D ReaderViewModel: initializePlayer: Creating ExoPlayer...
+02-10 09:12:50.748 19842 19842 D ReaderViewModel: ExoPlayer created, audio session ID: 122841
+02-10 09:14:59.161 20853 20905 D EpubParser: === SMIL Mapping Debug ===
+02-10 09:14:59.161 20853 20905 D EpubParser: smilFiles (4): p01_overlay -> MediaOverlays/King_9780385528832_epub_p01_r1.smil, c01_overlay -> MediaOverlays/King_9780385528832_epub_c01_r1.smil, c02_overlay -> MediaOverlays/King_9780385528832_epub_c02_r1.smil, c03_overlay -> MediaOverlays/King_9780385528832_epub_c03_r1.smil
+02-10 09:14:59.161 20853 20905 D EpubParser: chapterSmilMap (4): p01 -> p01_overlay, c01 -> c01_overlay, c02 -> c02_overlay, c03 -> c03_overlay
+02-10 09:14:59.161 20853 20905 D EpubParser: spine (15): cvi, tp, fip, toc, ded, fm, p01, c01, p02, c02, p03, c03, adc, ftn, cop
+02-10 09:14:59.161 20853 20905 D EpubParser: Parsed SMIL 'p01_overlay' from 'MediaOverlays/King_9780385528832_epub_p01_r1.smil': 0 pars
+02-10 09:14:59.282 20853 20905 D EpubParser: Parsed SMIL 'c01_overlay' from 'MediaOverlays/King_9780385528832_epub_c01_r1.smil': 2501 pars
+02-10 09:14:59.402 20853 20905 D EpubParser: Parsed SMIL 'c02_overlay' from 'MediaOverlays/King_9780385528832_epub_c02_r1.smil': 2761 pars
+02-10 09:14:59.406 20853 20905 D EpubParser: Parsed SMIL 'c03_overlay' from 'MediaOverlays/King_9780385528832_epub_c03_r1.smil': 106 pars
+02-10 09:14:59.407 20853 20905 D EpubParser: Mapped chapter 'p01' -> SMIL 'p01_overlay' (0 pars)
+02-10 09:14:59.407 20853 20905 D EpubParser: Mapped chapter 'c01' -> SMIL 'c01_overlay' (2501 pars)
+02-10 09:14:59.407 20853 20905 D EpubParser: Mapped chapter 'c02' -> SMIL 'c02_overlay' (2761 pars)
+02-10 09:14:59.407 20853 20905 D EpubParser: Mapped chapter 'c03' -> SMIL 'c03_overlay' (106 pars)
+02-10 09:14:59.407 20853 20905 D EpubParser: Final smilDataMap keys (4): p01, c01, c02, c03
+02-10 09:14:59.409 20853 20853 D ReaderViewModel: initializePlayer: Creating ExoPlayer...
+02-10 09:14:59.453 20853 20853 D ReaderViewModel: ExoPlayer created, audio session ID: 122849
+02-10 09:15:02.996 20853 20853 D ReaderViewModel: toggleAudioPlay called
+02-10 09:15:02.996 20853 20853 D ReaderViewModel: ExoPlayer exists, isPlaying = false
+02-10 09:15:02.997 20853 20853 D ReaderViewModel: Calling player.play()
+02-10 09:15:33.643 20853 20853 D ReaderViewModel: toggleAudioPlay called
+02-10 09:15:33.643 20853 20853 D ReaderViewModel: ExoPlayer exists, isPlaying = true
+02-10 09:15:33.645 20853 20853 D ReaderViewModel: Paused at position 13440
+02-10 09:15:34.157 20853 20853 D ReaderViewModel: toggleAudioPlay called
+02-10 09:15:34.157 20853 20853 D ReaderViewModel: ExoPlayer exists, isPlaying = false
+02-10 09:15:34.158 20853 20853 D ReaderViewModel: Rewound to position 8440
+02-10 09:15:34.158 20853 20853 D ReaderViewModel: Calling player.play()
+02-10 09:15:59.484 20853 20853 D ReaderViewModel: toggleAudioPlay called
+02-10 09:15:59.485 20853 20853 D ReaderViewModel: ExoPlayer exists, isPlaying = true
+02-10 09:15:59.486 20853 20853 D ReaderViewModel: Paused at position 33648
+02-10 09:16:00.025 20853 20853 D ReaderViewModel: toggleAudioPlay called
+02-10 09:16:00.025 20853 20853 D ReaderViewModel: ExoPlayer exists, isPlaying = false
+02-10 09:16:00.027 20853 20853 D ReaderViewModel: Rewound to position 28648
+02-10 09:16:00.027 20853 20853 D ReaderViewModel: Calling player.play()
+02-10 09:16:12.647 20853 20853 D ReaderViewModel: toggleAudioPlay called
+02-10 09:16:12.647 20853 20853 D ReaderViewModel: ExoPlayer exists, isPlaying = true
+02-10 09:16:12.649 20853 20853 D ReaderViewModel: Paused at position 41148

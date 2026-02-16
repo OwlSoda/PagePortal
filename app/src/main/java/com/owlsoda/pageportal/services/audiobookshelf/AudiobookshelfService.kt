@@ -2,6 +2,9 @@ package com.owlsoda.pageportal.services.audiobookshelf
 
 import android.os.Build
 import com.owlsoda.pageportal.services.*
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import okhttp3.OkHttpClient
@@ -118,26 +121,36 @@ class AudiobookshelfService(
     override suspend fun listBooks(page: Int, pageSize: Int): List<ServiceBook> {
         return try {
             val validTypes = setOf("book", "audiobook")
-            val targetLibraryId = defaultLibraryId ?: run {
-                val libraries = getApi().getLibraries(bearerToken())
-                libraries.libraries.firstOrNull { it.mediaType in validTypes }?.id
-            }
+            // Fetch all libraries matches valid types (usually type "book" covers both)
+            val allLibraries = getApi().getLibraries(bearerToken())
+            val targetLibraries = allLibraries.libraries.filter { it.mediaType in validTypes }
 
-            if (targetLibraryId == null) {
-                android.util.Log.w("AudiobookshelfService", "No valid book/audiobook library found.")
+            if (targetLibraries.isEmpty()) {
+                android.util.Log.w("AudiobookshelfService", "No valid book/audiobook libraries found.")
                 return emptyList()
             }
             
-            android.util.Log.d("AudiobookshelfService", "Listing books from library: $targetLibraryId (page $page)")
+            android.util.Log.d("AudiobookshelfService", "Listing books from ${targetLibraries.size} libraries (page $page)")
 
-            val response = getApi().getLibraryItems(
-                token = bearerToken(),
-                libraryId = targetLibraryId,
-                page = page,
-                limit = pageSize
-            )
-            
-            response.results.map { it.toServiceBook() }
+            // Query all target libraries in parallel
+            coroutineScope {
+                targetLibraries.map { library ->
+                    async {
+                        try {
+                            val response = getApi().getLibraryItems(
+                                token = bearerToken(),
+                                libraryId = library.id,
+                                page = page,
+                                limit = pageSize
+                            )
+                            response.results.map { it.toServiceBook() }
+                        } catch (e: Exception) {
+                            android.util.Log.e("AudiobookshelfService", "Failed to list library ${library.name}", e)
+                            emptyList<ServiceBook>()
+                        }
+                    }
+                }.awaitAll().flatten()
+            }
         } catch (e: Exception) {
             android.util.Log.e("AudiobookshelfService", "Failed to list books", e)
             emptyList()
@@ -225,12 +238,24 @@ class AudiobookshelfService(
     
     suspend fun searchBooks(query: String): List<ServiceBook> {
         return try {
-            val libraryId = defaultLibraryId ?: getApi().getLibraries(bearerToken())
-                .libraries.firstOrNull { it.mediaType == "book" }?.id
-                ?: return emptyList()
+            val validTypes = setOf("book", "audiobook")
+            val allLibraries = getApi().getLibraries(bearerToken())
+            val targetLibraries = allLibraries.libraries.filter { it.mediaType in validTypes }
             
-            val response = getApi().search(bearerToken(), libraryId, query)
-            response.book?.map { it.libraryItem.toServiceBook() } ?: emptyList()
+            if (targetLibraries.isEmpty()) return emptyList()
+            
+            coroutineScope {
+                targetLibraries.map { library ->
+                    async {
+                        try {
+                            val response = getApi().search(bearerToken(), library.id, query)
+                            response.book?.map { it.libraryItem.toServiceBook() } ?: emptyList()
+                        } catch (e: Exception) {
+                            emptyList<ServiceBook>()
+                        }
+                    }
+                }.awaitAll().flatten()
+            }
         } catch (e: Exception) {
             emptyList()
         }

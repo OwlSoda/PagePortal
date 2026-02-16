@@ -12,6 +12,7 @@ class SmilSynchronizer(
     
     private var currentHighlightedPar: SmilPar? = null
     private var currentParIndex: Int = -1
+    private var currentChapterHref: String? = null
     
     /**
      * Update based on current playback position in milliseconds.
@@ -26,6 +27,14 @@ class SmilSynchronizer(
             
             // Parse textSrc: "chapter1.html#para1" or "OEBPS/Text/chapter1.html#para1"
             val (chapterHref, fragmentId) = parseTextSrc(newPar.textSrc)
+            
+            // Check if we've moved to a different chapter file
+            if (currentChapterHref != null && chapterHref != currentChapterHref) {
+                if (fragmentId != null) {
+                    onChapterChange(chapterHref, fragmentId)
+                }
+            }
+            currentChapterHref = chapterHref
             
             if (fragmentId != null) {
                 onHighlight(fragmentId, chapterHref)

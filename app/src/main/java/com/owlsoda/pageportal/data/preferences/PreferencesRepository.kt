@@ -48,6 +48,10 @@ class PreferencesRepository @Inject constructor(
         val GESTURE_TAP_LEFT = stringPreferencesKey("gesture_tap_left") // "PREV", "NEXT", "MENU", "NONE"
         val GESTURE_TAP_CENTER = stringPreferencesKey("gesture_tap_center")
         val GESTURE_TAP_RIGHT = stringPreferencesKey("gesture_tap_right")
+        
+        // Audio Settings
+        val REWIND_SECONDS = intPreferencesKey("rewind_seconds")
+        val FORWARD_SECONDS = intPreferencesKey("forward_seconds")
     }
 
     val isOfflineModeEnabled: Flow<Boolean> = context.dataStore.data
@@ -212,6 +216,23 @@ class PreferencesRepository @Inject constructor(
     suspend fun setGestureTapRight(action: String) {
         context.dataStore.edit { it[PreferencesKeys.GESTURE_TAP_RIGHT] = action }
     }
+    
+    // Audio Settings
+    val rewindSeconds: Flow<Int> = context.dataStore.data
+        .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
+        .map { it[PreferencesKeys.REWIND_SECONDS] ?: 10 } // Default 10s
+
+    suspend fun setRewindSeconds(seconds: Int) {
+        context.dataStore.edit { it[PreferencesKeys.REWIND_SECONDS] = seconds }
+    }
+
+    val forwardSeconds: Flow<Int> = context.dataStore.data
+        .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
+        .map { it[PreferencesKeys.FORWARD_SECONDS] ?: 30 } // Default 30s
+
+    suspend fun setForwardSeconds(seconds: Int) {
+        context.dataStore.edit { it[PreferencesKeys.FORWARD_SECONDS] = seconds }
+    }
 
     suspend fun getPreferencesBackup(): AppPreferencesBackup {
         var backup = AppPreferencesBackup()
@@ -233,7 +254,9 @@ class PreferencesRepository @Inject constructor(
                 readerBrightness = prefs[PreferencesKeys.READER_BRIGHTNESS] ?: -1.0f,
                 gestureTapLeft = prefs[PreferencesKeys.GESTURE_TAP_LEFT] ?: "PREV",
                 gestureTapCenter = prefs[PreferencesKeys.GESTURE_TAP_CENTER] ?: "MENU",
-                gestureTapRight = prefs[PreferencesKeys.GESTURE_TAP_RIGHT] ?: "NEXT"
+                gestureTapRight = prefs[PreferencesKeys.GESTURE_TAP_RIGHT] ?: "NEXT",
+                rewindSeconds = prefs[PreferencesKeys.REWIND_SECONDS] ?: 10,
+                forwardSeconds = prefs[PreferencesKeys.FORWARD_SECONDS] ?: 30
             )
             throw kotlinx.coroutines.CancellationException("Backup collected") // Break collection
         }
@@ -260,7 +283,9 @@ class PreferencesRepository @Inject constructor(
             readerBrightness = prefs[PreferencesKeys.READER_BRIGHTNESS] ?: -1.0f,
             gestureTapLeft = prefs[PreferencesKeys.GESTURE_TAP_LEFT] ?: "PREV",
             gestureTapCenter = prefs[PreferencesKeys.GESTURE_TAP_CENTER] ?: "MENU",
-            gestureTapRight = prefs[PreferencesKeys.GESTURE_TAP_RIGHT] ?: "NEXT"
+            gestureTapRight = prefs[PreferencesKeys.GESTURE_TAP_RIGHT] ?: "NEXT",
+            rewindSeconds = prefs[PreferencesKeys.REWIND_SECONDS] ?: 10,
+            forwardSeconds = prefs[PreferencesKeys.FORWARD_SECONDS] ?: 30
         )
     }
 
@@ -283,6 +308,8 @@ class PreferencesRepository @Inject constructor(
             prefs[PreferencesKeys.GESTURE_TAP_LEFT] = backup.gestureTapLeft
             prefs[PreferencesKeys.GESTURE_TAP_CENTER] = backup.gestureTapCenter
             prefs[PreferencesKeys.GESTURE_TAP_RIGHT] = backup.gestureTapRight
+            prefs[PreferencesKeys.REWIND_SECONDS] = backup.rewindSeconds
+            prefs[PreferencesKeys.FORWARD_SECONDS] = backup.forwardSeconds
         }
     }
 }

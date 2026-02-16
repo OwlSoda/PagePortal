@@ -38,7 +38,9 @@ fun BookDetailScreen(
     onBack: () -> Unit,
     onPlayAudiobook: (String) -> Unit,
     onReadEbook: (String) -> Unit,
+    onReadEbook: (String) -> Unit,
     onPlayReadAloud: (String) -> Unit,
+    onAuthorClick: (String) -> Unit,
     viewModel: BookDetailViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsState()
@@ -154,7 +156,10 @@ fun BookDetailScreen(
                             text = book.authors,
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = TextAlign.Center
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier
+                                .clickable { onAuthorClick(book.authors) }
+                                .padding(4.dp)
                         )
                         
                         if (!book.series.isNullOrBlank()) {

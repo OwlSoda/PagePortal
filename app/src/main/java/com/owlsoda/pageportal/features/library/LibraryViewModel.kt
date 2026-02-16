@@ -347,6 +347,12 @@ class LibraryViewModel @Inject constructor(
             }
         }
         
+        // Build unique authors/series BEFORE applying author/series filter
+        // Use 'filtered' here (which already has tab + global filters) so only 
+        // authors/series with visible books appear in the list
+        val uniqueAuthors = filtered.map { it.authors }.distinct().sorted()
+        val uniqueSeries = filtered.mapNotNull { it.series }.distinct().sorted()
+        
         // Apply view-specific filtering
         if (state.viewMode == ViewMode.Authors && state.selectedFilter != null) {
             filtered = filtered.filter { it.authors == state.selectedFilter }
@@ -356,10 +362,6 @@ class LibraryViewModel @Inject constructor(
         
         // Apply sorting
         filtered = applySorting(filtered, state.sortOption, state.viewMode, state.selectedFilter)
-        
-        // Build unique authors/series for grouped views
-        val uniqueAuthors = allUnifiedBooks.map { it.authors }.distinct().sorted()
-        val uniqueSeries = allUnifiedBooks.mapNotNull { it.series }.distinct().sorted()
         
         // Home Screen Data
         // Recent: For now, just take the first 10. Ideally, this would be based on lastAccessTime from DB.

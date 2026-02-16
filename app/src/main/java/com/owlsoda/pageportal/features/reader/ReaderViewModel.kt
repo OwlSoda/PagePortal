@@ -9,6 +9,7 @@ import com.owlsoda.pageportal.core.database.dao.ServerDao
 import com.owlsoda.pageportal.core.database.entity.HighlightEntity
 import com.owlsoda.pageportal.data.preferences.PreferencesRepository
 import com.owlsoda.pageportal.data.repository.DownloadRepository
+import com.owlsoda.pageportal.data.repository.SyncRepository
 import com.owlsoda.pageportal.reader.epub.EpubBook
 import com.owlsoda.pageportal.reader.epub.EpubParser
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -55,7 +56,7 @@ data class ReaderUiState(
     val highlights: List<HighlightEntity> = emptyList(),
     val searchResults: List<SearchResult> = emptyList(),
     val isSearching: Boolean = false,
-    val isVerticalScroll: Boolean = true,
+    val isVerticalScroll: Boolean = false,
     val textAlignment: String = "LEFT",
     val paragraphSpacing: Float = 1.0f,
     val brightness: Float = -1.0f,
@@ -74,7 +75,9 @@ data class ReaderUiState(
     val sleepTimerRemaining: Long = 0, // Seconds remaining
     val skipSilenceEnabled: Boolean = false,
     val currentEqualizerPreset: String = "Spoken Word",  // Active EQ preset
-    val debugLog: String = ""
+    val debugLog: String = "",
+    val rewindSeconds: Int = 10,
+    val forwardSeconds: Int = 30
 )
 
 enum class ReaderTheme(val backgroundColor: String, val textColor: String) {
@@ -102,7 +105,8 @@ class ReaderViewModel @Inject constructor(
     private val highlightDao: HighlightDao,
     private val bookmarkDao: com.owlsoda.pageportal.core.database.dao.BookmarkDao,
     private val preferencesRepository: PreferencesRepository,
-    private val libraryRepository: com.owlsoda.pageportal.data.repository.LibraryRepository
+    private val libraryRepository: com.owlsoda.pageportal.data.repository.LibraryRepository,
+    private val syncRepository: SyncRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ReaderUiState())
@@ -138,12 +142,23 @@ class ReaderViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
             
+            // Set app context early - needed by prepareReadAloudFiles inside parseAndLoad
+            appContext = context.applicationContext
+            
             val id = bookId.toLongOrNull()
             if (id == null) {
                 _uiState.value = _uiState.value.copy(isLoading = false, error = "Invalid book ID")
                 return@launch
             }
             currentBookId = id
+            
+            // Sync progress from server before loading local
+            try {
+                syncRepository.syncProgress(id)
+            } catch (e: Exception) {
+                android.util.Log.e("ReaderViewModel", "Sync failed: ${e.message}")
+            }
+            
             loadHighlights(id)
             
             val bookEntity = bookDao.getBookById(id)
@@ -157,9 +172,6 @@ class ReaderViewModel @Inject constructor(
                 val file = File(bookEntity.localFilePath!!)
                 if (file.exists()) {
                     parseAndLoad(file, id)
-                    
-                    // Initialize audio context
-                    appContext = context.applicationContext
                     return@launch
                 }
             }
@@ -234,9 +246,6 @@ class ReaderViewModel @Inject constructor(
             val validFile = file!!
             parseAndLoad(validFile, id)
             
-            // Initialize audio context
-            appContext = context.applicationContext
-            
             // Auto-play if requested and available
             if (preferReadAloud) {
                 if (_uiState.value.isReadAloudAvailable) {
@@ -258,7 +267,9 @@ class ReaderViewModel @Inject constructor(
                  _uiState.value = _uiState.value.copy(
                      book = epubBook,
                      isLoading = false,
-                     isReadAloudAvailable = hasAudio
+                     isReadAloudAvailable = hasAudio,
+                     // Force vertical scroll for ReadAloud so text flows like synced lyrics
+                     isVerticalScroll = if (hasAudio) true else _uiState.value.isVerticalScroll
                  )
                  
                  // Load saved progress
@@ -266,6 +277,15 @@ class ReaderViewModel @Inject constructor(
                  if (progress != null) {
                      val safeIndex = progress.currentChapter.coerceAtLeast(0)
                      _uiState.update { it.copy(currentChapterIndex = safeIndex) }
+                 } else if (hasAudio) {
+                     // No saved progress + ReadAloud: auto-skip to first chapter with SMIL data
+                     val firstSmilChapter = epubBook.chapters.indexOfFirst { ch ->
+                         epubBook.smilData[ch.id] != null
+                     }
+                     if (firstSmilChapter > 0) {
+                         android.util.Log.d("ReaderViewModel", "Auto-skipping to first SMIL chapter: $firstSmilChapter")
+                         _uiState.update { it.copy(currentChapterIndex = firstSmilChapter) }
+                     }
                  }
                  
                  if (hasAudio) {
@@ -317,8 +337,20 @@ class ReaderViewModel @Inject constructor(
             delay(100)
         }
         
-        // Load initial track
-        loadAudioForChapter(_uiState.value.currentChapterIndex)
+        // Find and load the first chapter that has SMIL audio data
+        val book = _uiState.value.book
+        if (book != null && book.smilData.isNotEmpty()) {
+            val firstAudioChapterIndex = book.chapters.indexOfFirst { chapter ->
+                val smil = book.smilData[chapter.id]
+                smil != null && smil.parList.isNotEmpty()
+            }
+            if (firstAudioChapterIndex >= 0) {
+                appendLog("First audio chapter at index $firstAudioChapterIndex (${book.chapters[firstAudioChapterIndex].id})")
+                loadAudioForChapter(firstAudioChapterIndex)
+            } else {
+                appendLog("No chapters with SMIL data found")
+            }
+        }
     }
 
     private fun initializePlayer(context: android.content.Context) {
@@ -333,10 +365,21 @@ class ReaderViewModel @Inject constructor(
                 
                 override fun onPlaybackStateChanged(playbackState: Int) {
                      if (playbackState == Player.STATE_ENDED) {
-                         // Auto-advance chapter?
-                         if (_uiState.value.isPlayingAudio) {
-                             nextChapter()
+                         android.util.Log.d("ReaderViewModel", "Audio playback ended, auto-advancing")
+                         // Auto-advance to next chapter with audio
+                         val currentState = _uiState.value
+                         val book = currentState.book ?: return
+                         val nextIndex = currentState.currentChapterIndex + 1
+                         if (nextIndex < book.chapters.size) {
+                             _uiState.update { it.copy(currentChapterIndex = nextIndex) }
+                             loadAudioForChapter(nextIndex, autoPlay = true)
+                         } else {
+                             _uiState.update { it.copy(isPlayingAudio = false) }
+                             stopSyncTicker()
                          }
+                     }
+                     if (playbackState == Player.STATE_READY) {
+                         _uiState.update { it.copy(isPlayingAudio = exoPlayer?.isPlaying == true) }
                      }
                 }
             })
@@ -402,9 +445,8 @@ class ReaderViewModel @Inject constructor(
         }
         
         if (smilData == null) {
-            val errorMsg = "No SMIL data for chapter ${chapter.id}. Book may not have audio overlays."
-            appendLog("ERROR: $errorMsg")
-            _uiState.update { it.copy(error = errorMsg) }
+            // Not an error - many chapters (cover, TOC, etc.) legitimately have no audio
+            appendLog("No SMIL for chapter '${chapter.id}' - this chapter has no audio overlay (normal for front/back matter)")
             return
         }
         
@@ -422,14 +464,26 @@ class ReaderViewModel @Inject constructor(
                 }
             },
             onChapterChange = { newChapterHref, fragmentId ->
-                // Handle chapter boundary crossing (future enhancement)
+                // Navigate to the chapter matching this href
                 appendLog("Chapter change needed: $newChapterHref#$fragmentId")
+                val targetIndex = book.chapters.indexOfFirst { ch ->
+                    ch.href.endsWith(newChapterHref, ignoreCase = true) ||
+                    newChapterHref.endsWith(ch.href, ignoreCase = true) ||
+                    ch.href.substringAfterLast("/") == newChapterHref.substringAfterLast("/")
+                }
+                if (targetIndex >= 0 && targetIndex != chapterIndex) {
+                    appendLog("Navigating to chapter $targetIndex for $newChapterHref")
+                    viewModelScope.launch {
+                        _uiState.update { it.copy(currentChapterIndex = targetIndex) }
+                        loadAudioForChapter(targetIndex, autoPlay = true)
+                    }
+                }
             }
         )
         
         val firstPar = smilData.parList.firstOrNull() ?: run {
-            appendLog("ERROR: SMIL has no entries")
-            _uiState.update { it.copy(error = "SMIL file is empty") }
+            // Not an error - some chapters have SMIL entries but no audio pars
+            appendLog("SMIL for '${chapter.id}' has no par entries (normal for some front matter)")
             return
         }
         
@@ -498,8 +552,8 @@ class ReaderViewModel @Inject constructor(
              while (isActive) {
                  exoPlayer?.let { player ->
                      if (player.isPlaying) {
-                         val currentPosSeconds = player.currentPosition / 1000.0
-                         updateHighlight(currentPosSeconds)
+                         // Pass ms directly - SmilSynchronizer converts to seconds internally
+                         smilSynchronizer?.updatePlaybackPosition(player.currentPosition)
                      }
                  }
                  delay(100) // 10Hz update
@@ -509,13 +563,6 @@ class ReaderViewModel @Inject constructor(
     
     private fun stopSyncTicker() {
         syncTickerJob?.cancel()
-    }
-    
-    private fun updateHighlight(time: Double) {
-        // Use SmilSynchronizer for efficient position tracking
-        smilSynchronizer?.updatePlaybackPosition((time * 1000).toLong())
-        // Note: The highlight update is handled by the synchronizer's callback
-        // which updates _uiState.activeSmilHighlightId
     }
     
     fun toggleAudioPlay() {
@@ -539,8 +586,28 @@ class ReaderViewModel @Inject constructor(
             if (player.isPlaying) {
                 // Pause and remember position
                 player.pause()
+                stopSyncTicker()
                 lastPausePosition = player.currentPosition
                 android.util.Log.d("ReaderViewModel", "Paused at position $lastPausePosition")
+                
+                // Push progress on pause
+                currentBookId?.let { id ->
+                    viewModelScope.launch(Dispatchers.IO) {
+                        try {
+                           // Update local DB first (handled by syncTicker mostly, but ensure latest)
+                           progressDao.updatePosition(
+                               bookId = id,
+                               position = player.currentPosition,
+                               chapter = _uiState.value.currentChapterIndex,
+                               percent = calculatePercent(), // Helper needed or use existing logic
+                               timestamp = System.currentTimeMillis()
+                           )
+                           syncRepository.pushProgress(id)
+                        } catch(e: Exception) {
+                            e.printStackTrace()
+                        }
+                    }
+                }
             } else {
                 // Check if we have media
                 if (player.duration == androidx.media3.common.C.TIME_UNSET || player.duration <= 0) {
@@ -558,7 +625,9 @@ class ReaderViewModel @Inject constructor(
                 }
                 android.util.Log.d("ReaderViewModel", "Calling player.play()")
                 player.play()
+                startSyncTicker()
             }
+            _uiState.update { it.copy(isPlayingAudio = player.isPlaying) }
         }
     }
     
@@ -644,7 +713,23 @@ class ReaderViewModel @Inject constructor(
                      handleSleepTimer(minutes)
                 }
             }
-            // Part 4: Gestures
+            
+            // Part 4: Audio Skip Settings
+            launch {
+                kotlinx.coroutines.flow.combine(
+                    preferencesRepository.rewindSeconds,
+                    preferencesRepository.forwardSeconds
+                ) { rewind, forward -> 
+                     Pair(rewind, forward)
+                }.collect { (rewind, forward) ->
+                     _uiState.update { it.copy(
+                         rewindSeconds = rewind, 
+                         forwardSeconds = forward 
+                     ) }
+                }
+            }
+
+            // Part 5: Gestures
             launch {
                 kotlinx.coroutines.flow.combine(
                     preferencesRepository.gestureTapLeft,
@@ -742,6 +827,7 @@ class ReaderViewModel @Inject constructor(
             book.chapters.forEachIndexed { index, chapter ->
                 // Basic text search implementation
                 // In production, this should be optimized and run on chunks
+
                 val inputStream = parser.getInputStream(book.basePath + chapter.href) ?: return@forEachIndexed
                 try {
                     val content = inputStream.bufferedReader().use { it.readText() }
@@ -827,21 +913,17 @@ class ReaderViewModel @Inject constructor(
         if (currentState.currentChapterIndex < book.chapters.size - 1) {
             val nextIndex = currentState.currentChapterIndex + 1
             _uiState.value = currentState.copy(currentChapterIndex = nextIndex)
-            
-            if (currentState.isReadAloudAvailable) {
-                loadAudioForChapter(nextIndex, autoPlay = currentState.isPlayingAudio)
-            }
+            // Audio continues playing independently — only audio controls affect playback
         }
     }
     
     fun previousChapter() {
-        if (_uiState.value.currentChapterIndex > 0) {
-            val prevIndex = _uiState.value.currentChapterIndex - 1
-            _uiState.value = _uiState.value.copy(currentChapterIndex = prevIndex)
-            
-            if (_uiState.value.isReadAloudAvailable) {
-                loadAudioForChapter(prevIndex, autoPlay = _uiState.value.isPlayingAudio)
-            }
+        val currentState = _uiState.value
+        val book = currentState.book ?: return
+        if (currentState.currentChapterIndex > 0) {
+            val prevIndex = currentState.currentChapterIndex - 1
+            _uiState.value = currentState.copy(currentChapterIndex = prevIndex)
+            // Audio continues playing independently — only audio controls affect playback
         }
     }
     
@@ -910,6 +992,18 @@ class ReaderViewModel @Inject constructor(
     fun setSleepTimer(minutes: Int) {
         viewModelScope.launch {
             preferencesRepository.setSleepTimerMinutes(minutes)
+        }
+    }
+
+    fun setRewindSeconds(seconds: Int) {
+        viewModelScope.launch {
+            preferencesRepository.setRewindSeconds(seconds)
+        }
+    }
+
+    fun setForwardSeconds(seconds: Int) {
+        viewModelScope.launch {
+            preferencesRepository.setForwardSeconds(seconds)
         }
     }
     
@@ -990,6 +1084,23 @@ class ReaderViewModel @Inject constructor(
             exoPlayer?.play()
         }
     }
+
+    fun jumpToChapter(index: Int) {
+        viewModelScope.launch {
+            val book = _uiState.value.book ?: return@launch
+            if (index < 0 || index >= book.chapters.size) return@launch
+            if (index == _uiState.value.currentChapterIndex) return@launch
+            
+            _uiState.update { it.copy(currentChapterIndex = index) }
+            
+            // Only reload audio if currently playing
+            if (_uiState.value.isPlayingAudio) {
+                loadAudioForChapter(index, autoPlay = true)
+            } else {
+                loadAudioForChapter(index, autoPlay = false)
+            }
+        }
+    }
     
     fun getBookmarks(bookId: Long) = bookmarkDao.getBookmarksForBook(bookId)
     
@@ -1014,6 +1125,30 @@ class ReaderViewModel @Inject constructor(
         parser.close()
         exoPlayer?.release()
         exoPlayer = null
+    }
+
+    private fun calculatePercent(): Float {
+        // Simple percent calculation based on chapter index
+        // Ideally this would be more granular (e.g., words read / total words)
+        val book = _uiState.value.book ?: return 0f
+        val totalChapters = book.chapters.size
+        if (totalChapters == 0) return 0f
+        
+        val currentChapter = _uiState.value.currentChapterIndex
+        val percent = (currentChapter.toFloat() / totalChapters) * 100f
+        
+        // If playing audio, refinement:
+        if (_uiState.value.isPlayingAudio && exoPlayer != null) {
+            val duration = exoPlayer!!.duration
+            val position = exoPlayer!!.currentPosition
+            if (duration > 0) {
+                 val chapterProgress = position.toFloat() / duration
+                 // Adjust percent: currentChapter + chapterProgress
+                 return ((currentChapter + chapterProgress) / totalChapters) * 100f
+            }
+        }
+        
+        return percent.coerceIn(0f, 100f)
     }
 
 }

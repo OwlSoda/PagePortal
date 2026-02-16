@@ -23,5 +23,9 @@ data class AppPreferencesBackup(
     // Gestures
     @SerializedName("gesture_tap_left") val gestureTapLeft: String = "PREV",
     @SerializedName("gesture_tap_center") val gestureTapCenter: String = "MENU",
-    @SerializedName("gesture_tap_right") val gestureTapRight: String = "NEXT"
+    @SerializedName("gesture_tap_right") val gestureTapRight: String = "NEXT",
+    
+    // Audio Settings
+    @SerializedName("rewind_seconds") val rewindSeconds: Int = 10,
+    @SerializedName("forward_seconds") val forwardSeconds: Int = 30
 )

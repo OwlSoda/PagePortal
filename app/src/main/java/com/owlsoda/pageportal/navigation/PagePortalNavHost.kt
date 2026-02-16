@@ -308,6 +308,9 @@ fun PagePortalNavHost(
                         onPlayReadAloud = { id ->
                             // Use Reader Screen for True ReadAloud (Text+Audio)
                             navController.navigate(Screen.Reader.createRoute(id, true))
+                        },
+                        onAuthorClick = { author ->
+                            navController.navigate(Screen.FilteredBooks.createRoute("AUTHOR", author))
                         }
                     )
                 }

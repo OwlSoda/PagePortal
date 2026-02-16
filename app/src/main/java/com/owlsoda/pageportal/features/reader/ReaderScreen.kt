@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -49,6 +50,8 @@ import com.owlsoda.pageportal.R
 import androidx.compose.foundation.verticalScroll
 import com.owlsoda.pageportal.reader.epub.EpubBook
 import com.owlsoda.pageportal.features.reader.pdf.PdfViewer
+import androidx.compose.ui.platform.LocalConfiguration
+import android.webkit.WebSettings
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -86,6 +89,9 @@ fun ReaderScreen(
     var showBookmarkDialog by remember { mutableStateOf(false) }
     var bookmarkNote by remember { mutableStateOf("") }
     var showBookmarksSheet by remember { mutableStateOf(false) }
+    
+    // TOC State
+    var showTocSheet by remember { mutableStateOf(false) }
 
     // WebView reference
     var webViewRef by remember { mutableStateOf<WebView?>(null) }
@@ -106,11 +112,16 @@ fun ReaderScreen(
         }
     }
     
-    // Effects
-    // Style injection disabled - using raw EPUB HTML styling
-    // LaunchedEffect(uiState.theme, uiState.fontSize, uiState.fontFamily, uiState.lineHeight, uiState.margin, webViewRef) {
-    //     webViewRef?.let { injectStyles(it, uiState) }
-    // }
+    
+    // Style injection re-enabled and triggered on configuration changes
+    val configuration = LocalConfiguration.current
+    LaunchedEffect(uiState.theme, uiState.fontSize, uiState.fontFamily, 
+                   uiState.lineHeight, uiState.margin, uiState.isVerticalScroll,
+                   uiState.textAlignment, uiState.paragraphSpacing, 
+                   uiState.brightness, configuration.screenWidthDp, configuration.screenHeightDp, webViewRef) {
+        webViewRef?.let { injectStyles(it, uiState) }
+    }
+
     LaunchedEffect(uiState.book?.title, uiState.currentChapterIndex) {
         if (uiState.book != null && webViewRef != null) {
             val chapter = uiState.book!!.chapters.getOrNull(uiState.currentChapterIndex)
@@ -120,19 +131,16 @@ fun ReaderScreen(
                 
                 if (rawHtml != null) {
                     // Inject CSS to fix layout issues while preserving EPUB styling
+                    // CAUTION: Do NOT set height/overflow/position on html/body here as it conflicts with injectStyles
                     val cssOverride = """
+                        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
                         <style>
+                            * { max-width: 100% !important; box-sizing: border-box !important; }
                             html, body {
-                                height: auto !important;
-                                width: 100% !important;
                                 margin: 0 !important;
-                                padding: 16px !important;
-                                overflow-x: hidden !important;
-                                position: static !important;
-                            }
-                            * {
-                                max-width: 100% !important;
-                                position: static !important;
+                                padding: 0 !important;
+                                word-wrap: break-word;
+                                overflow-wrap: break-word;
                             }
                             body {
                                 background-color: ${uiState.theme.backgroundColor} !important;
@@ -140,6 +148,10 @@ fun ReaderScreen(
                             }
                             p, div, span, h1, h2, h3, h4, h5, h6 {
                                 color: ${uiState.theme.textColor} !important;
+                            }
+                            img, video, svg {
+                                max-width: 100% !important;
+                                height: auto !important;
                             }
                         </style>
                     """.trimIndent()
@@ -170,7 +182,9 @@ fun ReaderScreen(
     }
     LaunchedEffect(uiState.activeSmilHighlightId) {
         uiState.activeSmilHighlightId?.let { id ->
-            webViewRef?.evaluateJavascript("applySmilHighlight('$id');", null)
+            // Small delay to ensure page is loaded and JS functions are injected
+            kotlinx.coroutines.delay(50)
+            webViewRef?.evaluateJavascript("if (typeof applySmilHighlight === 'function') { applySmilHighlight('$id'); } else { console.warn('applySmilHighlight not yet available'); }", null)
         }
     }
 
@@ -226,6 +240,9 @@ fun ReaderScreen(
                              settings.javaScriptEnabled = true
                              settings.domStorageEnabled = true
                              settings.allowFileAccess = false
+                             settings.layoutAlgorithm = WebSettings.LayoutAlgorithm.NORMAL
+                             settings.loadWithOverviewMode = false
+                             settings.useWideViewPort = false
                              addJavascriptInterface(jsInterface, "Android")
                              
                              webViewClient = object : WebViewClient() {
@@ -245,53 +262,81 @@ fun ReaderScreen(
                                      return super.shouldInterceptRequest(view, request)
                                  }
                                  override fun onPageFinished(view: WebView?, url: String?) {
-                                     injectStyles(view!!, uiState)
-                                     injectSelectionScript(view)
-                                 }
-                             }
-                             
-                             setOnTouchListener { v, event ->
-                                 if (event.action == android.view.MotionEvent.ACTION_UP) {
-                                     val width = v.width
-                                     val x = event.x
-                                     
-                                     val action = when {
-                                        x < width * 0.3 -> uiState.gestureTapLeft
-                                        x > width * 0.7 -> uiState.gestureTapRight
-                                        else -> uiState.gestureTapCenter
-                                     }
-                                     
-                                     when (action) {
-                                         "PREV" -> {
-                                            if (uiState.isVerticalScroll) viewModel.previousChapter() 
-                                            else webViewRef?.evaluateJavascript( "if (window.scrollX > 0) { window.scrollBy(-window.innerWidth, 0); } else { Android.prevChapter(); }", null)
-                                         }
-                                         "NEXT" -> {
-                                            if (uiState.isVerticalScroll) viewModel.nextChapter()
-                                            else webViewRef?.evaluateJavascript( "if ((window.scrollX + window.innerWidth) < document.body.scrollWidth) { window.scrollBy(window.innerWidth, 0); } else { Android.nextChapter(); }", null)
-                                         }
-                                         "MENU" -> showControls = !showControls
-                                         else -> {} // NONE
-                                     }
-                                 }
-                                 false
-                             }
-                         }
-                     },
-                     update = { webViewRef = it }
-                 )
+                                    injectStyles(view!!, uiState)
+                                    injectSelectionScript(view)
+                                }
+                            }
+                            
+                            // Gesture detection: swipe for page navigation, tap for menu
+                            val gestureDetector = android.view.GestureDetector(ctx, object : android.view.GestureDetector.SimpleOnGestureListener() {
+                                override fun onSingleTapUp(e: android.view.MotionEvent): Boolean {
+                                    val width = this@apply.width
+                                    val x = e.x
+                                    when {
+                                        x < width * 0.3 -> {
+                                            if (uiState.isVerticalScroll) {
+                                                // In vertical scroll: left tap goes to previous chapter
+                                                viewModel.previousChapter()
+                                            } else {
+                                                // In horizontal: left tap scrolls left or prev chapter
+                                                webViewRef?.evaluateJavascript(
+                                                    "if (window.scrollX > 0) { window.scrollBy(-window.innerWidth, 0); } else { Android.prevChapter(); }", null
+                                                )
+                                            }
+                                        }
+                                        x > width * 0.7 -> {
+                                            if (uiState.isVerticalScroll) {
+                                                // In vertical scroll: right tap goes to next chapter
+                                                viewModel.nextChapter()
+                                            } else {
+                                                // In horizontal: right tap scrolls right or next chapter
+                                                webViewRef?.evaluateJavascript(
+                                                    "if ((window.scrollX + window.innerWidth) < document.body.scrollWidth) { window.scrollBy(window.innerWidth, 0); } else { Android.nextChapter(); }", null
+                                                )
+                                            }
+                                        }
+                                        else -> showControls = !showControls // Center tap: toggle controls
+                                    }
+                                    return true
+                                }
+                                
+                                override fun onFling(e1: android.view.MotionEvent?, e2: android.view.MotionEvent, velocityX: Float, velocityY: Float): Boolean {
+                                    val diffX = (e2.x - (e1?.x ?: e2.x))
+                                    val diffY = (e2.y - (e1?.y ?: e2.y))
+                                    if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 100) {
+                                        if (uiState.isVerticalScroll) {
+                                            // In vertical scroll: swipe changes chapter directly
+                                            if (diffX < 0) viewModel.nextChapter() else viewModel.previousChapter()
+                                        } else {
+                                            if (diffX < 0) {
+                                                // Swipe left -> next page
+                                                webViewRef?.evaluateJavascript(
+                                                    "if ((window.scrollX + window.innerWidth) < document.body.scrollWidth) { window.scrollBy(window.innerWidth, 0); } else { Android.nextChapter(); }", null
+                                                )
+                                            } else {
+                                                // Swipe right -> previous page
+                                                webViewRef?.evaluateJavascript(
+                                                    "if (window.scrollX > 0) { window.scrollBy(-window.innerWidth, 0); } else { Android.prevChapter(); }", null
+                                                )
+                                            }
+                                        }
+                                        return true
+                                    }
+                                    return false
+                                }
+                            })
+                            setOnTouchListener { v, event ->
+                                gestureDetector.onTouchEvent(event)
+                                // In vertical scroll mode, let WebView handle all touch events natively
+                                if (uiState.isVerticalScroll) false else v.performClick().let { false }
+                            }
+                        }
+                    },
+                    update = { webViewRef = it }
+                )
             }
             
             // Interaction blocker DISABLED for debugging
-            // if (showControls) {
-            //     Box(
-            //         modifier = Modifier
-            //             .fillMaxSize()
-            //             .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {
-            //                 showControls = false
-            //             }
-            //     )
-            // }
         }
 
         // --- 2. Chrome Layer (Controls) ---
@@ -305,6 +350,9 @@ fun ReaderScreen(
                      }
                  },
                  actions = {
+                     IconButton(onClick = { showTocSheet = true }) {
+                         Icon(Icons.AutoMirrored.Filled.List, "Table of Contents")
+                     }
                      IconButton(onClick = { showSearch = true }) {
                          Icon(Icons.Default.Search, "Search")
                      }
@@ -323,7 +371,7 @@ fun ReaderScreen(
                      .fillMaxWidth()
                      .navigationBarsPadding()
                      .padding(bottom = 24.dp),
-                 horizontalAlignment = Alignment.CenterHorizontally // Center existing items
+                 horizontalAlignment = Alignment.CenterHorizontally
              ) {
                   // Playback Controls (if available) - Centered and prominent
                   androidx.compose.animation.AnimatedVisibility(
@@ -350,15 +398,11 @@ fun ReaderScreen(
                               horizontalArrangement = Arrangement.spacedBy(12.dp)
                           ) {
                               // Rewind button
-                              IconButton(onClick = { 
+                              TextButton(onClick = { 
                                   view.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
-                                  viewModel.rewindAudio(10) 
+                                  viewModel.rewindAudio(uiState.rewindSeconds) 
                               }) {
-                                  Icon(
-                                      painter = androidx.compose.ui.res.painterResource(android.R.drawable.ic_media_rew),
-                                      contentDescription = "Rewind 10s",
-                                      modifier = Modifier.size(24.dp)
-                                  )
+                                  Text("-${uiState.rewindSeconds}s", style = MaterialTheme.typography.labelMedium)
                               }
                               
                               // Play/Pause button (larger, central)
@@ -380,39 +424,45 @@ fun ReaderScreen(
                               }
                               
                               // Forward button
-                              IconButton(onClick = { 
+                              TextButton(onClick = { 
                                   view.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
-                                  viewModel.forwardAudio(30) 
+                                  viewModel.forwardAudio(uiState.forwardSeconds) 
                               }) {
-                                  Icon(
-                                      painter = androidx.compose.ui.res.painterResource(android.R.drawable.ic_media_ff),
-                                      contentDescription = "Forward 30s",
-                                      modifier = Modifier.size(24.dp)
-                                  )
-                              }
-                              
-                              // Bookmark Button
-                              IconButton(onClick = { 
-                                  view.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
-                                  showBookmarkDialog = true
-                              }) {
-                                  Icon(
-                                      imageVector = Icons.Default.Bookmark,
-                                      contentDescription = "Add Bookmark",
-                                      modifier = Modifier.size(20.dp)
-                                  )
+                                  Text("+${uiState.forwardSeconds}s", style = MaterialTheme.typography.labelMedium)
                               }
                               
                               Spacer(Modifier.width(8.dp))
 
-                              Text("${String.format("%.1f", uiState.playbackSpeed)}x", style = MaterialTheme.typography.labelLarge)
+                              // Playback Speed Dropdown
+                              var showSpeedMenu by remember { mutableStateOf(false) }
+                              Box {
+                                  TextButton(onClick = { showSpeedMenu = true }) {
+                                      Text("${String.format("%.1f", uiState.playbackSpeed)}x", 
+                                           style = MaterialTheme.typography.labelLarge)
+                                  }
+                                  DropdownMenu(
+                                      expanded = showSpeedMenu,
+                                      onDismissRequest = { showSpeedMenu = false }
+                                  ) {
+                                      listOf(0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 1.75f, 2.0f, 2.5f, 3.0f).forEach { speed ->
+                                          DropdownMenuItem(
+                                              text = { Text("${String.format("%.1f", speed)}x") },
+                                              onClick = {
+                                                  viewModel.setPlaybackSpeed(speed)
+                                                  showSpeedMenu = false
+                                              },
+                                              leadingIcon = if (uiState.playbackSpeed == speed) {
+                                                  { Icon(Icons.Default.Check, null) }
+                                              } else null
+                                          )
+                                      }
+                                  }
+                              }
                               
                               // Sleep Timer Button
                               var showSleepMenu by remember { mutableStateOf(false) }
                              Box {
                                  IconButton(onClick = { showSleepMenu = true }) {
-                                     // Use Timer icon (needs import or vector resource)
-                                     // Using Settings placeholder if needed, but preferable to use Timer
                                      Icon(
                                          imageVector = Icons.Default.Timer ?: Icons.Default.Settings, 
                                          contentDescription = "Sleep Timer",
@@ -439,42 +489,30 @@ fun ReaderScreen(
                                   }
                               }
                               
-                              // Equalizer Button
-                              IconButton(onClick = { 
-                                  view.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
-                                  showEqualizerSheet = true
-                              }) {
-                                  Icon(
-                                      painter = androidx.compose.ui.res.painterResource(android.R.drawable.ic_menu_manage),
-                                      contentDescription = "Equalizer",
-                                      modifier = Modifier.size(20.dp)
-                                  )
-                              }
                           }
                       }
                   }
                  
-                 // Bottom Navigation (Chapters)
-                 BottomAppBar(
-                      containerColor = Color.Transparent,
-                      contentPadding = PaddingValues(0.dp)
+                 // Chapter indicator (no nav buttons - use swipe or TOC)
+                 Box(
+                     modifier = Modifier
+                         .fillMaxWidth()
+                         .padding(horizontal = 16.dp, vertical = 8.dp),
+                     contentAlignment = Alignment.Center
                  ) {
-                     IconButton(onClick = { viewModel.previousChapter() }) {
-                         Text("<", style = MaterialTheme.typography.titleLarge)
-                     }
-                     Spacer(Modifier.weight(1f))
-                     Text("Chapter ${uiState.currentChapterIndex + 1}/${uiState.book?.chapters?.size ?: 0}")
-                     Spacer(Modifier.weight(1f))
-                     IconButton(onClick = { viewModel.nextChapter() }) {
-                         Text(">", style = MaterialTheme.typography.titleLarge)
-                     }
+                     Text(
+                         text = uiState.book?.chapters?.getOrNull(uiState.currentChapterIndex)?.title 
+                             ?: "Chapter ${uiState.currentChapterIndex + 1} of ${uiState.book?.chapters?.size ?: 0}",
+                         style = MaterialTheme.typography.bodySmall,
+                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                     )
                  }
              }
         }
         
          // Dialogs and Sheets (Overlay)
          if (uiState.isLoading.not() && uiState.error == null) {
-             // ... (Keep existing dialog logic: Selection, Search, SettingsSheet)
+             // Selection Dialog
              if (showSelectionMenu && selectedText != null) {
                   AlertDialog(
                       onDismissRequest = { showSelectionMenu = false },
@@ -509,7 +547,6 @@ fun ReaderScreen(
                      isSearching = uiState.isSearching,
                      onResultClick = { result ->
                          showSearch = false
-                         // Todo: Navigation logic
                      }
                  )
              }
@@ -537,7 +574,11 @@ fun ReaderScreen(
                           brightness = uiState.brightness,
                           onBrightnessChanged = viewModel::setBrightness,
                           isVerticalScroll = uiState.isVerticalScroll,
-                          onScrollModeChanged = viewModel::setScrollMode
+                          onScrollModeChanged = viewModel::setScrollMode,
+                          rewindSeconds = uiState.rewindSeconds,
+                          forwardSeconds = uiState.forwardSeconds,
+                          onRewindSecondsChanged = viewModel::setRewindSeconds,
+                          onForwardSecondsChanged = viewModel::setForwardSeconds
                       )
                   }
               }
@@ -598,6 +639,58 @@ fun ReaderScreen(
                       onDismiss = { showBookmarksSheet = false }
                   )
               }
+              
+              // Table of Contents Bottom Sheet
+              if (showTocSheet) {
+                  ModalBottomSheet(
+                      onDismissRequest = { showTocSheet = false },
+                      containerColor = MaterialTheme.colorScheme.surface
+                  ) {
+                      Column(modifier = Modifier.padding(16.dp)) {
+                          Text(
+                              "Table of Contents",
+                              style = MaterialTheme.typography.titleLarge,
+                              modifier = Modifier.padding(bottom = 16.dp)
+                          )
+                          LazyColumn(
+                              modifier = Modifier.heightIn(max = 400.dp)
+                          ) {
+                              val chapters = uiState.book?.chapters ?: emptyList()
+                              items(chapters.size) { index ->
+                                  val chapter = chapters[index]
+                                  val isCurrentChapter = index == uiState.currentChapterIndex
+                                  val hasAudio = uiState.book?.smilData?.get(chapter.id)?.parList?.isNotEmpty() == true
+                                  ListItem(
+                                      headlineContent = {
+                                          Text(
+                                              text = chapter.title ?: "Chapter ${index + 1}",
+                                              style = if (isCurrentChapter) MaterialTheme.typography.bodyLarge.copy(
+                                                  fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                                              ) else MaterialTheme.typography.bodyLarge,
+                                              color = if (isCurrentChapter) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                          )
+                                      },
+                                      trailingContent = {
+                                          if (hasAudio) {
+                                              Text("🔊", style = MaterialTheme.typography.bodySmall)
+                                          }
+                                      },
+                                      modifier = Modifier.clickable {
+                                          viewModel.jumpToChapter(index)
+                                          showTocSheet = false
+                                      },
+                                      colors = ListItemDefaults.colors(
+                                          containerColor = if (isCurrentChapter) 
+                                              MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f) 
+                                          else Color.Transparent
+                                      )
+                                  )
+                                  if (index < chapters.size - 1) HorizontalDivider()
+                              }
+                          }
+                      }
+                  }
+              }
          }
     }
 }
@@ -620,9 +713,11 @@ private fun injectStyles(webView: WebView, state: ReaderUiState) {
         """
         document.body.style.height = '100vh';
         document.body.style.overflowY = 'hidden';
-        document.body.style.overflowX = 'hidden'; // Hide scrollbar, scroll via JS
-        document.body.style.columnWidth = '100vw';
-        document.body.style.columnGap = '100px'; // Gap between columns off-screen
+        document.body.style.overflowX = 'hidden';
+        document.body.style.columnWidth = window.innerWidth + 'px';
+        document.body.style.columnGap = '0px';
+        document.body.style.columnFill = 'auto';
+        document.body.style.boxSizing = 'border-box';
         """
     }
 
@@ -649,29 +744,32 @@ private fun injectStyles(webView: WebView, state: ReaderUiState) {
         }
         styleTag.innerHTML = `
             body {
-                font-size: ${state.fontSize}%;
-                color: ${state.theme.textColor};
-                line-height: ${state.lineHeight};
-                margin: 0 $marginVal;
-                max-width: 100%;
-                padding: 0 10px;
-                font-family: '${state.fontFamily}', serif;
-                text-align: ${state.textAlignment.lowercase()};
+                font-size: ${state.fontSize}% !important;
+                color: ${state.theme.textColor} !important;
+                line-height: ${state.lineHeight} !important;
+                margin: 0 $marginVal !important;
+                max-width: 100% !important;
+                padding: 16px !important;
+                font-family: '${state.fontFamily}', serif !important;
+                text-align: ${state.textAlignment.lowercase()} !important;
+                box-sizing: border-box !important;
+            }
+            p, div, span, h1, h2, h3, h4, h5, h6, li, td, th, a, em, strong, b, i, blockquote {
+                font-size: inherit !important;
+                line-height: inherit !important;
+                color: inherit !important;
             }
             $paragraphSpacingCss
             $brightnessFilter
             .smil-active { 
                 background: linear-gradient(135deg, #fff176 0%, #ffeb3b 100%) !important;
-                color: black !important; 
-                border-radius: 6px;
-                padding: 2px 4px;
-                box-shadow: 0 2px 8px rgba(255, 235, 59, 0.4);
-                transition: all 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
-                animation: smilPulse 2s ease-in-out infinite;
-            }
-            @keyframes smilPulse {
-                0%, 100% { box-shadow: 0 2px 8px rgba(255, 235, 59, 0.4); }
-                50% { box-shadow: 0 2px 12px rgba(255, 235, 59, 0.6); }
+                color: #000000 !important; 
+                text-decoration: underline 3px #FF6D00 !important;
+                text-underline-offset: 3px !important;
+                border-radius: 4px;
+                padding: 2px 6px;
+                box-shadow: 0 2px 8px rgba(255, 235, 59, 0.5);
+                transition: all 0.2s ease-out;
             }
         `;
     """.trimIndent()
@@ -692,18 +790,61 @@ private fun injectSelectionScript(webView: WebView) {
         
         
         var currentActiveId = null;
+        var smilDebugDone = false;
         
         function applySmilHighlight(id) {
+            console.log('SMIL highlight: ' + id);
+            
+            // Remove previous highlight
             if (currentActiveId) {
                  var oldEl = document.getElementById(currentActiveId);
+                 if (!oldEl) oldEl = document.querySelector('[data-smil-id="' + currentActiveId + '"]');
+                 if (!oldEl) oldEl = document.querySelector('.smil-active');
                  if (oldEl) oldEl.classList.remove('smil-active');
             }
             
+            // Strategy 1: direct getElementById
             var el = document.getElementById(id);
+            
+            // Strategy 2: data-id attribute
+            if (!el) el = document.querySelector('[data-id="' + id + '"]');
+            
+            // Strategy 3: name attribute
+            if (!el) el = document.querySelector('[name="' + id + '"]');
+            
+            // Strategy 4: epub:type or data-smil-id
+            if (!el) el = document.querySelector('[epub\\:type="' + id + '"]');
+            if (!el) el = document.querySelector('[data-smil-id="' + id + '"]');
+            
+            // Strategy 5: partial ID match (e.g. 'para1' matches 'word_para1_3')
+            if (!el) {
+                var allEls = document.querySelectorAll('[id*="' + id + '"]');
+                if (allEls.length > 0) el = allEls[0];
+            }
+            
+            // Strategy 6: CSS class with the id name
+            if (!el) el = document.querySelector('.' + id);
+            
             if (el) {
                 el.classList.add('smil-active');
-                el.scrollIntoView({behavior: "smooth", block: "center"});
+                el.scrollIntoView({behavior: 'smooth', block: 'center'});
                 currentActiveId = id;
+                console.log('SMIL highlighted: ' + id + ' tag=' + el.tagName);
+            } else {
+                // Debug: log available IDs on first miss
+                if (!smilDebugDone) {
+                    smilDebugDone = true;
+                    var ids = [];
+                    var allElements = document.querySelectorAll('[id]');
+                    allElements.forEach(function(e) { ids.push(e.id); });
+                    console.warn('SMIL: element "' + id + '" not found. Available IDs (' + ids.length + '): ' + ids.slice(0, 20).join(', '));
+                    // Also log elements with data-id
+                    var dataIds = [];
+                    document.querySelectorAll('[data-id]').forEach(function(e) { dataIds.push(e.getAttribute('data-id')); });
+                    if (dataIds.length > 0) console.warn('SMIL: data-id attrs: ' + dataIds.slice(0, 20).join(', '));
+                } else {
+                    console.warn('SMIL element not found: ' + id);
+                }
             }
         }
         
@@ -812,7 +953,11 @@ fun ReaderSettingsSheet(
     onParagraphSpacingChanged: (Float) -> Unit,
     onBrightnessChanged: (Float) -> Unit,
     isVerticalScroll: Boolean,
-    onScrollModeChanged: (Boolean) -> Unit
+    onScrollModeChanged: (Boolean) -> Unit,
+    rewindSeconds: Int,
+    forwardSeconds: Int,
+    onRewindSecondsChanged: (Int) -> Unit,
+    onForwardSecondsChanged: (Int) -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -950,6 +1095,35 @@ fun ReaderSettingsSheet(
                 Switch(
                     checked = isVerticalScroll,
                     onCheckedChange = { onScrollModeChanged(it) }
+                )
+            }
+        }
+        
+        Spacer(modifier = Modifier.height(32.dp)) 
+
+        HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
+        
+        // Audio Settings
+        Text("Audio Settings", style = MaterialTheme.typography.titleMedium)
+        
+        Text("Rewind Duration: ${rewindSeconds}s", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 8.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf(5, 10, 15, 30).forEach { seconds ->
+                FilterChip(
+                    selected = rewindSeconds == seconds,
+                    onClick = { onRewindSecondsChanged(seconds) },
+                    label = { Text("${seconds}s") }
+                )
+            }
+        }
+
+        Text("Forward Duration: ${forwardSeconds}s", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 8.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf(10, 15, 30, 60).forEach { seconds ->
+                FilterChip(
+                    selected = forwardSeconds == seconds,
+                    onClick = { onForwardSecondsChanged(seconds) },
+                    label = { Text("${seconds}s") }
                 )
             }
         }

@@ -27,6 +27,9 @@ import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Sort
 import com.owlsoda.pageportal.features.library.SortOption
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.material3.pulltorefresh.PullToRefreshContainer
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -53,42 +56,72 @@ fun ServiceScreen(
     val titles = listOf("Recent", "Authors", "Series", "All")
     val icons = listOf(Icons.Default.Archive, Icons.Default.Person, Icons.Default.Folder, Icons.AutoMirrored.Filled.List)
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        // Top Bar
-        CenterAlignedTopAppBar(
-            title = { Text(serviceType) },
-            actions = {
-               // Filter/Sort can go here
-               IconButton(onClick = { /* TODO: Sort Dialog */ }) {
-                   Icon(Icons.Default.Sort, "Sort")
-               }
+    val pullRefreshState = rememberPullToRefreshState()
+    
+    if (pullRefreshState.isRefreshing) {
+        LaunchedEffect(true) {
+            viewModel.refresh()
+        }
+    }
+    
+    // Explicitly control refreshing state based on UI state to stop the indicator
+    LaunchedEffect(uiState.isLoading) {
+        if (!uiState.isLoading) {
+            pullRefreshState.endRefresh()
+        } else {
+             pullRefreshState.startRefresh()
+        }
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .nestedScroll(pullRefreshState.nestedScrollConnection)
+    ) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            // Top Bar
+            CenterAlignedTopAppBar(
+                title = { Text(serviceType) },
+                actions = {
+                    // Filter/Sort can go here
+                    IconButton(onClick = { /* TODO: Sort Dialog */ }) {
+                        Icon(Icons.Default.Sort, "Sort")
+                    }
+                }
+            )
+
+            // Tab Row
+            TabRow(selectedTabIndex = pagerState.currentPage) {
+                titles.forEachIndexed { index, title ->
+                    Tab(
+                        selected = pagerState.currentPage == index,
+                        onClick = { scope.launch { pagerState.animateScrollToPage(index) } },
+                        text = { Text(title) },
+                        icon = { Icon(icons[index], null) }
+                    )
+                }
             }
+
+            // Pager
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier.fillMaxSize()
+            ) { page ->
+                when (page) {
+                    0 -> RecentPage(serviceBooks, onBookClick)
+                    1 -> AuthorsPage(serviceBooks, viewModel)
+                    2 -> SeriesPage(serviceBooks, viewModel)
+                    3 -> AllBooksPage(serviceBooks, onBookClick)
+                }
+            }
+        }
+        
+        PullToRefreshContainer(
+            state = pullRefreshState,
+            modifier = Modifier.align(Alignment.TopCenter),
+            containerColor = MaterialTheme.colorScheme.surface,
+            contentColor = MaterialTheme.colorScheme.primary
         )
-
-        // Tab Row
-        TabRow(selectedTabIndex = pagerState.currentPage) {
-            titles.forEachIndexed { index, title ->
-                Tab(
-                    selected = pagerState.currentPage == index,
-                    onClick = { scope.launch { pagerState.animateScrollToPage(index) } },
-                    text = { Text(title) },
-                    icon = { Icon(icons[index], null) }
-                )
-            }
-        }
-
-        // Pager
-        HorizontalPager(
-            state = pagerState,
-            modifier = Modifier.fillMaxSize()
-        ) { page ->
-            when (page) {
-                0 -> RecentPage(serviceBooks, onBookClick)
-                1 -> AuthorsPage(serviceBooks, viewModel)
-                2 -> SeriesPage(serviceBooks, viewModel)
-                3 -> AllBooksPage(serviceBooks, onBookClick)
-            }
-        }
     }
 }
 
