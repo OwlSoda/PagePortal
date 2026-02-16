@@ -60,10 +60,15 @@ sealed class Screen(val route: String) {
         }
     }
     object Browse : Screen("browse")
-    object FilteredBooks : Screen("filtered_books?type={type}&value={value}") {
-        fun createRoute(type: String, value: String): String {
+    object FilteredBooks : Screen("filtered_books?type={type}&value={value}&serviceType={serviceType}") {
+        fun createRoute(type: String, value: String, serviceType: String? = null): String {
              val encodedValue = URLEncoder.encode(value, "UTF-8")
-             return "filtered_books?type=$type&value=$encodedValue"
+             val route = "filtered_books?type=$type&value=$encodedValue"
+             return if (serviceType != null) {
+                 "$route&serviceType=$serviceType"
+             } else {
+                 route
+             }
         }
     }
     object Settings : Screen("settings")
@@ -206,6 +211,12 @@ fun PagePortalNavHost(
                         serviceType = serviceName,
                         onBookClick = { bookId ->
                              navController.navigate(Screen.BookDetail.createRoute(bookId))
+                        },
+                        onAuthorClick = { author ->
+                             navController.navigate(Screen.FilteredBooks.createRoute("AUTHOR", author, serviceName))
+                        },
+                        onSeriesClick = { series ->
+                            navController.navigate(Screen.FilteredBooks.createRoute("SERIES", series, serviceName))
                         }
                     )
                 }
@@ -241,7 +252,8 @@ fun PagePortalNavHost(
                     route = Screen.FilteredBooks.route,
                     arguments = listOf(
                         navArgument("type") { type = NavType.StringType },
-                        navArgument("value") { type = NavType.StringType }
+                        navArgument("value") { type = NavType.StringType },
+                        navArgument("serviceType") { type = NavType.StringType; nullable = true }
                     )
                 ) {
                      com.owlsoda.pageportal.features.book.BookListScreen(

@@ -23,8 +23,14 @@ interface BookDao {
     @Query("SELECT * FROM books WHERE authors LIKE '%' || :author || '%' ORDER BY title ASC")
     fun getBooksByAuthor(author: String): Flow<List<BookEntity>>
 
+    @Query("SELECT * FROM books WHERE authors LIKE '%' || :author || '%' AND serverId IN (:serverIds) ORDER BY title ASC")
+    fun getBooksByAuthorAndServerIds(author: String, serverIds: List<Long>): Flow<List<BookEntity>>
+
     @Query("SELECT * FROM books WHERE series = :series ORDER BY seriesIndex ASC, title ASC")
     fun getBooksBySeries(series: String): Flow<List<BookEntity>>
+
+    @Query("SELECT * FROM books WHERE series = :series AND serverId IN (:serverIds) ORDER BY seriesIndex ASC, title ASC")
+    fun getBooksBySeriesAndServerIds(series: String, serverIds: List<Long>): Flow<List<BookEntity>>
     
     @Query("SELECT * FROM books WHERE id = :id")
     suspend fun getBookById(id: Long): BookEntity?

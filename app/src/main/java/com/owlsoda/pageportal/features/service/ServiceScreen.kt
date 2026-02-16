@@ -26,9 +26,7 @@ import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Sort
-import com.owlsoda.pageportal.features.library.SortOption
-import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.material3.pulltorefresh.PullToRefreshContainer
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -36,6 +34,8 @@ import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 fun ServiceScreen(
     serviceType: String, // "Storyteller", "Audiobookshelf", "Booklore"
     onBookClick: (String) -> Unit,
+    onAuthorClick: (String) -> Unit,
+    onSeriesClick: (String) -> Unit,
     viewModel: LibraryViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -58,25 +58,11 @@ fun ServiceScreen(
 
     val pullRefreshState = rememberPullToRefreshState()
     
-    if (pullRefreshState.isRefreshing) {
-        LaunchedEffect(true) {
-            viewModel.refresh()
-        }
-    }
-    
-    // Explicitly control refreshing state based on UI state to stop the indicator
-    LaunchedEffect(uiState.isLoading) {
-        if (!uiState.isLoading) {
-            pullRefreshState.endRefresh()
-        } else {
-             pullRefreshState.startRefresh()
-        }
-    }
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .nestedScroll(pullRefreshState.nestedScrollConnection)
+    PullToRefreshBox(
+        isRefreshing = uiState.isLoading,
+        onRefresh = { viewModel.refresh() },
+        state = pullRefreshState,
+        modifier = Modifier.fillMaxSize()
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
             // Top Bar
@@ -109,19 +95,12 @@ fun ServiceScreen(
             ) { page ->
                 when (page) {
                     0 -> RecentPage(serviceBooks, onBookClick)
-                    1 -> AuthorsPage(serviceBooks, viewModel)
-                    2 -> SeriesPage(serviceBooks, viewModel)
+                    1 -> AuthorsPage(serviceBooks, onAuthorClick)
+                    2 -> SeriesPage(serviceBooks, onSeriesClick)
                     3 -> AllBooksPage(serviceBooks, onBookClick)
                 }
             }
         }
-        
-        PullToRefreshContainer(
-            state = pullRefreshState,
-            modifier = Modifier.align(Alignment.TopCenter),
-            containerColor = MaterialTheme.colorScheme.surface,
-            contentColor = MaterialTheme.colorScheme.primary
-        )
     }
 }
 
@@ -167,7 +146,7 @@ fun AllBooksPage(books: List<UnifiedBookDisplay>, onBookClick: (String) -> Unit)
 }
 
 @Composable
-fun AuthorsPage(books: List<UnifiedBookDisplay>, viewModel: LibraryViewModel) {
+fun AuthorsPage(books: List<UnifiedBookDisplay>, onAuthorClick: (String) -> Unit) {
     val authors = remember(books) { books.map { it.authors }.distinct().sorted() }
     
     if (authors.isEmpty()) {
@@ -175,8 +154,6 @@ fun AuthorsPage(books: List<UnifiedBookDisplay>, viewModel: LibraryViewModel) {
         return
     }
 
-    // Reuse the LibraryViewModel's filtering mechanism or navigate to a filtered view
-    // For now, let's just show a list
     androidx.compose.foundation.lazy.LazyColumn(
         contentPadding = PaddingValues(16.dp)
     ) {
@@ -186,9 +163,7 @@ fun AuthorsPage(books: List<UnifiedBookDisplay>, viewModel: LibraryViewModel) {
                 headlineContent = { Text(author) },
                 leadingContent = { Icon(Icons.Default.Person, null) },
                 modifier = Modifier.clickable { 
-                    // TODO: Navigate to author detail or filter
-                    viewModel.selectFilter(author)
-                    viewModel.setViewMode(ViewMode.Authors) // This might need adjustment for new nav
+                    onAuthorClick(author)
                 }
             )
             HorizontalDivider()
@@ -197,7 +172,7 @@ fun AuthorsPage(books: List<UnifiedBookDisplay>, viewModel: LibraryViewModel) {
 }
 
 @Composable
-fun SeriesPage(books: List<UnifiedBookDisplay>, viewModel: LibraryViewModel) {
+fun SeriesPage(books: List<UnifiedBookDisplay>, onSeriesClick: (String) -> Unit) {
     val seriesList = remember(books) { books.mapNotNull { it.series }.distinct().sorted() }
     
      if (seriesList.isEmpty()) {
@@ -214,8 +189,7 @@ fun SeriesPage(books: List<UnifiedBookDisplay>, viewModel: LibraryViewModel) {
                 headlineContent = { Text(series) },
                 leadingContent = { Icon(Icons.Default.Folder, null) },
                 modifier = Modifier.clickable { 
-                   viewModel.selectFilter(series)
-                   viewModel.setViewMode(ViewMode.Series)
+                   onSeriesClick(series)
                 }
             )
              HorizontalDivider()

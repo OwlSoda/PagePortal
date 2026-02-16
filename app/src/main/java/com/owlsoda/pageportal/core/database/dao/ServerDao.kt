@@ -20,6 +20,9 @@ interface ServerDao {
     
     @Query("SELECT * FROM servers WHERE serviceType = :serviceType LIMIT 1")
     suspend fun getServerByServiceType(serviceType: String): ServerEntity?
+
+    @Query("SELECT * FROM servers WHERE serviceType = :serviceType")
+    suspend fun getServersByServiceType(serviceType: String): List<ServerEntity>
     
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertServer(server: ServerEntity): Long

@@ -38,7 +38,7 @@ fun BookDetailScreen(
     onBack: () -> Unit,
     onPlayAudiobook: (String) -> Unit,
     onReadEbook: (String) -> Unit,
-    onReadEbook: (String) -> Unit,
+
     onPlayReadAloud: (String) -> Unit,
     onAuthorClick: (String) -> Unit,
     viewModel: BookDetailViewModel = hiltViewModel()

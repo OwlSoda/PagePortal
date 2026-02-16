@@ -24,6 +24,7 @@ data class BookListUiState(
 class BookListViewModel @Inject constructor(
     private val bookDao: BookDao,
     private val collectionDao: com.owlsoda.pageportal.core.database.dao.CollectionDao,
+    private val serverDao: com.owlsoda.pageportal.core.database.dao.ServerDao,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -32,6 +33,7 @@ class BookListViewModel @Inject constructor(
 
     private val filterType: String = checkNotNull(savedStateHandle["type"])
     private val filterValue: String = URLDecoder.decode(checkNotNull(savedStateHandle["value"]), "UTF-8")
+    private val serviceType: String? = savedStateHandle["serviceType"]
 
     init {
         // Initial title, updated later for Collections
@@ -44,7 +46,27 @@ class BookListViewModel @Inject constructor(
     private fun loadBooks() {
         viewModelScope.launch {
             val flow = when (filterType) {
-                "AUTHOR" -> bookDao.getBooksByAuthor(filterValue)
+                "AUTHOR" -> {
+                    if (serviceType != null) {
+                        val normalizedType = serviceType.uppercase()
+                        val servers = serverDao.getServersByServiceType(normalizedType)
+                        val serverIds = servers.map { it.id }
+                        bookDao.getBooksByAuthorAndServerIds(filterValue, serverIds)
+                    } else {
+                        bookDao.getBooksByAuthor(filterValue)
+                    }
+                }
+                "SERIES" -> {
+                    _uiState.update { it.copy(title = filterValue) }
+                    if (serviceType != null) {
+                        val normalizedType = serviceType.uppercase()
+                        val servers = serverDao.getServersByServiceType(normalizedType)
+                        val serverIds = servers.map { it.id }
+                        bookDao.getBooksBySeriesAndServerIds(filterValue, serverIds)
+                    } else {
+                         bookDao.getBooksBySeries(filterValue)
+                    }
+                }
                 "COLLECTION" -> {
                      val collectionId = filterValue.toLongOrNull() ?: 0L
                      val collection = collectionDao.getCollectionById(collectionId)

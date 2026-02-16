@@ -50,6 +50,8 @@ class LibraryRepository @Inject constructor(
                             narrators = gson.toJson(searchBook.narrators),
                             description = searchBook.description,
                             coverUrl = searchBook.coverUrl,
+                            series = searchBook.series,
+                            seriesIndex = searchBook.seriesIndex?.toString(),
                             hasEbook = searchBook.hasEbook,
                             hasAudiobook = searchBook.hasAudiobook,
                             hasReadAloud = searchBook.hasReadAloud,
