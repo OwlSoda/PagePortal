@@ -9,6 +9,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.LinkOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -18,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.owlsoda.pageportal.core.database.entity.ServerEntity
 import com.owlsoda.pageportal.services.ServiceType
+import com.owlsoda.pageportal.ui.components.EmptyState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -47,18 +49,14 @@ fun ServerManagementScreen(
         }
     ) { padding ->
         if (servers.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "No servers connected",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
+            EmptyState(
+                icon = Icons.Default.LinkOff,
+                title = "No Servers Connected",
+                message = "Add a Storyteller, Audiobookshelf, or Booklore server to access your library.",
+                buttonText = "Add Server",
+                onButtonClick = onAddServer,
+                modifier = Modifier.padding(padding)
+            )
         } else {
             LazyColumn(
                 modifier = Modifier
