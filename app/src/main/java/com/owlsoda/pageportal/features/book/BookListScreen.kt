@@ -8,6 +8,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.LibraryBooks
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -60,9 +61,10 @@ fun BookListScreen(
                 CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
             } else if (uiState.books.isEmpty()) {
                 EmptyState(
-                    icon = "📚",
+                    icon = Icons.AutoMirrored.Filled.LibraryBooks,
                     title = "No Books Found",
-                    message = "There are no books in this category."
+                    message = "There are no books in this category.",
+                    contentDescription = "No books"
                 )
             } else {
                 LazyVerticalGrid(
