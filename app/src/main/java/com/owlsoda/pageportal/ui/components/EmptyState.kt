@@ -2,21 +2,24 @@ package com.owlsoda.pageportal.ui.components
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 
 @Composable
 fun EmptyState(
-    icon: String,
+    icon: ImageVector,
     title: String,
     message: String,
     buttonText: String? = null,
     onButtonClick: (() -> Unit)? = null,
+    contentDescription: String? = null,
     modifier: Modifier = Modifier
 ) {
     Box(
@@ -29,9 +32,11 @@ fun EmptyState(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Text(
-                text = icon,
-                style = MaterialTheme.typography.displayLarge
+            Icon(
+                imageVector = icon,
+                contentDescription = contentDescription,
+                modifier = Modifier.size(64.dp),
+                tint = MaterialTheme.colorScheme.primary
             )
             Text(
                 text = title,

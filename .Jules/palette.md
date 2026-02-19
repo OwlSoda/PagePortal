@@ -9,3 +9,7 @@
 ## 2024-05-24 - Slider Precision Controls
 **Learning:** Touch sliders are often imprecise, making it difficult for users to select specific values (like an exact font size). Adding incremental +/- buttons alongside the slider significantly improves usability and accessibility for fine-tuning.
 **Action:** When using `Slider` for precise adjustments, always consider wrapping it in a `Row` with decrement/increment buttons. Ensure these buttons have proper `contentDescription` and `enabled` states based on the slider's range to prevent crashes or invalid states.
+
+## 2024-05-25 - Icon Usage Standards
+**Learning:** This project strictly enforces `Icons.Filled.*` over `Icons.Default.*` for consistency, and `Icons.AutoMirrored.Filled.*` for directional icons. Violating this leads to deprecation warnings and potential RTL issues.
+**Action:** Always check imports and usage of `Icons` to ensure compliance with the project's specific icon style guide, especially when copying code or using standard examples.

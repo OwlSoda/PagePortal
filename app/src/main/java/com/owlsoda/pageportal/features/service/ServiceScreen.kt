@@ -25,9 +25,11 @@ import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Sort
+import androidx.compose.material.icons.automirrored.filled.Sort
+import androidx.compose.material.icons.automirrored.filled.LibraryBooks
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
+import com.owlsoda.pageportal.ui.components.EmptyState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -54,7 +56,7 @@ fun ServiceScreen(
 
     val pagerState = rememberPagerState(pageCount = { 4 })
     val titles = listOf("Recent", "Authors", "Series", "All")
-    val icons = listOf(Icons.Default.Archive, Icons.Default.Person, Icons.Default.Folder, Icons.AutoMirrored.Filled.List)
+    val icons = listOf(Icons.Filled.Archive, Icons.Filled.Person, Icons.Filled.Folder, Icons.AutoMirrored.Filled.List)
 
     val pullRefreshState = rememberPullToRefreshState()
     
@@ -71,7 +73,7 @@ fun ServiceScreen(
                 actions = {
                     // Filter/Sort can go here
                     IconButton(onClick = { /* TODO: Sort Dialog */ }) {
-                        Icon(Icons.Default.Sort, "Sort")
+                        Icon(Icons.AutoMirrored.Filled.Sort, "Sort")
                     }
                 }
             )
@@ -110,7 +112,7 @@ fun RecentPage(books: List<UnifiedBookDisplay>, onBookClick: (String) -> Unit) {
     val recent = books.sortedByDescending { it.id }.take(50) // Placeholder sort
     
     if (recent.isEmpty()) {
-        EmptyStateMessage("No books found")
+        EmptyState(Icons.AutoMirrored.Filled.LibraryBooks, "No books found", "Recently added books will appear here.")
         return
     }
 
@@ -129,7 +131,7 @@ fun RecentPage(books: List<UnifiedBookDisplay>, onBookClick: (String) -> Unit) {
 @Composable
 fun AllBooksPage(books: List<UnifiedBookDisplay>, onBookClick: (String) -> Unit) {
      if (books.isEmpty()) {
-        EmptyStateMessage("No books found")
+        EmptyState(Icons.AutoMirrored.Filled.LibraryBooks, "No books found", "Books from this service will appear here.")
         return
     }
     
@@ -150,7 +152,7 @@ fun AuthorsPage(books: List<UnifiedBookDisplay>, onAuthorClick: (String) -> Unit
     val authors = remember(books) { books.map { it.authors }.distinct().sorted() }
     
     if (authors.isEmpty()) {
-        EmptyStateMessage("No authors found")
+        EmptyState(Icons.Filled.Person, "No authors found", "Authors from this service will appear here.")
         return
     }
 
@@ -161,7 +163,7 @@ fun AuthorsPage(books: List<UnifiedBookDisplay>, onAuthorClick: (String) -> Unit
             val author = authors[index]
             ListItem(
                 headlineContent = { Text(author) },
-                leadingContent = { Icon(Icons.Default.Person, null) },
+                leadingContent = { Icon(Icons.Filled.Person, null) },
                 modifier = Modifier.clickable { 
                     onAuthorClick(author)
                 }
@@ -176,7 +178,7 @@ fun SeriesPage(books: List<UnifiedBookDisplay>, onSeriesClick: (String) -> Unit)
     val seriesList = remember(books) { books.mapNotNull { it.series }.distinct().sorted() }
     
      if (seriesList.isEmpty()) {
-        EmptyStateMessage("No series found")
+        EmptyState(Icons.Filled.Folder, "No series found", "Series from this service will appear here.")
         return
     }
 
@@ -187,19 +189,12 @@ fun SeriesPage(books: List<UnifiedBookDisplay>, onSeriesClick: (String) -> Unit)
             val series = seriesList[index]
             ListItem(
                 headlineContent = { Text(series) },
-                leadingContent = { Icon(Icons.Default.Folder, null) },
+                leadingContent = { Icon(Icons.Filled.Folder, null) },
                 modifier = Modifier.clickable { 
                    onSeriesClick(series)
                 }
             )
              HorizontalDivider()
         }
-    }
-}
-
-@Composable
-fun EmptyStateMessage(msg: String) {
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Text(msg, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
