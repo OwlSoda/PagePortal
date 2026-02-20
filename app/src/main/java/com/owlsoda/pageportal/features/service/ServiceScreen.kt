@@ -20,6 +20,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.text.style.TextAlign
 import com.owlsoda.pageportal.features.library.BookCard
 import androidx.compose.foundation.clickable
+import com.owlsoda.pageportal.ui.components.EmptyState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.Folder
@@ -110,7 +111,12 @@ fun RecentPage(books: List<UnifiedBookDisplay>, onBookClick: (String) -> Unit) {
     val recent = books.sortedByDescending { it.id }.take(50) // Placeholder sort
     
     if (recent.isEmpty()) {
-        EmptyStateMessage("No books found")
+        EmptyState(
+            icon = Icons.Default.Archive,
+            title = "No Recent Activity",
+            message = "Start reading or listening to see your history here.",
+            contentDescription = "No Recent Activity"
+        )
         return
     }
 
@@ -129,7 +135,12 @@ fun RecentPage(books: List<UnifiedBookDisplay>, onBookClick: (String) -> Unit) {
 @Composable
 fun AllBooksPage(books: List<UnifiedBookDisplay>, onBookClick: (String) -> Unit) {
      if (books.isEmpty()) {
-        EmptyStateMessage("No books found")
+        EmptyState(
+            icon = Icons.AutoMirrored.Filled.List,
+            title = "No Books Found",
+            message = "No books found for this service.",
+            contentDescription = "No Books Found"
+        )
         return
     }
     
@@ -150,7 +161,12 @@ fun AuthorsPage(books: List<UnifiedBookDisplay>, onAuthorClick: (String) -> Unit
     val authors = remember(books) { books.map { it.authors }.distinct().sorted() }
     
     if (authors.isEmpty()) {
-        EmptyStateMessage("No authors found")
+        EmptyState(
+            icon = Icons.Default.Person,
+            title = "No Authors Found",
+            message = "No authors found for this service.",
+            contentDescription = "No Authors Found"
+        )
         return
     }
 
@@ -176,7 +192,12 @@ fun SeriesPage(books: List<UnifiedBookDisplay>, onSeriesClick: (String) -> Unit)
     val seriesList = remember(books) { books.mapNotNull { it.series }.distinct().sorted() }
     
      if (seriesList.isEmpty()) {
-        EmptyStateMessage("No series found")
+        EmptyState(
+            icon = Icons.Default.Folder,
+            title = "No Series Found",
+            message = "No series found for this service.",
+            contentDescription = "No Series Found"
+        )
         return
     }
 
@@ -197,9 +218,3 @@ fun SeriesPage(books: List<UnifiedBookDisplay>, onSeriesClick: (String) -> Unit)
     }
 }
 
-@Composable
-fun EmptyStateMessage(msg: String) {
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Text(msg, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
-}

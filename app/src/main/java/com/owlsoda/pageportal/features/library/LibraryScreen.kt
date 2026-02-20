@@ -28,11 +28,15 @@ import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.LinkOff
+import androidx.compose.material.icons.filled.CloudOff
+import androidx.compose.material.icons.automirrored.filled.LibraryBooks
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -45,7 +49,7 @@ import com.owlsoda.pageportal.features.auth.LoginScreen
 import com.owlsoda.pageportal.ui.components.EmptyState
 
 private data class EmptyStateInfo(
-    val icon: String,
+    val icon: ImageVector,
     val title: String,
     val message: String,
     val buttonText: String? = null,
@@ -314,15 +318,15 @@ fun LibraryScreen(
                         uiState.books.isEmpty() && !uiState.isLoading -> {
                             val info = when {
                                 uiState.servers.isEmpty() -> {
-                                    EmptyStateInfo("🔌", "No Services Connected", "Go to Settings to add Storyteller or other services.", "Open Settings", onSettingsClick)
+                                    EmptyStateInfo(Icons.Default.LinkOff, "No Services Connected", "Go to Settings to add Storyteller or other services.", "Open Settings", onSettingsClick)
                                 }
                                 
                                 uiState.isOfflineFilterActive -> {
-                                    EmptyStateInfo("☁️", "No Downloaded Books", "Download books while online to read them here.", null, null)
+                                    EmptyStateInfo(Icons.Default.CloudOff, "No Downloaded Books", "Download books while online to read them here.", null, null)
                                 }
                                 
                                 else -> {
-                                    EmptyStateInfo("📚", "No Books Found", "Pull down to refresh or check your server connection.", null, null)
+                                    EmptyStateInfo(Icons.AutoMirrored.Filled.LibraryBooks, "No Books Found", "Pull down to refresh or check your server connection.", null, null)
                                 }
                             }
                             
@@ -330,6 +334,7 @@ fun LibraryScreen(
                                 icon = info.icon,
                                 title = info.title,
                                 message = info.message,
+                                contentDescription = info.title,
                                 buttonText = info.buttonText,
                                 onButtonClick = info.onAction
                             )
