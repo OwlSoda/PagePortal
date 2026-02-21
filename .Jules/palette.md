@@ -9,3 +9,7 @@
 ## 2024-05-24 - Slider Precision Controls
 **Learning:** Touch sliders are often imprecise, making it difficult for users to select specific values (like an exact font size). Adding incremental +/- buttons alongside the slider significantly improves usability and accessibility for fine-tuning.
 **Action:** When using `Slider` for precise adjustments, always consider wrapping it in a `Row` with decrement/increment buttons. Ensure these buttons have proper `contentDescription` and `enabled` states based on the slider's range to prevent crashes or invalid states.
+
+## 2026-02-02 - Component Icon Flexibility
+**Learning:** Hardcoding UI components (like `EmptyState`) to accept `String` for icons inadvertently forces the use of emojis, which compromises accessibility and visual consistency across platforms.
+**Action:** Design reusable components to accept `ImageVector` (or a Composable slot) for icons. This allows for the use of semantic, theme-aware vector assets that support `contentDescription` and proper tinting.
