@@ -19,6 +19,7 @@ import androidx.compose.ui.platform.LocalContext
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import kotlin.math.roundToInt
 import com.owlsoda.pageportal.ui.components.ListDetailLayout
 import com.owlsoda.pageportal.ui.components.WindowSizeClass
 import com.owlsoda.pageportal.ui.components.rememberWindowSizeClass
@@ -362,12 +363,35 @@ fun ReadingSettings(state: SettingsState, viewModel: SettingsViewModel) {
         // Font Size
         Column(modifier = Modifier.padding(horizontal = 16.dp)) {
             Text("Font Size: ${(state.readerFontSize * 100).toInt()}%")
-            Slider(
-                value = state.readerFontSize,
-                onValueChange = { viewModel.setReaderFontSize(it) },
-                valueRange = 0.5f..2.0f,
-                steps = 14
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(
+                    onClick = {
+                        val newValue = ((state.readerFontSize - 0.1f) * 10).roundToInt() / 10f
+                        viewModel.setReaderFontSize(newValue.coerceIn(0.5f, 2.0f))
+                    },
+                    enabled = state.readerFontSize > 0.55f
+                ) {
+                    Icon(Icons.Filled.Remove, contentDescription = "Decrease font size")
+                }
+
+                Slider(
+                    value = state.readerFontSize,
+                    onValueChange = { viewModel.setReaderFontSize(it) },
+                    valueRange = 0.5f..2.0f,
+                    steps = 14,
+                    modifier = Modifier.weight(1f)
+                )
+
+                IconButton(
+                    onClick = {
+                        val newValue = ((state.readerFontSize + 0.1f) * 10).roundToInt() / 10f
+                        viewModel.setReaderFontSize(newValue.coerceIn(0.5f, 2.0f))
+                    },
+                    enabled = state.readerFontSize < 1.95f
+                ) {
+                    Icon(Icons.Filled.Add, contentDescription = "Increase font size")
+                }
+            }
         }
         
         Spacer(Modifier.height(16.dp))
