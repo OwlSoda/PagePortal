@@ -9,3 +9,7 @@
 ## 2024-05-24 - Slider Precision Controls
 **Learning:** Touch sliders are often imprecise, making it difficult for users to select specific values (like an exact font size). Adding incremental +/- buttons alongside the slider significantly improves usability and accessibility for fine-tuning.
 **Action:** When using `Slider` for precise adjustments, always consider wrapping it in a `Row` with decrement/increment buttons. Ensure these buttons have proper `contentDescription` and `enabled` states based on the slider's range to prevent crashes or invalid states.
+
+## 2024-05-25 - Empty States with Visual Weight
+**Learning:** Empty states using text-only emojis (e.g., "📚") lack visual weight and fail to engage users or clearly communicate the system status at a glance. They also present accessibility challenges as screen readers read the literal emoji name.
+**Action:** Replace text-based empty state icons with large, semantic `Icon` composables (using `ImageVector`) and tint them with `MaterialTheme.colorScheme.primary` or `onSurfaceVariant` to create a more polished and accessible empty state experience.
