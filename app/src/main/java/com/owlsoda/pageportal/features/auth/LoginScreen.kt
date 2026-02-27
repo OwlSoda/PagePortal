@@ -1,6 +1,7 @@
 package com.owlsoda.pageportal.features.auth
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.MenuBook
@@ -10,7 +11,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
@@ -23,6 +26,7 @@ fun LoginScreen(
     viewModel: LoginViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val keyboardController = LocalSoftwareKeyboardController.current
     
     LaunchedEffect(uiState.isLoggedIn) {
         if (uiState.isLoggedIn) {
@@ -99,7 +103,10 @@ fun LoginScreen(
             },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri)
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Uri,
+                imeAction = ImeAction.Next
+            )
         )
         
         Spacer(modifier = Modifier.height(16.dp))
@@ -110,13 +117,21 @@ fun LoginScreen(
             onValueChange = { viewModel.updateUsername(it) },
             label = { Text("Username") },
             modifier = Modifier.fillMaxWidth(),
-            singleLine = true
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(
+                imeAction = ImeAction.Next
+            )
         )
         
         Spacer(modifier = Modifier.height(16.dp))
         
         // Password
         var passwordVisible by remember { mutableStateOf(false) }
+        val canSubmit = !uiState.isLoading &&
+            uiState.serverUrl.isNotBlank() &&
+            uiState.username.isNotBlank() &&
+            uiState.password.isNotBlank()
+
         OutlinedTextField(
             value = uiState.password,
             onValueChange = { viewModel.updatePassword(it) },
@@ -124,7 +139,18 @@ fun LoginScreen(
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
             visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Password,
+                imeAction = ImeAction.Done
+            ),
+            keyboardActions = KeyboardActions(
+                onDone = {
+                    keyboardController?.hide()
+                    if (canSubmit) {
+                        viewModel.login(uiState.selectedService)
+                    }
+                }
+            ),
             trailingIcon = {
                 IconButton(onClick = { passwordVisible = !passwordVisible }) {
                     Icon(
@@ -152,10 +178,7 @@ fun LoginScreen(
         Button(
             onClick = { viewModel.login(uiState.selectedService) },
             modifier = Modifier.fillMaxWidth(),
-            enabled = !uiState.isLoading && 
-                      uiState.serverUrl.isNotBlank() && 
-                      uiState.username.isNotBlank() && 
-                      uiState.password.isNotBlank()
+            enabled = canSubmit
         ) {
             if (uiState.isLoading) {
                 CircularProgressIndicator(
