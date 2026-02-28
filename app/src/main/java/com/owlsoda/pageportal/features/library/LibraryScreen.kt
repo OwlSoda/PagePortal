@@ -28,6 +28,9 @@ import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Link
+import androidx.compose.material.icons.filled.RecordVoiceOver
+import androidx.compose.material.icons.automirrored.filled.LibraryBooks
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -252,13 +255,20 @@ fun LibraryScreen(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                val icon = when {
-                                    tab.id == -1L -> "📚"
-                                    tab.serviceType == ServiceType.AUDIOBOOKSHELF -> "🎧"
-                                    tab.serviceType == ServiceType.BOOKLORE -> "📖"
-                                    tab.serviceType == ServiceType.STORYTELLER -> "🗣️"
-                                    else -> "🔗"
+                                val (iconVector, contentDesc) = when {
+                                    tab.id == -1L -> Icons.AutoMirrored.Filled.LibraryBooks to "All Books"
+                                    tab.serviceType == ServiceType.AUDIOBOOKSHELF -> Icons.Filled.Headphones to "Audiobooks"
+                                    tab.serviceType == ServiceType.BOOKLORE -> Icons.AutoMirrored.Filled.MenuBook to "Ebooks"
+                                    tab.serviceType == ServiceType.STORYTELLER -> Icons.Filled.RecordVoiceOver to "ReadAloud"
+                                    else -> Icons.Filled.Link to "Connected Service"
                                 }
+
+                                Icon(
+                                    imageVector = iconVector,
+                                    contentDescription = contentDesc,
+                                    modifier = Modifier.size(18.dp)
+                                )
+
                                 if (tab.id != -1L) {
                                     val color = if (tab.isConnected) {
                                         androidx.compose.ui.graphics.Color.Green
@@ -274,7 +284,7 @@ fun LibraryScreen(
                                     )
                                 }
 
-                                Text(text = "$icon ${tab.name}")
+                                Text(text = tab.name)
                                 
                                 if (tab.bookCount > 0) {
                                     Text(
