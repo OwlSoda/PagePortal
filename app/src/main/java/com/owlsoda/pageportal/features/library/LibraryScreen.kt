@@ -35,6 +35,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -43,11 +44,14 @@ import androidx.compose.foundation.background
 import coil.compose.AsyncImage
 import com.owlsoda.pageportal.features.auth.LoginScreen
 import com.owlsoda.pageportal.ui.components.EmptyState
+import androidx.compose.material.icons.filled.LinkOff
+import androidx.compose.material.icons.filled.CloudOff
 
 private data class EmptyStateInfo(
-    val icon: String,
+    val icon: ImageVector,
     val title: String,
     val message: String,
+    val contentDescription: String? = null,
     val buttonText: String? = null,
     val onAction: (() -> Unit)? = null
 )
@@ -314,15 +318,15 @@ fun LibraryScreen(
                         uiState.books.isEmpty() && !uiState.isLoading -> {
                             val info = when {
                                 uiState.servers.isEmpty() -> {
-                                    EmptyStateInfo("🔌", "No Services Connected", "Go to Settings to add Storyteller or other services.", "Open Settings", onSettingsClick)
+                                    EmptyStateInfo(Icons.Default.LinkOff, "No Services Connected", "Go to Settings to add Storyteller or other services.", "No Services Connected", "Open Settings", onSettingsClick)
                                 }
                                 
                                 uiState.isOfflineFilterActive -> {
-                                    EmptyStateInfo("☁️", "No Downloaded Books", "Download books while online to read them here.", null, null)
+                                    EmptyStateInfo(Icons.Default.CloudOff, "No Downloaded Books", "Download books while online to read them here.", "No Downloaded Books", null, null)
                                 }
                                 
                                 else -> {
-                                    EmptyStateInfo("📚", "No Books Found", "Pull down to refresh or check your server connection.", null, null)
+                                    EmptyStateInfo(Icons.AutoMirrored.Filled.MenuBook, "No Books Found", "Pull down to refresh or check your server connection.", "No Books Found", null, null)
                                 }
                             }
                             
@@ -330,6 +334,7 @@ fun LibraryScreen(
                                 icon = info.icon,
                                 title = info.title,
                                 message = info.message,
+                                contentDescription = info.contentDescription,
                                 buttonText = info.buttonText,
                                 onButtonClick = info.onAction
                             )

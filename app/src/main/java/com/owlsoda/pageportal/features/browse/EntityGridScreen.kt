@@ -24,6 +24,10 @@ import coil.compose.AsyncImage
 
 import com.owlsoda.pageportal.ui.components.EmptyState
 
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.CollectionsBookmark
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EntityGridScreen(
@@ -67,15 +71,16 @@ fun EntityGridScreen(
                 CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
             } else if (uiState.items.isEmpty()) {
                 val (icon, title, message) = when(uiState.selectedType) {
-                    EntityType.Authors -> Triple("👤", "No Authors Found", "Connect a service or refresh to find authors.")
-                    EntityType.Series -> Triple("📚", "No Series Found", "Connect a service or refresh to find series.")
-                    EntityType.Collections -> Triple("📁", "No Collections Found", "Create collections or sync with your server.")
+                    EntityType.Authors -> Triple(Icons.Default.Person, "No Authors Found", "Connect a service or refresh to find authors.")
+                    EntityType.Series -> Triple(Icons.Default.Folder, "No Series Found", "Connect a service or refresh to find series.")
+                    EntityType.Collections -> Triple(Icons.Default.CollectionsBookmark, "No Collections Found", "Create collections or sync with your server.")
                 }
                 
                 EmptyState(
                     icon = icon,
                     title = title,
-                    message = message
+                    message = message,
+                    contentDescription = title
                 )
             } else {
                 LazyVerticalGrid(
