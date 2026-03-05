@@ -27,7 +27,15 @@ import androidx.compose.material.icons.filled.GridView
 
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.RecordVoiceOver
+import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.LinkOff
+import androidx.compose.material.icons.filled.CloudOff
+import androidx.compose.material.icons.automirrored.filled.LibraryBooks
+import androidx.compose.material.icons.filled.CloudDownload
+import androidx.compose.material.icons.filled.Headphones
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -45,7 +53,7 @@ import com.owlsoda.pageportal.features.auth.LoginScreen
 import com.owlsoda.pageportal.ui.components.EmptyState
 
 private data class EmptyStateInfo(
-    val icon: String,
+    val icon: ImageVector,
     val title: String,
     val message: String,
     val buttonText: String? = null,
@@ -211,28 +219,32 @@ fun LibraryScreen(
                     FilterChip(
                         selected = uiState.filterHasAudiobook,
                         onClick = { viewModel.toggleAudiobookFilter() },
-                        label = { Text("🎧 Audio") }
+                        label = { Text("Audio") },
+                        leadingIcon = { Icon(Icons.Filled.Headphones, contentDescription = null, modifier = Modifier.size(18.dp)) }
                     )
                 }
                 item {
                     FilterChip(
                         selected = uiState.filterHasEbook,
                         onClick = { viewModel.toggleEbookFilter() },
-                        label = { Text("📖 Ebook") }
+                        label = { Text("Ebook") },
+                        leadingIcon = { Icon(Icons.AutoMirrored.Filled.MenuBook, contentDescription = null, modifier = Modifier.size(18.dp)) }
                     )
                 }
                 item {
                     FilterChip(
                         selected = uiState.filterHasReadAloud,
                         onClick = { viewModel.toggleReadAloudFilter() },
-                        label = { Text("🗣️ ReadAloud") }
+                        label = { Text("ReadAloud") },
+                        leadingIcon = { Icon(Icons.Filled.RecordVoiceOver, contentDescription = null, modifier = Modifier.size(18.dp)) }
                     )
                 }
                 item {
                     FilterChip(
                         selected = uiState.filterDownloaded,
                         onClick = { viewModel.toggleDownloadedFilter() },
-                        label = { Text("📥 Downloaded") }
+                        label = { Text("Downloaded") },
+                        leadingIcon = { Icon(Icons.Filled.CloudDownload, contentDescription = null, modifier = Modifier.size(18.dp)) }
                     )
                 }
             }
@@ -253,12 +265,19 @@ fun LibraryScreen(
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 val icon = when {
-                                    tab.id == -1L -> "📚"
-                                    tab.serviceType == ServiceType.AUDIOBOOKSHELF -> "🎧"
-                                    tab.serviceType == ServiceType.BOOKLORE -> "📖"
-                                    tab.serviceType == ServiceType.STORYTELLER -> "🗣️"
-                                    else -> "🔗"
+                                    tab.id == -1L -> Icons.AutoMirrored.Filled.MenuBook
+                                    tab.serviceType == ServiceType.AUDIOBOOKSHELF -> Icons.Filled.Headphones
+                                    tab.serviceType == ServiceType.BOOKLORE -> Icons.AutoMirrored.Filled.MenuBook
+                                    tab.serviceType == ServiceType.STORYTELLER -> Icons.Filled.RecordVoiceOver
+                                    else -> Icons.Filled.Link
                                 }
+
+                                Icon(
+                                    imageVector = icon,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+
                                 if (tab.id != -1L) {
                                     val color = if (tab.isConnected) {
                                         androidx.compose.ui.graphics.Color.Green
@@ -274,7 +293,7 @@ fun LibraryScreen(
                                     )
                                 }
 
-                                Text(text = "$icon ${tab.name}")
+                                Text(text = tab.name)
                                 
                                 if (tab.bookCount > 0) {
                                     Text(
@@ -314,15 +333,15 @@ fun LibraryScreen(
                         uiState.books.isEmpty() && !uiState.isLoading -> {
                             val info = when {
                                 uiState.servers.isEmpty() -> {
-                                    EmptyStateInfo("🔌", "No Services Connected", "Go to Settings to add Storyteller or other services.", "Open Settings", onSettingsClick)
+                                    EmptyStateInfo(Icons.Filled.LinkOff, "No Services Connected", "Go to Settings to add Storyteller or other services.", "Open Settings", onSettingsClick)
                                 }
                                 
                                 uiState.isOfflineFilterActive -> {
-                                    EmptyStateInfo("☁️", "No Downloaded Books", "Download books while online to read them here.", null, null)
+                                    EmptyStateInfo(Icons.Filled.CloudOff, "No Downloaded Books", "Download books while online to read them here.", null, null)
                                 }
                                 
                                 else -> {
-                                    EmptyStateInfo("📚", "No Books Found", "Pull down to refresh or check your server connection.", null, null)
+                                    EmptyStateInfo(Icons.AutoMirrored.Filled.LibraryBooks, "No Books Found", "Pull down to refresh or check your server connection.", null, null)
                                 }
                             }
                             
