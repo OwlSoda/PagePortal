@@ -9,3 +9,7 @@
 ## 2024-05-24 - Slider Precision Controls
 **Learning:** Touch sliders are often imprecise, making it difficult for users to select specific values (like an exact font size). Adding incremental +/- buttons alongside the slider significantly improves usability and accessibility for fine-tuning.
 **Action:** When using `Slider` for precise adjustments, always consider wrapping it in a `Row` with decrement/increment buttons. Ensure these buttons have proper `contentDescription` and `enabled` states based on the slider's range to prevent crashes or invalid states.
+
+## 2024-05-25 - Fine-Grained Slider Controls
+**Learning:** For layout configurations like margin, line height, and paragraph spacing, users need more precise control than standard touch sliders offer. Adding +/- buttons alongside sliders significantly improves usability and accessibility for precise adjustments.
+**Action:** Wrap `Slider` components in a `Row` with decrement/increment buttons. Apply rounding logic such as `((value +/- step) * 10).roundToInt() / 10f` for floating point adjustments to prevent precision drift.
