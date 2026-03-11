@@ -264,13 +264,19 @@ class ServiceManager @Inject constructor(
             if (url.isBlank()) return ""
             
             var processed = url.trim()
+            val original = processed
             
-            // Fix common typo "http:host" -> "http://host"
-            if (processed.contains("http:") && !processed.contains("http://")) {
+            // Fix common typos like "http:host" -> "http://host"
+            if (processed.startsWith("http:") && !processed.startsWith("http://")) {
+                processed = "http://" + processed.removePrefix("http:")
+            } else if (processed.startsWith("https:") && !processed.startsWith("https://")) {
+                processed = "https://" + processed.removePrefix("https:")
+            } else if (processed.contains("http:") && !processed.contains("http://")) {
                 processed = processed.replace("http:", "http://")
             }
-            if (processed.contains("https:") && !processed.contains("https://")) {
-                processed = processed.replace("https:", "https://")
+            
+            if (original != processed) {
+                android.util.Log.d("ServiceManager", "Fixed URL typo: '$original' -> '$processed'")
             }
 
             val withProtocol = if (!processed.startsWith("http")) {

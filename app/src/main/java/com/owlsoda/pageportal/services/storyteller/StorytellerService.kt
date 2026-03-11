@@ -115,7 +115,7 @@ class StorytellerService(
             android.util.Log.d("StorytellerService", "Received ${response.size} books from Storyteller")
             response.map { it.toServiceBook() }
         } catch (e: Exception) {
-            android.util.Log.e("StorytellerService", "Failed to fetch books from Storyteller", e)
+            android.util.Log.e("StorytellerService", "Failed to fetch books from Storyteller. URL: $baseUrl, Token present: ${authToken != null}", e)
             emptyList()
         }
     }
