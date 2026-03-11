@@ -140,7 +140,7 @@ fun LoginScreen(
                     )
                     ServiceSelectionCard(
                         title = "Booklore",
-                        description = "Connect via Booklore (OIDC Support)",
+                        description = "Connect to your Booklore server",
                         onClick = { viewModel.selectService(2) }
                     )
                 }
@@ -205,7 +205,7 @@ fun LoginScreen(
                         
                         val isBooklore = uiState.selectedService == 2
                         
-                        AnimatedVisibility(visible = !isBooklore) {
+                        AnimatedVisibility(visible = true) {
                             Column {
                                 Spacer(modifier = Modifier.height(16.dp))
                                 
@@ -259,18 +259,14 @@ fun LoginScreen(
                         // Login button
                         Button(
                             onClick = { 
-                                if (isBooklore) {
-                                    viewModel.startOidcLogin()
-                                } else {
-                                    viewModel.login(uiState.selectedService)
-                                }
+                                viewModel.login(uiState.selectedService)
                             },
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(56.dp),
                             enabled = !uiState.isLoading && 
                                       uiState.serverUrl.isNotBlank() && 
-                                      (isBooklore || (uiState.username.isNotBlank() && uiState.password.isNotBlank()))
+                                      uiState.username.isNotBlank() && uiState.password.isNotBlank()
                         ) {
                             if (uiState.isLoading) {
                                 CircularProgressIndicator(
@@ -281,7 +277,7 @@ fun LoginScreen(
                                 Spacer(modifier = Modifier.width(12.dp))
                             }
                             Text(
-                                text = if (isBooklore) "Login with OIDC" else "Connect",
+                                text = "Connect",
                                 style = MaterialTheme.typography.titleMedium
                             )
                         }
