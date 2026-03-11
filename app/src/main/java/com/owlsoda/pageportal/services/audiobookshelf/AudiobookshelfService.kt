@@ -380,7 +380,7 @@ class AudiobookshelfService(
     }
     
     override suspend fun downloadBook(bookId: String): Flow<DownloadProgress> {
-         return flow { } // TODO: Implement if needed, or rely on DownloadService fetching URL
+         return flow { } // Downloads are handled by DownloadService, not this method
     }
     
     private fun normalizeUrl(url: String): String {

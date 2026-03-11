@@ -33,6 +33,7 @@ import net.openid.appauth.AuthorizationService
 @Composable
 fun LoginScreen(
     onLoginSuccess: () -> Unit,
+    onManageServers: () -> Unit = {},
     viewModel: LoginViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -329,7 +330,7 @@ fun LoginScreen(
                 Spacer(modifier = Modifier.height(24.dp))
                 
                 // Manage servers link
-                TextButton(onClick = { /* TODO: Navigate to server management */ }) {
+                TextButton(onClick = onManageServers) {
                     Text("Manage connected servers")
                 }
             }

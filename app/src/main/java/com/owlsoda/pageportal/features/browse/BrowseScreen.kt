@@ -4,6 +4,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -31,12 +35,17 @@ fun BrowseScreen(
     Scaffold(
         bottomBar = {
             NavigationBar {
+                val icons = listOf(
+                    Icons.Default.Person,
+                    Icons.Default.Folder,
+                    Icons.Default.Star
+                )
                 tabs.forEachIndexed { index, title ->
                     NavigationBarItem(
                         selected = selectedTab == index,
                         onClick = { selectedTab = index },
                         label = { Text(title) },
-                        icon = { /* TODO: Icons */ }
+                        icon = { Icon(icons[index], contentDescription = title) }
                     )
                 }
             }

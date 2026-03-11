@@ -26,7 +26,8 @@ data class UnifiedBookDisplay(
     val isDownloading: Boolean,
     val downloadProgress: Float,
     val series: String? = null,
-    val seriesIndex: String? = null
+    val seriesIndex: String? = null,
+    val addedAt: Long = 0L
 )
 
 data class ServerTab(
@@ -281,7 +282,8 @@ class LibraryViewModel @Inject constructor(
                         },
                         downloadProgress = books.maxOfOrNull { it.downloadProgress } ?: 0f,
                         series = books.firstOrNull()?.series,
-                        seriesIndex = books.firstOrNull()?.seriesIndex
+                        seriesIndex = books.firstOrNull()?.seriesIndex,
+                        addedAt = books.minOfOrNull { it.addedAt } ?: 0L
                     )
                 }
                 updateDisplayedBooks()

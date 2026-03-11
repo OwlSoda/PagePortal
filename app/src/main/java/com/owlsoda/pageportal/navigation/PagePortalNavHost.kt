@@ -235,6 +235,11 @@ fun PagePortalNavHost(
                                     popUpTo(Screen.Login.route) { inclusive = true }
                                 }
                             }
+                        },
+                        onManageServers = {
+                            navController.navigate(Screen.ServerManagement.route) {
+                                launchSingleTop = true
+                            }
                         }
                     )
                 }
@@ -390,7 +395,6 @@ fun PagePortalNavHost(
                     )
                 }
                 
-                // Placeholders
                 composable(Screen.MatchReview.route) {
                      com.owlsoda.pageportal.features.settings.MatchReviewScreen(
                          onBack = { navController.popBackStack() }

@@ -41,15 +41,24 @@ fun ServiceScreen(
     val uiState by viewModel.uiState.collectAsState()
     val scope = rememberCoroutineScope()
     
+    // Sort state
+    var currentSort by remember { mutableStateOf("RECENT") }
+    var showSortDialog by remember { mutableStateOf(false) }
+    
     // Filter books for this service
-    // Note: This filtering logic might ideally move to VM to avoid large lists in UI
-    val serviceBooks = remember(uiState.books, serviceType) {
-        // Find the tab ID for this service
+    val serviceBooks = remember(uiState.books, serviceType, currentSort) {
         val tabId = uiState.serverTabs.find { 
             it.name.contains(serviceType, ignoreCase = true) 
         }?.id ?: -999L
         
-        uiState.books.filter { it.serverIds.contains(tabId) }
+        val filtered = uiState.books.filter { it.serverIds.contains(tabId) }
+        
+        when (currentSort) {
+            "TITLE" -> filtered.sortedBy { it.title.lowercase() }
+            "AUTHOR" -> filtered.sortedBy { it.authors.lowercase() }
+            "SERIES" -> filtered.sortedWith(compareBy({ it.series?.lowercase() ?: "\uFFFF" }, { it.seriesIndex?.toDoubleOrNull() ?: Double.MAX_VALUE }))
+            else -> filtered.sortedByDescending { it.addedAt }
+        }
     }
 
     val pagerState = rememberPagerState(pageCount = { 4 })
@@ -69,8 +78,7 @@ fun ServiceScreen(
             CenterAlignedTopAppBar(
                 title = { Text(serviceType) },
                 actions = {
-                    // Filter/Sort can go here
-                    IconButton(onClick = { /* TODO: Sort Dialog */ }) {
+                    IconButton(onClick = { showSortDialog = true }) {
                         Icon(Icons.Default.Sort, "Sort")
                     }
                 }
@@ -102,12 +110,56 @@ fun ServiceScreen(
             }
         }
     }
+    
+    // Sort Dialog
+    if (showSortDialog) {
+        AlertDialog(
+            onDismissRequest = { showSortDialog = false },
+            title = { Text("Sort By") },
+            text = {
+                Column {
+                    val options = listOf(
+                        "RECENT" to "Recently Added",
+                        "TITLE" to "Title",
+                        "AUTHOR" to "Author",
+                        "SERIES" to "Series"
+                    )
+                    options.forEach { (value, label) ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    currentSort = value
+                                    showSortDialog = false
+                                }
+                                .padding(vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(label)
+                            RadioButton(
+                                selected = currentSort == value,
+                                onClick = {
+                                    currentSort = value
+                                    showSortDialog = false
+                                }
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showSortDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
 }
 
 @Composable
 fun RecentPage(books: List<UnifiedBookDisplay>, onBookClick: (String) -> Unit) {
-    // Assuming 'books' is already sorted or we sort here by added date (id often proxies this)
-    val recent = books.sortedByDescending { it.id }.take(50) // Placeholder sort
+    val recent = books.sortedByDescending { it.addedAt }.take(50)
     
     if (recent.isEmpty()) {
         EmptyStateMessage("No books found")

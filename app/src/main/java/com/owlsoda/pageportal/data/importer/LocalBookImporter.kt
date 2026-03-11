@@ -144,17 +144,28 @@ class LocalBookImporter @Inject constructor(
     private suspend fun parseEpub(file: File): ParsedMetadata {
         val parser = EpubParser()
         val result = parser.parse(file).getOrThrow()
-        parser.close()
         
-        // Extract cover to accessible file if needed?
-        // For now, if coverImage is relative path inside ZIP, we can't display it easily in Coil 
-        // without a custom Fetcher or extracting it.
-        // TODO: Extract cover image to cache dir
+        // Extract cover image from EPUB ZIP to a local file
+        var coverUrl: String? = null
+        if (result.coverImage != null) {
+            try {
+                val coverBytes = parser.getInputStream(result.coverImage)?.readBytes()
+                if (coverBytes != null && coverBytes.isNotEmpty()) {
+                    val extension = result.coverImage.substringAfterLast('.', "jpg")
+                    val coverFile = saveCoverImage(coverBytes, file.nameWithoutExtension, extension)
+                    coverUrl = android.net.Uri.fromFile(coverFile).toString()
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+        
+        parser.close()
         
         return ParsedMetadata(
             title = result.title,
             author = result.author,
-            coverUrl = null, // TODO: Handle cover extraction
+            coverUrl = coverUrl,
             hasMediaOverlays = result.hasMediaOverlays
         )
     }
@@ -168,20 +179,36 @@ class LocalBookImporter @Inject constructor(
             val durationMs = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()
             val durationSec = durationMs?.let { it / 1000 }
             
-            // Extract cover art
-            // val art = retriever.embeddedPicture
-            // TODO: Save art to file
+            // Extract embedded cover art
+            var coverUrl: String? = null
+            val art = retriever.embeddedPicture
+            if (art != null && art.isNotEmpty()) {
+                try {
+                    val coverFile = saveCoverImage(art, file.nameWithoutExtension, "jpg")
+                    coverUrl = android.net.Uri.fromFile(coverFile).toString()
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
             
             return ParsedMetadata(
                 title = title,
                 author = artist,
                 duration = durationSec,
-                coverUrl = null
+                coverUrl = coverUrl
             )
         } catch (e: Exception) {
             return ParsedMetadata(file.nameWithoutExtension, "Unknown", null, null)
         } finally {
             retriever.release()
         }
+    }
+    
+    private fun saveCoverImage(bytes: ByteArray, bookName: String, extension: String): File {
+        val coversDir = File(context.filesDir, "covers")
+        coversDir.mkdirs()
+        val coverFile = File(coversDir, "${bookName}_cover.$extension")
+        coverFile.writeBytes(bytes)
+        return coverFile
     }
 }
