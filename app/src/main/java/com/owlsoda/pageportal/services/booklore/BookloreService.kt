@@ -38,7 +38,8 @@ class BookloreService(
 
     override suspend fun authenticate(serverUrl: String, username: String, password: String): AuthResult {
         return try {
-            val token = okhttp3.Credentials.basic(username, password)
+            val isOidc = username == "OIDC User"
+            val token = if (isOidc) "Bearer $password" else okhttp3.Credentials.basic(username, password)
             var cleanUrl = normalizeUrl(serverUrl)
             
             // Create temporary client with generous timeouts for authentication
@@ -171,8 +172,8 @@ class BookloreService(
             listOf(
                 BookFile(
                     id = "mainfile",
-                    filename = "${entry.title}.${getExtension(entry.format)}",
-                    mimeType = "application/octet-stream",
+                    filename = "${entry.title}.${getExtension(entry.format, entry.mimeType)}",
+                    mimeType = entry.mimeType ?: "application/octet-stream",
                     size = 0,
                     downloadUrl = entry.downloadUrl
                 )
@@ -208,9 +209,15 @@ class BookloreService(
         }
     }
     
-    private fun getExtension(format: MediaFormat): String {
+    private fun getExtension(format: MediaFormat, mimeType: String? = null): String {
         return when (format) {
-            MediaFormat.AUDIOBOOK -> "m4b"
+            MediaFormat.AUDIOBOOK -> when {
+                mimeType?.contains("mp4") == true || mimeType?.contains("m4a") == true || mimeType?.contains("m4b") == true -> "m4b"
+                mimeType?.contains("mpeg") == true || mimeType?.contains("mp3") == true -> "mp3"
+                mimeType?.contains("ogg") == true -> "ogg"
+                mimeType?.contains("flac") == true -> "flac"
+                else -> "m4b" // Default fallback
+            }
             MediaFormat.EBOOK -> "epub"
             MediaFormat.PDF -> "pdf"
             MediaFormat.COMIC -> "cbz"

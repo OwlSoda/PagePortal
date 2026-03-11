@@ -19,7 +19,8 @@ class OpdsParser {
         val summary: String?,
         val coverUrl: String?,
         val downloadUrl: String?,
-        val format: MediaFormat
+        val format: MediaFormat,
+        val mimeType: String? = null
     )
 
     fun parse(inputStream: InputStream, serverUrl: String): List<OpdsEntry> {
@@ -57,6 +58,7 @@ class OpdsParser {
         var coverUrl: String? = null
         var downloadUrl: String? = null
         var format: MediaFormat = MediaFormat.EBOOK // Default
+        var mimeType: String? = null
 
         while (parser.next() != XmlPullParser.END_TAG) {
             if (parser.eventType != XmlPullParser.START_TAG) {
@@ -84,6 +86,7 @@ class OpdsParser {
                             rel?.contains("acquisition") == true -> {
                                 downloadUrl = absoluteHref
                                 format = determineFormat(type)
+                                mimeType = type
                             }
                         }
                     }
@@ -101,7 +104,8 @@ class OpdsParser {
                 summary = summary,
                 coverUrl = coverUrl,
                 downloadUrl = downloadUrl,
-                format = format
+                format = format,
+                mimeType = mimeType
             )
         } else {
             null

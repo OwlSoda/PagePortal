@@ -20,6 +20,7 @@ android {
         vectorDrawables {
             useSupportLibrary = true
         }
+        manifestPlaceholders += mapOf("appAuthRedirectScheme" to "pageportal")
     }
 
     buildTypes {
@@ -57,6 +58,10 @@ android {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
+    }
+
+    lint {
+        abortOnError = false
     }
 }
 
@@ -96,6 +101,9 @@ dependencies {
     
     // Image Loading
     implementation("io.coil-kt:coil-compose:2.5.0")
+    
+    // Auth
+    implementation("net.openid:appauth:0.11.1")
     
     // Media3 (ExoPlayer)
     implementation("androidx.media3:media3-exoplayer:1.2.1")

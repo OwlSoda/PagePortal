@@ -17,3 +17,4 @@
 # Keep data classes for serialization
 -keep class com.owlsoda.pageportal.core.model.** { *; }
 -keep class com.owlsoda.pageportal.services.**.model.** { *; }
+-dontwarn org.slf4j.**

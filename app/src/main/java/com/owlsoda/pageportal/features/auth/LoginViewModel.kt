@@ -10,6 +10,13 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import net.openid.appauth.AuthorizationRequest
+import net.openid.appauth.AuthorizationResponse
+import net.openid.appauth.AuthorizationService
+import net.openid.appauth.ResponseTypeValues
+import net.openid.appauth.TokenRequest
+import net.openid.appauth.AuthorizationException
+import android.net.Uri
 
 data class LoginUiState(
     val serverUrl: String = "",
@@ -18,7 +25,9 @@ data class LoginUiState(
     val selectedService: Int = 0,
     val isLoading: Boolean = false,
     val error: String? = null,
-    val isLoggedIn: Boolean = false
+    val isLoggedIn: Boolean = false,
+    val oidcRequest: AuthorizationRequest? = null,
+    val isServiceSelected: Boolean = false
 )
 
 @HiltViewModel
@@ -55,11 +64,110 @@ class LoginViewModel @Inject constructor(
     }
     
     fun selectService(index: Int) {
-        _uiState.value = _uiState.value.copy(selectedService = index, error = null)
+        _uiState.value = _uiState.value.copy(
+            selectedService = index, 
+            isServiceSelected = true,
+            error = null,
+            serverUrl = "", // Reset fields when changing service
+            username = "",
+            password = ""
+        )
+    }
+    
+    fun clearServiceSelection() {
+        _uiState.value = _uiState.value.copy(
+            isServiceSelected = false,
+            error = null
+        )
     }
     
     fun updateError(message: String) {
         _uiState.value = _uiState.value.copy(error = message, isLoading = false)
+    }
+    
+    fun clearOidcRequest() {
+        _uiState.value = _uiState.value.copy(oidcRequest = null)
+    }
+    
+    fun startOidcLogin() {
+        viewModelScope.launch {
+            val state = _uiState.value
+            val normalizedUrl = state.serverUrl.trim().trimEnd('/')
+            if (normalizedUrl.isBlank()) {
+                _uiState.value = state.copy(error = "Please enter a server URL")
+                return@launch
+            }
+            
+            _uiState.value = state.copy(isLoading = true, error = null)
+            
+            try {
+                // Fetch config from the issuer
+                val config = OidcHelper.fetchConfiguration(Uri.parse(normalizedUrl))
+                
+                // Build the authorization request
+                val request = AuthorizationRequest.Builder(
+                    config,
+                    "pageportal",
+                    ResponseTypeValues.CODE,
+                    Uri.parse("pageportal://oauth2redirect")
+                )
+                .setScope("openid profile offline_access")
+                .build()
+                
+                _uiState.value = state.copy(oidcRequest = request, isLoading = false)
+            } catch (e: Exception) {
+                _uiState.value = state.copy(
+                    isLoading = false,
+                    error = "Failed to discover OIDC provider: ${e.message}"
+                )
+                e.printStackTrace()
+            }
+        }
+    }
+    
+    fun exchangeToken(authService: AuthorizationService, resp: AuthorizationResponse) {
+        viewModelScope.launch {
+            val state = _uiState.value
+            val normalizedUrl = state.serverUrl.trim().trimEnd('/')
+            _uiState.value = state.copy(isLoading = true, error = null)
+            
+            authService.performTokenRequest(resp.createTokenExchangeRequest()) { response, ex ->
+                viewModelScope.launch {
+                    if (response != null && response.accessToken != null) {
+                        try {
+                            val result = authRepository.login(
+                                serviceType = ServiceType.BOOKLORE,
+                                serverUrl = normalizedUrl,
+                                username = "OIDC User", // or extract from ID token
+                                password = response.accessToken!!
+                            )
+                            
+                            result.fold(
+                                onSuccess = {
+                                    _uiState.value = _uiState.value.copy(
+                                        isLoading = false,
+                                        isLoggedIn = true
+                                    )
+                                },
+                                onFailure = { error ->
+                                    _uiState.value = _uiState.value.copy(
+                                        isLoading = false,
+                                        error = error.message ?: "Authentication failed"
+                                    )
+                                }
+                            )
+                        } catch (e: Exception) {
+                            _uiState.value = _uiState.value.copy(isLoading = false, error = "Login failed: ${e.message}")
+                        }
+                    } else {
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = false,
+                            error = ex?.message ?: "Token exchange failed"
+                        )
+                    }
+                }
+            }
+        }
     }
     
     fun login(serviceIndex: Int) {
