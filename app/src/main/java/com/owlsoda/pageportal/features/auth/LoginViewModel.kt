@@ -102,7 +102,16 @@ class LoginViewModel @Inject constructor(
             
             try {
                 // Fetch config from the issuer
-                val config = OidcHelper.fetchConfiguration(Uri.parse(normalizedUrl))
+                val config = try {
+                    OidcHelper.fetchConfiguration(Uri.parse(normalizedUrl))
+                } catch (e: Exception) {
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        error = "OIDC discovery failed for '$normalizedUrl'. Make sure the server URL is correct and the server supports OIDC.\n\nDetails: ${e.message}"
+                    )
+                    e.printStackTrace()
+                    return@launch
+                }
                 
                 // Build the authorization request
                 val request = AuthorizationRequest.Builder(
@@ -114,11 +123,11 @@ class LoginViewModel @Inject constructor(
                 .setScope("openid profile offline_access")
                 .build()
                 
-                _uiState.value = state.copy(oidcRequest = request, isLoading = false)
+                _uiState.value = _uiState.value.copy(oidcRequest = request, isLoading = false)
             } catch (e: Exception) {
-                _uiState.value = state.copy(
+                _uiState.value = _uiState.value.copy(
                     isLoading = false,
-                    error = "Failed to discover OIDC provider: ${e.message}"
+                    error = "Failed to start OIDC login: ${e.message}"
                 )
                 e.printStackTrace()
             }

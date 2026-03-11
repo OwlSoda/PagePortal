@@ -113,6 +113,11 @@ class LibraryViewModel @Inject constructor(
         observeBooks()
         observeOfflineMode()
         observeGridSettings()
+        // Auto-sync library on first load
+        viewModelScope.launch {
+            val result = libraryRepository.syncLibrary()
+            _uiState.update { it.copy(isLoading = false, error = result.exceptionOrNull()?.message) }
+        }
     }
 
     fun refresh() {

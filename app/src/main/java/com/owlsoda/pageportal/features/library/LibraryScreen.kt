@@ -29,6 +29,9 @@ import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
+import androidx.compose.material3.pulltorefresh.pullToRefresh
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -291,8 +294,20 @@ fun LibraryScreen(
             
             
             // Content
+            val pullRefreshState = rememberPullToRefreshState()
+            if (pullRefreshState.isAnimating && !uiState.isLoading) {
+                LaunchedEffect(true) {
+                    pullRefreshState.animateToHidden()
+                }
+            }
             Box(
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier
+                    .fillMaxSize()
+                    .pullToRefresh(
+                        state = pullRefreshState,
+                        isRefreshing = uiState.isLoading,
+                        onRefresh = { viewModel.refresh() }
+                    )
             ) {
                  when {
                         // Error State
@@ -458,10 +473,11 @@ fun LibraryScreen(
                             }
                         }
                     }
-                    
-                    if (uiState.isLoading) {
-                        CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-                    }
+                PullToRefreshDefaults.Indicator(
+                    state = pullRefreshState,
+                    isRefreshing = uiState.isLoading,
+                    modifier = Modifier.align(Alignment.TopCenter)
+                )
             }
         }
     }
