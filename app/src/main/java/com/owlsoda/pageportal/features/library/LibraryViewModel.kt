@@ -255,7 +255,7 @@ class LibraryViewModel @Inject constructor(
     }
 
     private fun observeBooks() {
-        viewModelScope.launch {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.Default) {
             unifiedBookDao.getAllWithBooks().collect { unifiedList ->
                 allUnifiedBooks = unifiedList.map { item ->
                     val books = item.books
@@ -320,77 +320,78 @@ class LibraryViewModel @Inject constructor(
     }
 
     private fun updateDisplayedBooks() {
-        val currentServers = _uiState.value.servers
-        val newTabs = buildServerTabs(currentServers, allUnifiedBooks)
-        val state = _uiState.value
-        
-        var newIndex = state.selectedTabIndex
-        if (newIndex >= newTabs.size) {
-            newIndex = 0
-        }
-        
-        val selectedTab = newTabs.getOrNull(newIndex)
-        var filtered = allUnifiedBooks
-        
-        // Filter by Tab
-        if (selectedTab != null && selectedTab.id != -1L) {
-             filtered = filtered.filter { book: UnifiedBookDisplay ->
-                 book.serverIds.contains(selectedTab.id)
-             }
-        }
-        
-        // Apply global filters
-        filtered = applyFilters(filtered, state)
-        
-        // Apply search
-        if (state.searchQuery.isNotBlank()) {
-            val query = state.searchQuery.lowercase().trim()
-            filtered = filtered.filter { book ->
-                book.title.lowercase().contains(query) ||
-                book.authors.lowercase().contains(query) ||
-                (book.series?.lowercase()?.contains(query) == true)
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.Default) {
+            val currentServers = _uiState.value.servers
+            val newTabs = buildServerTabs(currentServers, allUnifiedBooks)
+            val state = _uiState.value
+            
+            var newIndex = state.selectedTabIndex
+            if (newIndex >= newTabs.size) {
+                newIndex = 0
+            }
+            
+            val selectedTab = newTabs.getOrNull(newIndex)
+            var filtered = allUnifiedBooks
+            
+            // Filter by Tab
+            if (selectedTab != null && selectedTab.id != -1L) {
+                 filtered = filtered.filter { book: UnifiedBookDisplay ->
+                     book.serverIds.contains(selectedTab.id)
+                 }
+            }
+            
+            // Apply global filters
+            filtered = applyFilters(filtered, state)
+            
+            // Apply search
+            if (state.searchQuery.isNotBlank()) {
+                val query = state.searchQuery.lowercase().trim()
+                filtered = filtered.filter { book ->
+                    book.title.lowercase().contains(query) ||
+                    book.authors.lowercase().contains(query) ||
+                    (book.series?.lowercase()?.contains(query) == true)
+                }
+            }
+            
+            // Build unique authors/series BEFORE applying author/series filter
+            val uniqueAuthors = filtered.map { it.authors }.distinct().sorted()
+            val uniqueSeries = filtered.mapNotNull { it.series }.distinct().sorted()
+            
+            // Apply view-specific filtering
+            if (state.viewMode == ViewMode.Authors && state.selectedFilter != null) {
+                filtered = filtered.filter { it.authors == state.selectedFilter }
+            } else if (state.viewMode == ViewMode.Series && state.selectedFilter != null) {
+                filtered = filtered.filter { it.series == state.selectedFilter }
+            }
+            
+            // Apply sorting
+            filtered = applySorting(filtered, state.sortOption, state.viewMode, state.selectedFilter)
+            
+            // Home Screen Data
+            val recent = allUnifiedBooks.take(10)
+            
+            // Group by Service Name
+            val serviceMap = newTabs
+                .filter { it.id != -1L } // Exclude "All"
+                .associate { tab ->
+                    val tabBooks = allUnifiedBooks.filter { book -> book.serverIds.contains(tab.id) }
+                    tab.name to tabBooks
+                }
+                .filter { it.value.isNotEmpty() }
+            
+            _uiState.update {
+                it.copy(
+                    books = filtered,
+                    recentBooks = recent,
+                    booksByService = serviceMap,
+                    serverTabs = newTabs,
+                    selectedTabIndex = newIndex,
+                    uniqueAuthors = uniqueAuthors,
+                    uniqueSeries = uniqueSeries,
+                    isLoading = false
+                )
             }
         }
-        
-        // Build unique authors/series BEFORE applying author/series filter
-        // Use 'filtered' here (which already has tab + global filters) so only 
-        // authors/series with visible books appear in the list
-        val uniqueAuthors = filtered.map { it.authors }.distinct().sorted()
-        val uniqueSeries = filtered.mapNotNull { it.series }.distinct().sorted()
-        
-        // Apply view-specific filtering
-        if (state.viewMode == ViewMode.Authors && state.selectedFilter != null) {
-            filtered = filtered.filter { it.authors == state.selectedFilter }
-        } else if (state.viewMode == ViewMode.Series && state.selectedFilter != null) {
-            filtered = filtered.filter { it.series == state.selectedFilter }
-        }
-        
-        // Apply sorting
-        filtered = applySorting(filtered, state.sortOption, state.viewMode, state.selectedFilter)
-        
-        // Home Screen Data
-        // Recent: For now, just take the first 10. Ideally, this would be based on lastAccessTime from DB.
-        val recent = allUnifiedBooks.take(10)
-        
-        // Group by Service Name
-        val serviceMap = newTabs
-            .filter { it.id != -1L } // Exclude "All"
-            .associate { tab ->
-                val tabBooks = allUnifiedBooks.filter { book -> book.serverIds.contains(tab.id) }
-                tab.name to tabBooks
-            }
-            .filter { it.value.isNotEmpty() }
-        
-        _uiState.value = state.copy(
-            books = filtered,
-            recentBooks = recent,
-            booksByService = serviceMap,
-            serverTabs = newTabs,
-            selectedTabIndex = newIndex,
-            uniqueAuthors = uniqueAuthors,
-            uniqueSeries = uniqueSeries,
-            isLoading = false
-        )
     }
     
     private fun applyFilters(books: List<UnifiedBookDisplay>, state: LibraryUiState): List<UnifiedBookDisplay> {

@@ -31,18 +31,19 @@ class ServiceManager @Inject constructor(
     ): Result<ServerEntity> {
         return try {
             withContext(Dispatchers.IO) {
+                val normalizedUrl = normalizeUrl(serverUrl)
                 // Create service instance
-                val service = createService(serviceType, serverUrl)
+                val service = createService(serviceType, normalizedUrl)
                 
                 // Authenticate
-                val authResult = service.authenticate(serverUrl, username, password)
+                val authResult = service.authenticate(normalizedUrl, username, password)
                 
                 if (!authResult.success) {
                     return@withContext Result.failure(Exception(authResult.errorMessage ?: "Authentication failed"))
                 }
                 
                 // Check if server already exists
-                val existing = serverDao.getServerByUrlAndType(serverUrl, serviceType.name)
+                val existing = serverDao.getServerByUrlAndType(normalizedUrl, serviceType.name)
                 if (existing != null) {
                     // Update existing server
                     val updated = existing.copy(
@@ -58,7 +59,7 @@ class ServiceManager @Inject constructor(
                 // Create new server entry
                 val server = ServerEntity(
                     serviceType = serviceType.name,
-                    serverUrl = serverUrl,
+                    serverUrl = normalizedUrl,
                     username = username,
                     authToken = authResult.token,
                     userId = authResult.userId,
@@ -91,8 +92,9 @@ class ServiceManager @Inject constructor(
     ): Result<ServerEntity> {
         return try {
             withContext(Dispatchers.IO) {
+                val normalizedUrl = normalizeUrl(serverUrl)
                 // Check if server already exists
-                val existing = serverDao.getServerByUrlAndType(serverUrl, serviceType.name)
+                val existing = serverDao.getServerByUrlAndType(normalizedUrl, serviceType.name)
                 if (existing != null) {
                     val updated = existing.copy(
                         authToken = token,
@@ -109,7 +111,7 @@ class ServiceManager @Inject constructor(
                 // Create new server entry
                 val server = ServerEntity(
                     serviceType = serviceType.name,
-                    serverUrl = serverUrl,
+                    serverUrl = normalizedUrl,
                     username = username,
                     authToken = token,
                     userId = userId,

@@ -56,7 +56,24 @@ class AuthInterceptor @Inject constructor(
         }
 
         if (server == null) {
-            android.util.Log.d("AuthInterceptor", "No matching server found for: $url")
+            // Try one more time with host-only matching for flexibility
+            val fallbackServer = runBlocking {
+                serverDao.getActiveServers().first().find { it.serverUrl.toHttpUrl().host == requestHttpUrl.host }
+            }
+            if (fallbackServer != null) {
+                android.util.Log.d("AuthInterceptor", "Falling back to host-only match for: ${fallbackServer.serverUrl}")
+                val token = fallbackServer.authToken
+                if (token != null) {
+                    return chain.proceed(originalRequest.newBuilder().apply {
+                        if (fallbackServer.serviceType == ServiceType.BOOKLORE.name) {
+                            addHeader("Authorization", token)
+                        } else {
+                            addHeader("Authorization", "Bearer $token")
+                        }
+                    }.build())
+                }
+            }
+            android.util.Log.w("AuthInterceptor", "No matching server found for: $url")
             return chain.proceed(originalRequest)
         }
 

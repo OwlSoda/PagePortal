@@ -108,9 +108,16 @@ class StorytellerService(
     }
     
     override suspend fun listBooks(page: Int, pageSize: Int): List<ServiceBook> {
-        if (page > 0) return emptyList() // Storyteller doesn't support pagination via this endpoint yet
-        val response = getApi().listBooks(synced = null) // Removed synced=true to show all books
-        return response.map { it.toServiceBook() }
+        if (page > 0) return emptyList() 
+        return try {
+            android.util.Log.d("StorytellerService", "Fetching books from Storyteller API...")
+            val response = getApi().listBooks(synced = null)
+            android.util.Log.d("StorytellerService", "Received ${response.size} books from Storyteller")
+            response.map { it.toServiceBook() }
+        } catch (e: Exception) {
+            android.util.Log.e("StorytellerService", "Failed to fetch books from Storyteller", e)
+            emptyList()
+        }
     }
     
     override suspend fun getBookDetails(bookId: String): ServiceBookDetails {
