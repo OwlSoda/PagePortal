@@ -141,8 +141,10 @@ class StorytellerService(
              return "$cleanBase/$encodedPath"
         }
         
+        val durationSeconds = position?.locator?.locations?.totalDurationMs?.let { it / 1000 }
+
         return ServiceBookDetails(
-            book = response.toServiceBook(),
+            book = response.toServiceBook().copy(duration = durationSeconds),
             chapters = emptyList(),  // Storyteller doesn't expose chapter list in main API
             files = buildList {
                 // Ebook
@@ -186,6 +188,7 @@ class StorytellerService(
                     }
                 }
             },
+            totalDuration = durationSeconds,
             lastProgress = position?.toReadingProgress(bookId)
         )
     }

@@ -434,6 +434,7 @@ fun VerticalDivider(modifier: Modifier, alpha: Float) {
 }
 
 private fun formatDuration(seconds: Long): String {
+    if (seconds <= 0) return "Unknown"
     val hours = seconds / 3600
     val minutes = (seconds % 3600) / 60
     return if (hours > 0) "${hours}h ${minutes}m" else "${minutes}m"

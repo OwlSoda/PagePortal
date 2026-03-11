@@ -405,7 +405,7 @@ class AudiobookshelfService(
             coverUrl = if (media.coverPath != null) {
                 "$normalizedUrl/api/items/$id/cover"
             } else null,
-            duration = media.duration?.times(1000)?.toLong(),
+            duration = media.duration?.toLong(),
             hasAudiobook = (media.numAudioFiles ?: 0) > 0,
             hasEbook = media.ebookFile != null,
             hasReadAloud = false, // ABS doesn't support read-aloud

@@ -57,6 +57,7 @@ class LocalBookImporter @Inject constructor(
                 serviceBookId = destinationFile.absolutePath, // Use local path as ID
                 title = bookMetadata.title,
                 authors = bookMetadata.author, // Simple string for now
+                duration = bookMetadata.duration, // in seconds
                 coverUrl = bookMetadata.coverUrl, // Local path or null
                 
                 // Format flags
@@ -135,6 +136,7 @@ class LocalBookImporter @Inject constructor(
     data class ParsedMetadata(
         val title: String,
         val author: String,
+        val duration: Long? = null,
         val coverUrl: String?,
         val hasMediaOverlays: Boolean = false
     )
@@ -163,7 +165,8 @@ class LocalBookImporter @Inject constructor(
             retriever.setDataSource(file.absolutePath)
             val title = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_TITLE) ?: file.nameWithoutExtension
             val artist = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_ARTIST) ?: "Unknown Artist"
-            // val duration = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()
+            val durationMs = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()
+            val durationSec = durationMs?.let { it / 1000 }
             
             // Extract cover art
             // val art = retriever.embeddedPicture
@@ -172,10 +175,11 @@ class LocalBookImporter @Inject constructor(
             return ParsedMetadata(
                 title = title,
                 author = artist,
+                duration = durationSec,
                 coverUrl = null
             )
         } catch (e: Exception) {
-            return ParsedMetadata(file.nameWithoutExtension, "Unknown", null)
+            return ParsedMetadata(file.nameWithoutExtension, "Unknown", null, null)
         } finally {
             retriever.release()
         }
