@@ -35,7 +35,7 @@ class StorytellerService(
      * Configure the service with server URL and auth token.
      */
     fun configure(serverUrl: String, authToken: String?) {
-        val cleanUrl = if (serverUrl.startsWith("http")) serverUrl else "https://$serverUrl"
+        val cleanUrl = ServiceManager.normalizeUrl(serverUrl)
         this.baseUrl = if (cleanUrl.endsWith("/")) cleanUrl else "$cleanUrl/"
         this.authToken = authToken
         
@@ -245,9 +245,20 @@ class StorytellerService(
     }
     
     // URL helpers
-    fun getEbookDownloadUrl(bookId: String): String = "${baseUrl}/api/v2/books/$bookId/files?format=ebook&token=$authToken"
-    fun getAudiobookDownloadUrl(bookId: String): String = "${baseUrl}/api/v2/books/$bookId/files?format=audiobook&token=$authToken"
-    fun getSyncDownloadUrl(bookId: String): String = "${baseUrl}/api/v2/books/$bookId/files?format=readaloud&token=$authToken"
+    fun getEbookDownloadUrl(bookId: String): String {
+        val base = baseUrl?.trimEnd('/') ?: return ""
+        return "$base/api/v2/books/$bookId/files?format=ebook&token=$authToken"
+    }
+    
+    fun getAudiobookDownloadUrl(bookId: String): String {
+        val base = baseUrl?.trimEnd('/') ?: return ""
+        return "$base/api/v2/books/$bookId/files?format=audiobook&token=$authToken"
+    }
+    
+    fun getSyncDownloadUrl(bookId: String): String {
+        val base = baseUrl?.trimEnd('/') ?: return ""
+        return "$base/api/v2/books/$bookId/files?format=readaloud&token=$authToken"
+    }
     
     private fun getApi(): StorytellerApi {
         return api ?: throw IllegalStateException("StorytellerService not configured. Call configure() first.")
