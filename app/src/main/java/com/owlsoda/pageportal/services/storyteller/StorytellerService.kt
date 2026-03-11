@@ -69,7 +69,7 @@ class StorytellerService(
     
     override suspend fun authenticate(serverUrl: String, username: String, password: String): AuthResult {
         return try {
-            val cleanUrl = normalizeUrl(serverUrl)
+            val cleanUrl = ServiceManager.normalizeUrl(serverUrl)
             
             // Create temporary client for login with generous timeouts
             val tempClient = baseOkHttpClient.newBuilder()
@@ -108,7 +108,8 @@ class StorytellerService(
     }
     
     override suspend fun listBooks(page: Int, pageSize: Int): List<ServiceBook> {
-        val response = getApi().listBooks(synced = true)
+        if (page > 0) return emptyList() // Storyteller doesn't support pagination via this endpoint yet
+        val response = getApi().listBooks(synced = null) // Removed synced=true to show all books
         return response.map { it.toServiceBook() }
     }
     
@@ -246,31 +247,7 @@ class StorytellerService(
     }
     
     private fun normalizeUrl(url: String): String {
-        val withProtocol = if (!url.startsWith("http")) {
-            val isPrivate = if (url.startsWith("localhost") ||
-                url.startsWith("127.0.0.1") ||
-                url.startsWith("192.168.") || 
-                url.startsWith("10.")) {
-                true
-            } else if (url.startsWith("172.")) {
-                val parts = url.split('.')
-                if (parts.size >= 2) {
-                    val second = parts[1].toIntOrNull()
-                    second != null && second in 16..31
-                } else {
-                    false
-                }
-            } else {
-                false
-            }
-
-            if (isPrivate) {
-                "http://$url"
-            } else {
-                "https://$url"
-            }
-        } else url
-        return if (withProtocol.endsWith("/")) withProtocol.dropLast(1) else withProtocol
+        return ServiceManager.normalizeUrl(url)
     }
     
     // Mapping extensions

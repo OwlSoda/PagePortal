@@ -384,31 +384,7 @@ class AudiobookshelfService(
     }
     
     private fun normalizeUrl(url: String): String {
-        val withProtocol = if (!url.startsWith("http")) {
-            val isPrivate = if (url.startsWith("localhost") ||
-                url.startsWith("127.0.0.1") ||
-                url.startsWith("192.168.") ||
-                url.startsWith("10.")) {
-                true
-            } else if (url.startsWith("172.")) {
-                val parts = url.split('.')
-                if (parts.size >= 2) {
-                    val second = parts[1].toIntOrNull()
-                    second != null && second in 16..31
-                } else {
-                    false
-                }
-            } else {
-                false
-            }
-
-            if (isPrivate) {
-                "http://$url"
-            } else {
-                "https://$url"
-            }
-        } else url
-        return if (withProtocol.endsWith("/")) withProtocol.dropLast(1) else withProtocol
+        return ServiceManager.normalizeUrl(url)
     }
 
     // Extension functions to convert ABS models to service models

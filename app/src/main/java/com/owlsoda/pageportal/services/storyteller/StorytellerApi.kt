@@ -19,7 +19,7 @@ interface StorytellerApi {
     
     @GET("api/v2/books")
     suspend fun listBooks(
-        @Query("synced") synced: Boolean = true
+        @Query("synced") synced: Boolean? = null
     ): List<BookResponse>
     
     @GET("api/v2/books/{uuid}")

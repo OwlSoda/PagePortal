@@ -252,4 +252,47 @@ class ServiceManager @Inject constructor(
             ServiceType.LOCAL -> com.owlsoda.pageportal.services.local.LocalService()
         }
     }
+
+    companion object {
+        /**
+         * Normalizes a server URL by adding protocols if missing and removing trailing slashes.
+         * Handles common errors like "http:host" and selects http vs https based on port.
+         */
+        fun normalizeUrl(url: String): String {
+            if (url.isBlank()) return ""
+            
+            var processed = url.trim()
+            
+            // Fix common typo "http:host" -> "http://host"
+            if (processed.contains("http:") && !processed.contains("http://")) {
+                processed = processed.replace("http:", "http://")
+            }
+            if (processed.contains("https:") && !processed.contains("https://")) {
+                processed = processed.replace("https:", "https://")
+            }
+
+            val withProtocol = if (!processed.startsWith("http")) {
+                val isPrivate = processed.startsWith("localhost") ||
+                    processed.startsWith("127.0.0.1") ||
+                    processed.startsWith("192.168.") ||
+                    processed.startsWith("10.") ||
+                    processed.contains(".local")
+                
+                // If it has a port, check if it's common non-SSL ports
+                val hasPort = processed.contains(":")
+                val isLikelyHttp = if (hasPort) {
+                    val port = processed.substringAfterLast(":").toIntOrNull()
+                    port != null && (port == 80 || port == 8080 || port == 6060 || port == 32400)
+                } else false
+
+                if (isPrivate || isLikelyHttp) {
+                    "http://$processed"
+                } else {
+                    "https://$processed"
+                }
+            } else processed
+            
+            return if (withProtocol.endsWith("/")) withProtocol.dropLast(1) else withProtocol
+        }
+    }
 }

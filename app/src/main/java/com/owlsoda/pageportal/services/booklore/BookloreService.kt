@@ -23,7 +23,7 @@ class BookloreService(
 
 
     fun configure(serverUrl: String, authToken: String?) {
-        val cleanUrl = normalizeUrl(serverUrl)
+        val cleanUrl = ServiceManager.normalizeUrl(serverUrl)
         this.baseUrl = cleanUrl
         this.authToken = authToken // Store locally, but AuthInterceptor reads from DB
         
@@ -40,7 +40,7 @@ class BookloreService(
         return try {
             val isOidc = username == "OIDC User"
             val token = if (isOidc) "Bearer $password" else okhttp3.Credentials.basic(username, password)
-            var cleanUrl = normalizeUrl(serverUrl)
+            var cleanUrl = ServiceManager.normalizeUrl(serverUrl)
             
             // Create temporary client with generous timeouts for authentication
             val tempClient = client.newBuilder()
@@ -100,7 +100,8 @@ class BookloreService(
             if (!success) {
                 return AuthResult(
                     success = false, 
-                    errorMessage = "Could not find a valid OPDS feed at $cleanUrl or common sub-paths. Please check the URL."
+                    errorMessage = "Could not find a valid OPDS feed at $cleanUrl or common sub-paths. " +
+                            "Please ensure Booklore is running and OPDS is enabled in settings."
                 )
             }
             
@@ -223,33 +224,5 @@ class BookloreService(
             MediaFormat.COMIC -> "cbz"
             else -> "bin"
         }
-    }
-
-    private fun normalizeUrl(url: String): String {
-        val withProtocol = if (!url.startsWith("http")) {
-            val isPrivate = if (url.startsWith("localhost") ||
-                url.startsWith("127.0.0.1") ||
-                url.startsWith("192.168.") ||
-                url.startsWith("10.")) {
-                true
-            } else if (url.startsWith("172.")) {
-                val parts = url.split('.')
-                if (parts.size >= 2) {
-                    val second = parts[1].toIntOrNull()
-                    second != null && second in 16..31
-                } else {
-                    false
-                }
-            } else {
-                false
-            }
-
-            if (isPrivate) {
-                "http://$url"
-            } else {
-                "https://$url"
-            }
-        } else url
-        return if (withProtocol.endsWith("/")) withProtocol.dropLast(1) else withProtocol
     }
 }
