@@ -66,9 +66,15 @@ fun LoginScreen(
     
     LaunchedEffect(uiState.oidcRequest) {
         uiState.oidcRequest?.let { req ->
-            val intent = authService.getAuthorizationRequestIntent(req)
-            launcher.launch(intent)
-            viewModel.clearOidcRequest()
+            try {
+                val intent = authService.getAuthorizationRequestIntent(req)
+                launcher.launch(intent)
+            } catch (e: Exception) {
+                viewModel.updateError("Could not open login page: ${e.message}")
+                e.printStackTrace()
+            } finally {
+                viewModel.clearOidcRequest()
+            }
         }
     }
     
