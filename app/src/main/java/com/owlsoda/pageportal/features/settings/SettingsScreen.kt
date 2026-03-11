@@ -548,12 +548,6 @@ fun AudioSettings(state: SettingsState, viewModel: SettingsViewModel) {
             )
         }
         
-        Spacer(Modifier.height(16.dp))
-        Text(
-            "Audio enhancements (equalizer, pitch control) coming in Phase 3",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
     }
 }
 
@@ -606,19 +600,34 @@ fun StorageSettings(
     }
 }
 
-// ACCESSIBILITY SETTINGS (Placeholder for Phase 4)
+// ACCESSIBILITY SETTINGS
 @Composable
 fun AccessibilitySettings(state: SettingsState, viewModel: SettingsViewModel) {
     Column {
-        Text(
-            "Accessibility features coming in Phase 4",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+        SettingsSectionHeader("Display")
+        
+        SwitchSettingsItem(
+            icon = Icons.Default.TextFields,
+            title = "Bold Text",
+            subtitle = "Use heavier font weights throughout the app",
+            checked = state.boldTextEnabled,
+            onCheckedChange = { viewModel.setBoldTextEnabled(it) }
         )
-        Text(
-            "• High contrast mode\n• Font size presets\n• TalkBack optimizations\n• Color blindness filters",
-            style = MaterialTheme.typography.bodySmall,
-            modifier = Modifier.padding(top = 8.dp)
+        
+        SwitchSettingsItem(
+            icon = Icons.Default.ScreenLockPortrait,
+            title = "Keep Screen On",
+            subtitle = "Prevent screen from dimming while reading or listening",
+            checked = state.keepScreenOn,
+            onCheckedChange = { viewModel.setKeepScreenOn(it) }
+        )
+        
+        SwitchSettingsItem(
+            icon = Icons.Default.Animation,
+            title = "Reduce Animations",
+            subtitle = "Minimize motion effects for comfort",
+            checked = state.reduceAnimations,
+            onCheckedChange = { viewModel.setReduceAnimations(it) }
         )
     }
 }
@@ -626,12 +635,21 @@ fun AccessibilitySettings(state: SettingsState, viewModel: SettingsViewModel) {
 // ABOUT SETTINGS
 @Composable
 fun AboutSettings(state: SettingsState) {
+    val context = LocalContext.current
+    val versionName = remember {
+        try {
+            context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "Unknown"
+        } catch (e: Exception) {
+            "Unknown"
+        }
+    }
+    
     Column {
         SettingsSectionHeader("App Information")
         SettingsItem(
             icon = Icons.Default.Info,
             title = "Version",
-            subtitle = "1.0.0 (Alpha)",
+            subtitle = versionName,
             showChevron = false,
             onClick = { }
         )

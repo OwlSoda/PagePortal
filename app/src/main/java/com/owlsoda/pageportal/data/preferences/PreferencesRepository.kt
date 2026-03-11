@@ -52,6 +52,11 @@ class PreferencesRepository @Inject constructor(
         // Audio Settings
         val REWIND_SECONDS = intPreferencesKey("rewind_seconds")
         val FORWARD_SECONDS = intPreferencesKey("forward_seconds")
+        
+        // Accessibility Settings
+        val BOLD_TEXT_ENABLED = booleanPreferencesKey("bold_text_enabled")
+        val KEEP_SCREEN_ON = booleanPreferencesKey("keep_screen_on")
+        val REDUCE_ANIMATIONS = booleanPreferencesKey("reduce_animations")
     }
 
     val isOfflineModeEnabled: Flow<Boolean> = context.dataStore.data
@@ -232,6 +237,31 @@ class PreferencesRepository @Inject constructor(
 
     suspend fun setForwardSeconds(seconds: Int) {
         context.dataStore.edit { it[PreferencesKeys.FORWARD_SECONDS] = seconds }
+    }
+
+    // Accessibility Settings
+    val boldTextEnabled: Flow<Boolean> = context.dataStore.data
+        .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
+        .map { it[PreferencesKeys.BOLD_TEXT_ENABLED] ?: false }
+
+    suspend fun setBoldTextEnabled(enabled: Boolean) {
+        context.dataStore.edit { it[PreferencesKeys.BOLD_TEXT_ENABLED] = enabled }
+    }
+
+    val keepScreenOn: Flow<Boolean> = context.dataStore.data
+        .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
+        .map { it[PreferencesKeys.KEEP_SCREEN_ON] ?: false }
+
+    suspend fun setKeepScreenOn(enabled: Boolean) {
+        context.dataStore.edit { it[PreferencesKeys.KEEP_SCREEN_ON] = enabled }
+    }
+
+    val reduceAnimations: Flow<Boolean> = context.dataStore.data
+        .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
+        .map { it[PreferencesKeys.REDUCE_ANIMATIONS] ?: false }
+
+    suspend fun setReduceAnimations(enabled: Boolean) {
+        context.dataStore.edit { it[PreferencesKeys.REDUCE_ANIMATIONS] = enabled }
     }
 
     suspend fun getPreferencesBackup(): AppPreferencesBackup {

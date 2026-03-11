@@ -41,6 +41,11 @@ data class SettingsState(
     val gestureTapCenter: String = "MENU",
     val gestureTapRight: String = "NEXT",
     
+    // Accessibility
+    val boldTextEnabled: Boolean = false,
+    val keepScreenOn: Boolean = false,
+    val reduceAnimations: Boolean = false,
+    
     val toastMessage: String? = null
 )
 
@@ -122,6 +127,17 @@ class SettingsViewModel @Inject constructor(
             preferencesRepository.gestureTapRight.collectLatest { v -> _state.update { it.copy(gestureTapRight = v) } }
         }
         
+        // Accessibility Settings
+        viewModelScope.launch {
+            preferencesRepository.boldTextEnabled.collectLatest { v -> _state.update { it.copy(boldTextEnabled = v) } }
+        }
+        viewModelScope.launch {
+            preferencesRepository.keepScreenOn.collectLatest { v -> _state.update { it.copy(keepScreenOn = v) } }
+        }
+        viewModelScope.launch {
+            preferencesRepository.reduceAnimations.collectLatest { v -> _state.update { it.copy(reduceAnimations = v) } }
+        }
+        
         calculateCacheSize()
     }
 
@@ -133,9 +149,15 @@ class SettingsViewModel @Inject constructor(
 
     fun clearCache() {
         viewModelScope.launch {
-            // Placeholder: In a real app, this would delete cached images/files
-            // For now, we just simulate recalculating
-            _state.value = _state.value.copy(cacheSize = "0 MB")
+            try {
+                val cacheDir = context.cacheDir
+                cacheDir?.deleteRecursively()
+                cacheDir?.mkdirs()
+                calculateCacheSize()
+                _state.update { it.copy(toastMessage = "Cache cleared") }
+            } catch (e: Exception) {
+                _state.update { it.copy(toastMessage = "Failed to clear cache: ${e.message}") }
+            }
         }
     }
     
@@ -179,6 +201,11 @@ class SettingsViewModel @Inject constructor(
     fun setGestureTapCenter(action: String) = viewModelScope.launch { preferencesRepository.setGestureTapCenter(action) }
     fun setGestureTapRight(action: String) = viewModelScope.launch { preferencesRepository.setGestureTapRight(action) }
     
+    // Accessibility Setters
+    fun setBoldTextEnabled(enabled: Boolean) = viewModelScope.launch { preferencesRepository.setBoldTextEnabled(enabled) }
+    fun setKeepScreenOn(enabled: Boolean) = viewModelScope.launch { preferencesRepository.setKeepScreenOn(enabled) }
+    fun setReduceAnimations(enabled: Boolean) = viewModelScope.launch { preferencesRepository.setReduceAnimations(enabled) }
+    
     
     fun exportSettings(uri: Uri) {
         viewModelScope.launch {
@@ -218,7 +245,22 @@ class SettingsViewModel @Inject constructor(
     }
 
     private fun calculateCacheSize() {
-        // Placeholder
-        _state.value = _state.value.copy(cacheSize = "124 MB")
+        viewModelScope.launch {
+            val size = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                val cacheDir = context.cacheDir
+                val bytes = cacheDir?.walkTopDown()?.filter { it.isFile }?.sumOf { it.length() } ?: 0L
+                formatBytes(bytes)
+            }
+            _state.update { it.copy(cacheSize = size) }
+        }
+    }
+    
+    private fun formatBytes(bytes: Long): String {
+        return when {
+            bytes < 1024 -> "$bytes B"
+            bytes < 1024 * 1024 -> "${bytes / 1024} KB"
+            bytes < 1024 * 1024 * 1024 -> "${bytes / (1024 * 1024)} MB"
+            else -> String.format("%.1f GB", bytes / (1024.0 * 1024.0 * 1024.0))
+        }
     }
 }
