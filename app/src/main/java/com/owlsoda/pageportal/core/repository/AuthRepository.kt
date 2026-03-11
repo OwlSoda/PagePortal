@@ -14,7 +14,7 @@ import javax.inject.Singleton
  */
 @Singleton
 class AuthRepository @Inject constructor(
-    private val serviceManager: ServiceManager,
+    val serviceManager: ServiceManager,
     private val serverDao: ServerDao
 ) {
     /**
@@ -49,6 +49,32 @@ class AuthRepository @Inject constructor(
             username = username,
             password = password
         )
+    }
+
+    /**
+     * Login using a pre-obtained token.
+     */
+    suspend fun loginWithToken(
+        serviceType: ServiceType,
+        serverUrl: String,
+        token: String,
+        username: String,
+        userId: String? = null
+    ): Result<ServerEntity> {
+        return serviceManager.addServerWithToken(
+            serviceType = serviceType,
+            serverUrl = serverUrl,
+            token = token,
+            username = username,
+            userId = userId
+        )
+    }
+
+    /**
+     * Check if Audiobookshelf server has SSO/OIDC enabled.
+     */
+    suspend fun checkAbsSso(serverUrl: String): Boolean {
+        return serviceManager.checkAbsSsoEnabled(serverUrl)
     }
     
     /**

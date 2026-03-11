@@ -15,6 +15,16 @@ interface AudiobookshelfApi {
     suspend fun login(
         @Body request: AbsLoginRequest
     ): AbsLoginResponse
+
+    @GET("status")
+    suspend fun getStatus(): AbsStatusResponse
+
+    @GET("auth/openid/callback")
+    suspend fun oauthCallback(
+        @Query("state") state: String,
+        @Query("code") code: String,
+        @Query("code_verifier") verifier: String
+    ): AbsLoginResponse
     
     // ===== Libraries =====
     
@@ -144,7 +154,13 @@ data class AbsUser(
 
 data class AbsServerSettings(
     val id: String?,
-    val serverName: String? = null
+    val serverName: String? = null,
+    val authOpenIDAutoLaunch: Boolean = false,
+    val authOpenIDEnabled: Boolean = false
+)
+
+data class AbsStatusResponse(
+    val serverSettings: AbsServerSettings
 )
 
 data class AbsLibrariesResponse(

@@ -14,7 +14,7 @@ android {
         minSdk = 26
         targetSdk = 34
         versionCode = 1
-        versionName = "1.0.0"
+        versionName = "0.1.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -63,6 +63,13 @@ android {
     lint {
         abortOnError = false
     }
+
+    applicationVariants.all {
+        outputs.all {
+            val output = this as com.android.build.gradle.internal.api.BaseVariantOutputImpl
+            output.outputFileName = "PagePortal.apk"
+        }
+    }
 }
 
 dependencies {
@@ -104,6 +111,7 @@ dependencies {
     
     // Auth
     implementation("net.openid:appauth:0.11.1")
+    implementation("androidx.browser:browser:1.7.0")
     
     // Media3 (ExoPlayer)
     implementation("androidx.media3:media3-exoplayer:1.2.1")

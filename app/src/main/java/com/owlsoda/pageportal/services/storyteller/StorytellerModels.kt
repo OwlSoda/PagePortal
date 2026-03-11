@@ -138,3 +138,8 @@ data class Locations(
     val totalChapters: Int? = null,
     val totalDurationMs: Long? = null
 )
+data class UserResponse(
+    val id: String,
+    val name: String,
+    val email: String? = null
+)

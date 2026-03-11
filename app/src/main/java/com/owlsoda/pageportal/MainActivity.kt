@@ -23,9 +23,20 @@ class MainActivity : ComponentActivity() {
     @Inject
     lateinit var preferencesRepository: PreferencesRepository
     
+    @Inject
+    lateinit var oauthManager: com.owlsoda.pageportal.features.auth.OAuthManager
+    
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        
+        // Handle initial deep link
+        intent?.data?.let { uri ->
+            if (uri.scheme == "pageportal" && uri.host == "oauth2redirect") {
+                oauthManager.handleRedirect(uri)
+            }
+        }
+        
         setContent {
             val themeMode by preferencesRepository.themeMode.collectAsState(initial = "SYSTEM")
             
@@ -37,6 +48,15 @@ class MainActivity : ComponentActivity() {
                     val audiobookViewModel: com.owlsoda.pageportal.features.player.AudiobookPlayerViewModel = androidx.hilt.navigation.compose.hiltViewModel()
                     PagePortalNavHost(audiobookPlayerViewModel = audiobookViewModel)
                 }
+            }
+        }
+    }
+
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        intent.data?.let { uri ->
+            if (uri.scheme == "pageportal" && uri.host == "oauth2redirect") {
+                oauthManager.handleRedirect(uri)
             }
         }
     }

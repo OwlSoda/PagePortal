@@ -103,6 +103,35 @@ class AudiobookshelfService(
         }
     }
     
+    suspend fun checkSsoEnabled(): Boolean {
+        return try {
+            val status = getApi().getStatus()
+            status.serverSettings.authOpenIDAutoLaunch || status.serverSettings.authOpenIDEnabled
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    suspend fun oauthCallback(state: String, code: String, verifier: String): AuthResult {
+        return try {
+            val response = getApi().oauthCallback(state, code, verifier)
+            authToken = response.user.token
+            userId = response.user.id
+            serverName = response.serverSettings?.serverName
+            defaultLibraryId = response.userDefaultLibraryId
+            
+            api = null // Force recreation with new client
+            
+            AuthResult(
+                success = true,
+                token = response.user.token,
+                userId = response.user.id
+            )
+        } catch (e: Exception) {
+            AuthResult(success = false, errorMessage = e.message ?: "OAuth callback failed")
+        }
+    }
+
     suspend fun validateToken(token: String): Boolean {
         return try {
             authToken = token

@@ -16,7 +16,7 @@ import javax.inject.Singleton
 @Singleton
 class ServiceManager @Inject constructor(
     private val serverDao: ServerDao,
-    private val okHttpClient: OkHttpClient
+    internal val okHttpClient: OkHttpClient
 ) {
     private val services = ConcurrentHashMap<Long, BookService>()
     
@@ -76,6 +76,54 @@ class ServiceManager @Inject constructor(
         } catch (e: Exception) {
             e.printStackTrace()
             Result.failure(Exception("Authentication failed: ${e.message ?: "Unknown error"}"))
+        }
+    }
+
+    /**
+     * Add a server using a pre-obtained token (OAuth/OIDC).
+     */
+    suspend fun addServerWithToken(
+        serviceType: ServiceType,
+        serverUrl: String,
+        token: String,
+        username: String,
+        userId: String? = null
+    ): Result<ServerEntity> {
+        return try {
+            withContext(Dispatchers.IO) {
+                // Check if server already exists
+                val existing = serverDao.getServerByUrlAndType(serverUrl, serviceType.name)
+                if (existing != null) {
+                    val updated = existing.copy(
+                        authToken = token,
+                        userId = userId ?: existing.userId,
+                        username = username,
+                        lastSyncAt = System.currentTimeMillis()
+                    )
+                    serverDao.updateServer(updated)
+                    // Invalidate service cache
+                    services.remove(updated.id)
+                    return@withContext Result.success(updated)
+                }
+
+                // Create new server entry
+                val server = ServerEntity(
+                    serviceType = serviceType.name,
+                    serverUrl = serverUrl,
+                    username = username,
+                    authToken = token,
+                    userId = userId,
+                    displayName = "${serviceType.name} - $username"
+                )
+
+                val serverId = serverDao.insertServer(server)
+                val savedServer = server.copy(id = serverId)
+
+                Result.success(savedServer)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            Result.failure(Exception("Failed to add server: ${e.message}"))
         }
     }
     
@@ -181,6 +229,15 @@ class ServiceManager @Inject constructor(
             ServerStatus(serverId, true, System.currentTimeMillis(), null)
         } catch (e: Exception) {
             ServerStatus(serverId, false, null, e.message)
+        }
+    }
+
+    suspend fun checkAbsSsoEnabled(serverUrl: String): Boolean {
+        return try {
+            val service = com.owlsoda.pageportal.services.audiobookshelf.AudiobookshelfService(serverUrl, okHttpClient)
+            service.checkSsoEnabled()
+        } catch (e: Exception) {
+            false
         }
     }
     

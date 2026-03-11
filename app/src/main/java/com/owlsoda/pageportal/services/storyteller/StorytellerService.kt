@@ -34,21 +34,37 @@ class StorytellerService(
     /**
      * Configure the service with server URL and auth token.
      */
-    fun configure(serverUrl: String, token: String?) {
-        val cleanUrl = normalizeUrl(serverUrl)
+    fun configure(serverUrl: String, authToken: String?) {
+        val cleanUrl = if (serverUrl.startsWith("http")) serverUrl else "https://$serverUrl"
+        this.baseUrl = if (cleanUrl.endsWith("/")) cleanUrl else "$cleanUrl/"
+        this.authToken = authToken
         
-        if (cleanUrl == baseUrl && token == authToken && api != null) return
-        
-        baseUrl = cleanUrl
-        authToken = token
-        
-        // Use baseOkHttpClient directly - global AuthInterceptor handles injection
-        api = Retrofit.Builder()
-            .baseUrl("$cleanUrl/")
+        val retrofit = Retrofit.Builder()
+            .baseUrl(baseUrl!!) // Use non-null assertion as baseUrl is set above
+            .client(baseOkHttpClient) // Use baseOkHttpClient as per original context
             .addConverterFactory(GsonConverterFactory.create())
-            .client(baseOkHttpClient)
             .build()
-            .create(StorytellerApi::class.java)
+        
+        this.api = retrofit.create(StorytellerApi::class.java)
+    }
+
+    suspend fun authenticateWithToken(serverUrl: String, token: String): AuthResult {
+        return try {
+            configure(serverUrl, token)
+            // Validate by fetching current user
+            val api = this.api ?: throw Exception("Service not configured")
+            val user = api.getCurrentUser()
+            
+            AuthResult(
+                success = true,
+                token = token,
+                userId = user.id,
+                username = user.name,
+                errorMessage = null
+            )
+        } catch (e: Exception) {
+            AuthResult(success = false, errorMessage = "Token validation failed: ${e.message}")
+        }
     }
     
     override suspend fun authenticate(serverUrl: String, username: String, password: String): AuthResult {

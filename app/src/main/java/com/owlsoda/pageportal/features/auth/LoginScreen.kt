@@ -24,6 +24,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.ui.platform.LocalContext
+import androidx.browser.customtabs.CustomTabsIntent
+import android.net.Uri
 import net.openid.appauth.AuthorizationException
 import net.openid.appauth.AuthorizationResponse
 import net.openid.appauth.AuthorizationService
@@ -60,6 +62,19 @@ fun LoginScreen(
                 viewModel.exchangeToken(authService, response)
             } else if (exception != null) {
                 viewModel.updateError("Login failed: ${exception.message}")
+            }
+        }
+    }
+    
+    LaunchedEffect(uiState.browserUrl) {
+        uiState.browserUrl?.let { url ->
+            try {
+                val customTabsIntent = CustomTabsIntent.Builder().build()
+                customTabsIntent.launchUrl(context, Uri.parse(url))
+            } catch (e: Exception) {
+                viewModel.updateError("Could not open browser: ${e.message}")
+            } finally {
+                viewModel.clearBrowserUrl()
             }
         }
     }
@@ -280,6 +295,33 @@ fun LoginScreen(
                                 text = "Connect",
                                 style = MaterialTheme.typography.titleMedium
                             )
+                        }
+
+                        // Browser-based Login Options
+                        if (uiState.selectedService == 1 && uiState.isAbsSsoAvailable) {
+                            Spacer(modifier = Modifier.height(16.dp))
+                            OutlinedButton(
+                                onClick = { viewModel.startAbsSsoLogin() },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(56.dp),
+                                enabled = !uiState.isLoading
+                            ) {
+                                Text("Login with SSO")
+                            }
+                        }
+
+                        if (uiState.selectedService == 0) {
+                            Spacer(modifier = Modifier.height(16.dp))
+                            OutlinedButton(
+                                onClick = { viewModel.startStorytellerBrowserLogin() },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(56.dp),
+                                enabled = !uiState.isLoading
+                            ) {
+                                Text("Login with Browser")
+                            }
                         }
                     }
                 }

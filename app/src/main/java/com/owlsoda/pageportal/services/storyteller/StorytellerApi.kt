@@ -67,4 +67,7 @@ interface StorytellerApi {
     
     @GET("api/v2/collections")
     suspend fun getCollections(): List<CollectionResponse>
+
+    @GET("api/v2/users/me")
+    suspend fun getCurrentUser(): UserResponse
 }
