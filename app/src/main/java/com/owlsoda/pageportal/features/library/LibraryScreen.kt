@@ -21,6 +21,12 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Category
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Headphones
+import androidx.compose.material.icons.automirrored.filled.MenuBook
+import androidx.compose.material.icons.filled.RecordVoiceOver
+import androidx.compose.material.icons.filled.DownloadDone
+import androidx.compose.material.icons.automirrored.filled.LibraryBooks
+import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.GridView
@@ -214,28 +220,32 @@ fun LibraryScreen(
                     FilterChip(
                         selected = uiState.filterHasAudiobook,
                         onClick = { viewModel.toggleAudiobookFilter() },
-                        label = { Text("🎧 Audio") }
+                        label = { Text("Audio") },
+                        leadingIcon = { Icon(Icons.Filled.Headphones, contentDescription = "Audiobook available") }
                     )
                 }
                 item {
                     FilterChip(
                         selected = uiState.filterHasEbook,
                         onClick = { viewModel.toggleEbookFilter() },
-                        label = { Text("📖 Ebook") }
+                        label = { Text("Ebook") },
+                        leadingIcon = { Icon(Icons.AutoMirrored.Filled.MenuBook, contentDescription = "Ebook available") }
                     )
                 }
                 item {
                     FilterChip(
                         selected = uiState.filterHasReadAloud,
                         onClick = { viewModel.toggleReadAloudFilter() },
-                        label = { Text("🗣️ ReadAloud") }
+                        label = { Text("ReadAloud") },
+                        leadingIcon = { Icon(Icons.Filled.RecordVoiceOver, contentDescription = "ReadAloud available") }
                     )
                 }
                 item {
                     FilterChip(
                         selected = uiState.filterDownloaded,
                         onClick = { viewModel.toggleDownloadedFilter() },
-                        label = { Text("📥 Downloaded") }
+                        label = { Text("Downloaded") },
+                        leadingIcon = { Icon(Icons.Filled.DownloadDone, contentDescription = "Downloaded") }
                     )
                 }
             }
@@ -256,12 +266,15 @@ fun LibraryScreen(
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 val icon = when {
-                                    tab.id == -1L -> "📚"
-                                    tab.serviceType == ServiceType.AUDIOBOOKSHELF -> "🎧"
-                                    tab.serviceType == ServiceType.BOOKLORE -> "📖"
-                                    tab.serviceType == ServiceType.STORYTELLER -> "🗣️"
-                                    else -> "🔗"
+                                    tab.id == -1L -> Icons.AutoMirrored.Filled.LibraryBooks
+                                    tab.serviceType == ServiceType.AUDIOBOOKSHELF -> Icons.Filled.Headphones
+                                    tab.serviceType == ServiceType.BOOKLORE -> Icons.AutoMirrored.Filled.MenuBook
+                                    tab.serviceType == ServiceType.STORYTELLER -> Icons.Filled.RecordVoiceOver
+                                    else -> Icons.Filled.Link
                                 }
+
+                                Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
+
                                 if (tab.id != -1L) {
                                     val color = if (tab.isConnected) {
                                         androidx.compose.ui.graphics.Color.Green
