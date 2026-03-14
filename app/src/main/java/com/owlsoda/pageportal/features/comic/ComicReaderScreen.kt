@@ -24,6 +24,8 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.compose.foundation.Image
 import kotlinx.coroutines.flow.collect
@@ -353,7 +355,8 @@ fun ComicReaderScreen(
                             },
                             label = { Text("Page") },
                             modifier = Modifier.weight(1f),
-                            singleLine = true
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                         )
                         Button(
                             onClick = {
