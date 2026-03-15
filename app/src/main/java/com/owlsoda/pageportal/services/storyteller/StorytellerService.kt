@@ -280,11 +280,12 @@ class StorytellerService(
             serviceType = ServiceType.STORYTELLER,
             serviceId = uuid,
             title = title,
-            authors = authors.map { it.name },
+            authors = authors?.map { it.name } ?: emptyList(),
             narrators = narrators?.map { it.name } ?: emptyList(),
             series = series?.firstOrNull()?.name,
             seriesIndex = series?.firstOrNull()?.seriesIndex?.toFloatOrNull(),
             coverUrl = getCoverUrl(uuid),
+            audiobookCoverUrl = if (audiobook != null) "${getCoverUrl(uuid)}?format=square" else null,
             hasEbook = ebook != null,
             hasAudiobook = audiobook != null,
             hasReadAloud = readaloud != null && (readaloud.status == "completed" || readaloud.status == "ready" || !readaloud.filepath.isNullOrBlank()),
@@ -299,7 +300,7 @@ class StorytellerService(
             bookId = bookId,
             currentPosition = locator.locations.audioTimestampMs ?: 0,
             currentChapter = locator.locations.position ?: 0,
-            percentComplete = ((locator.locations.totalProgression ?: locator.locations.progression) * 100).toFloat(),
+            percentComplete = (((locator.locations.totalProgression ?: locator.locations.progression ?: 0.0) * 100).toFloat()),
             lastUpdated = timestamp
         )
     }
