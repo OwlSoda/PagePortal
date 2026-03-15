@@ -13,8 +13,20 @@
 -keepattributes Signature
 -keep class com.google.gson.reflect.TypeToken { *; }
 -keep class * extends com.google.gson.reflect.TypeToken
+-keep class com.google.gson.annotations.SerializedName { *; }
 
-# Keep data classes for serialization
--keep class com.owlsoda.pageportal.core.model.** { *; }
--keep class com.owlsoda.pageportal.services.**.model.** { *; }
+# Keep PagePortal models and entities for serialization/Room
+-keep class com.owlsoda.pageportal.core.database.entity.** { *; }
+-keep class com.owlsoda.pageportal.services.** { *; }
+-keep class com.owlsoda.pageportal.services.storyteller.** { *; }
+-keep class com.owlsoda.pageportal.services.audiobookshelf.** { *; }
+-keep class com.owlsoda.pageportal.services.booklore.** { *; }
+
+# Keep AppAuth
+-keep class net.openid.appauth.** { *; }
+-dontwarn net.openid.appauth.**
+
+# Keep Hilt/Dagger (usually handled by AAR but just in case)
+-keep class dagger.hilt.** { *; }
+
 -dontwarn org.slf4j.**
