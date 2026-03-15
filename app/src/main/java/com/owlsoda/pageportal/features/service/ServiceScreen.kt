@@ -46,12 +46,14 @@ fun ServiceScreen(
     var showSortDialog by remember { mutableStateOf(false) }
     
     // Filter books for this service
-    val serviceBooks = remember(uiState.books, serviceType, currentSort) {
-        val tabId = uiState.serverTabs.find { 
-            it.name.contains(serviceType, ignoreCase = true) 
-        }?.id ?: -999L
+    val serviceBooks = remember(uiState.books, serviceType, currentSort, uiState.serverTabs) {
+        val tabIds = uiState.serverTabs.filter { tab ->
+            tab.serviceType?.name?.equals(serviceType, ignoreCase = true) == true
+        }.map { it.id }.toSet()
         
-        val filtered = uiState.books.filter { it.serverIds.contains(tabId) }
+        val filtered = uiState.books.filter { book -> 
+            book.serverIds.any { it in tabIds } 
+        }
         
         when (currentSort) {
             "TITLE" -> filtered.sortedBy { it.title.lowercase() }

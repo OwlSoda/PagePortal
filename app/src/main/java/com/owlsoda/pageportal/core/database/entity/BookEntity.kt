@@ -44,6 +44,7 @@ data class BookEntity(
     val narrators: String = "[]",  // JSON array of narrator names
     val description: String? = null,
     val coverUrl: String? = null,
+    val audiobookCoverUrl: String? = null,
     val series: String? = null,
     val seriesIndex: String? = null,
     val hasEbook: Boolean = false,

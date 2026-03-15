@@ -131,12 +131,15 @@ fun BookDetailScreen(
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         // Cover Image
+                        val coverUrl = state.book?.audiobookCoverUrl ?: state.book?.coverUrl
+                        val aspectRatio = if (state.book?.audiobookCoverUrl != null) 1f else 2f / 3f
+                        
                         AsyncImage(
-                            model = book.coverUrl,
-                            contentDescription = book.title,
+                            model = coverUrl,
+                            contentDescription = state.book?.title,
                             modifier = Modifier
-                                .width(200.dp)
-                                .aspectRatio(2f / 3f)
+                                .width(if (aspectRatio == 1f) 240.dp else 200.dp)
+                                .aspectRatio(aspectRatio)
                                 .clip(RoundedCornerShape(12.dp))
                                 .shadow(24.dp, RoundedCornerShape(12.dp)),
                             contentScale = ContentScale.Crop
@@ -163,8 +166,12 @@ fun BookDetailScreen(
                         )
                         
                         if (!book.series.isNullOrBlank()) {
+                            val seriesLabel = book.seriesIndex?.toFloatOrNull()?.let {
+                                val s = if (it % 1 == 0f) it.toInt().toString() else it.toString()
+                                " #$s"
+                            } ?: ""
                             Text(
-                                text = "${book.series} #${book.seriesIndex?.toInt() ?: ""}",
+                                text = "${book.series}$seriesLabel",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.padding(top = 4.dp)

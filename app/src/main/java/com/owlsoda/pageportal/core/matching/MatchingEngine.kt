@@ -66,6 +66,7 @@ class MatchingEngine @Inject constructor(
                     title = book.title, // Use this book's title as canonical for now
                     author = bookAuthors.firstOrNull() ?: "Unknown",
                     coverUrl = book.coverUrl,
+                    audiobookCoverUrl = book.audiobookCoverUrl,
                     description = book.description,
                     lastUpdated = System.currentTimeMillis()
                 )

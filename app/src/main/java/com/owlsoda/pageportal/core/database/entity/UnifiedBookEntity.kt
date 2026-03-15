@@ -10,6 +10,7 @@ data class UnifiedBookEntity(
     val title: String,
     val author: String,
     val coverUrl: String? = null,
+    val audiobookCoverUrl: String? = null,
     val description: String? = null,
     val lastUpdated: Long = System.currentTimeMillis()
 )

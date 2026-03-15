@@ -24,11 +24,11 @@ data class BookResponse(
     val createdAt: String? = null,
     val updatedAt: String? = null,
     val publicationDate: String? = null,
-    val authors: List<AuthorResponse> = emptyList(),
-    val narrators: List<NarratorResponse>? = null,
-    val series: List<SeriesResponse>? = null,
-    val collections: List<CollectionResponse>? = null,
-    val tags: List<TagResponse>? = null,
+    val authors: List<AuthorResponse>? = emptyList(),
+    val narrators: List<NarratorResponse>? = emptyList(),
+    val series: List<SeriesResponse>? = emptyList(),
+    val collections: List<CollectionResponse>? = emptyList(),
+    val tags: List<TagResponse>? = emptyList(),
     val status: Any? = null,
     val position: Any? = null,
     val audiobook: AudiobookResponse? = null,
@@ -47,7 +47,7 @@ data class CollectionResponse(
 data class SeriesResponse(
     val uuid: String,
     val name: String,
-    val featured: Int? = null,
+    val featured: Any? = null,
     val createdAt: String? = null,
     val updatedAt: String? = null,
     @SerializedName("index") val index: Any? = null,
@@ -129,7 +129,7 @@ data class Locator(
 )
 
 data class Locations(
-    val progression: Double,
+    val progression: Double? = 0.0,
     val position: Int? = null,
     @SerializedName("totalProgression") val totalProgression: Double? = null,
     val audioTimestampMs: Long? = null,
@@ -138,8 +138,10 @@ data class Locations(
     val totalChapters: Int? = null,
     val totalDurationMs: Long? = null
 )
+
 data class UserResponse(
     val id: String,
     val name: String,
     val email: String? = null
 )
+

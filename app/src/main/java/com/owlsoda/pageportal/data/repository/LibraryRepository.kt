@@ -50,6 +50,7 @@ class LibraryRepository @Inject constructor(
                             narrators = gson.toJson(searchBook.narrators),
                             description = searchBook.description,
                             coverUrl = searchBook.coverUrl,
+                            audiobookCoverUrl = searchBook.audiobookCoverUrl,
                             series = searchBook.series,
                             seriesIndex = searchBook.seriesIndex?.toString(),
                             hasEbook = searchBook.hasEbook,
@@ -113,18 +114,22 @@ class LibraryRepository @Inject constructor(
             
             // Batch insert (REPLACE strategy will overwrite but we preserved ID and unifiedId)
             if (booksToInsert.isNotEmpty()) {
+                android.util.Log.d("LibraryRepository", "Inserting ${booksToInsert.size} books into database")
                 bookDao.insertBooks(booksToInsert)
             }
             
             // Run matching
             try {
+                android.util.Log.d("LibraryRepository", "Running matching engine")
                 matchingEngine.runMatching()
             } catch (e: Exception) {
-                // Matching failure shouldn't fail entire sync
+                android.util.Log.e("LibraryRepository", "Matching failed", e)
             }
             
+            android.util.Log.i("LibraryRepository", "Sync successful")
             Result.success(Unit)
         } catch (e: Exception) {
+            android.util.Log.e("LibraryRepository", "Sync failed", e)
             Result.failure(Exception("Failed to sync library: ${e.message}", e))
         }
     }

@@ -171,8 +171,16 @@ class ServiceManager @Inject constructor(
      */
     suspend fun getAllBooks(): List<Pair<ServerEntity, List<ServiceBook>>> {
         val activeServers = serverDao.getActiveServers().first()
+        android.util.Log.d("ServiceManager", "Starting sync for ${activeServers.size} active servers")
+        
         return activeServers.mapNotNull { server ->
-            val service = getService(server.id) ?: return@mapNotNull null
+            android.util.Log.d("ServiceManager", "Syncing server: ${server.displayName} (${server.serverUrl}) - ${server.serviceType}")
+            val service = getService(server.id) 
+            if (service == null) {
+                android.util.Log.e("ServiceManager", "Failed to create service for ${server.serverUrl}")
+                return@mapNotNull null
+            }
+            
             try {
                 val allServiceBooks = mutableListOf<ServiceBook>()
                 var currentPage = 0
@@ -180,6 +188,8 @@ class ServiceManager @Inject constructor(
                 
                 while (true) {
                     val pageBooks = service.listBooks(page = currentPage, pageSize = pageSize)
+                    android.util.Log.d("ServiceManager", "  Page $currentPage: Received ${pageBooks.size} books")
+                    
                     if (pageBooks.isEmpty()) break
                     
                     allServiceBooks.addAll(pageBooks)
@@ -190,12 +200,16 @@ class ServiceManager @Inject constructor(
                     currentPage++
                     
                     // Safety cap to prevent infinite loops (e.g. 10k books max per server for now)
-                    if (currentPage > 200) break 
+                    if (currentPage > 200) {
+                        android.util.Log.w("ServiceManager", "  Safety cap reached for ${server.serverUrl}")
+                        break 
+                    }
                 }
                 
+                android.util.Log.i("ServiceManager", "Successfully fetched ${allServiceBooks.size} books from ${server.displayName}")
                 server to allServiceBooks
             } catch (e: Exception) {
-                e.printStackTrace()
+                android.util.Log.e("ServiceManager", "Critical error syncing ${server.serverUrl}", e)
                 null
             }
         }
@@ -266,20 +280,18 @@ class ServiceManager @Inject constructor(
             var processed = url.trim()
             val original = processed
             
-            // Fix common typos like "http:host" -> "http://host"
-            if (processed.startsWith("http:") && !processed.startsWith("http://")) {
-                processed = "http://" + processed.removePrefix("http:")
-            } else if (processed.startsWith("https:") && !processed.startsWith("https://")) {
-                processed = "https://" + processed.removePrefix("https:")
-            } else if (processed.contains("http:") && !processed.contains("http://")) {
-                processed = processed.replace("http:", "http://")
+            // Use regex for more robust fixing of broken protocols
+            // Fix http:/host (single slash) or http:host (no slash)
+            val protocolRegex = "^(https?):/*".toRegex(RegexOption.IGNORE_CASE)
+            processed = protocolRegex.replace(processed) { matchResult ->
+                matchResult.groupValues[1].lowercase() + "://"
             }
-            
+
             if (original != processed) {
                 android.util.Log.d("ServiceManager", "Fixed URL typo: '$original' -> '$processed'")
             }
 
-            val withProtocol = if (!processed.startsWith("http")) {
+            val withProtocol = if (!processed.startsWith("http", ignoreCase = true)) {
                 val isPrivate = processed.startsWith("localhost") ||
                     processed.startsWith("127.0.0.1") ||
                     processed.startsWith("192.168.") ||
@@ -300,7 +312,11 @@ class ServiceManager @Inject constructor(
                 }
             } else processed
             
-            return if (withProtocol.endsWith("/")) withProtocol.dropLast(1) else withProtocol
+            val finalUrl = if (withProtocol.endsWith("/")) withProtocol.dropLast(1) else withProtocol
+            if (original != finalUrl) {
+                android.util.Log.d("ServiceManager", "Final Normalized URL: '$original' -> '$finalUrl'")
+            }
+            return finalUrl
         }
     }
 }

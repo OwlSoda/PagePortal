@@ -39,6 +39,7 @@ class StorytellerService(
         this.baseUrl = if (cleanUrl.endsWith("/")) cleanUrl else "$cleanUrl/"
         this.authToken = authToken
         
+        android.util.Log.d("StorytellerService", "Configuring with URL: $baseUrl, Token present: ${authToken != null}")
         val retrofit = Retrofit.Builder()
             .baseUrl(baseUrl!!) // Use non-null assertion as baseUrl is set above
             .client(baseOkHttpClient) // Use baseOkHttpClient as per original context
@@ -100,6 +101,7 @@ class StorytellerService(
                 userId = null  // Storyteller doesn't return user ID in token response
             )
         } catch (e: Exception) {
+            android.util.Log.e("StorytellerService", "Authentication failed for $serverUrl", e)
             AuthResult(
                 success = false,
                 errorMessage = e.message ?: "Authentication failed"
@@ -110,10 +112,11 @@ class StorytellerService(
     override suspend fun listBooks(page: Int, pageSize: Int): List<ServiceBook> {
         if (page > 0) return emptyList() 
         return try {
-            android.util.Log.d("StorytellerService", "Fetching books from Storyteller API...")
+            android.util.Log.d("StorytellerService", "Fetching books from Storyteller API... URL: $baseUrl, Token present: ${authToken != null}")
             val response = getApi().listBooks(synced = null)
             android.util.Log.d("StorytellerService", "Received ${response.size} books from Storyteller")
-            response.map { it.toServiceBook() }
+            
+            response.mapNotNull { it.toServiceBookSafe(baseUrl, authToken) }
         } catch (e: Exception) {
             android.util.Log.e("StorytellerService", "Failed to fetch books from Storyteller. URL: $baseUrl, Token present: ${authToken != null}", e)
             emptyList()

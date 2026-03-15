@@ -98,6 +98,7 @@ data class ServiceBook(
     val series: String? = null,
     val seriesIndex: Float? = null,
     val coverUrl: String? = null,
+    val audiobookCoverUrl: String? = null,
     val hasEbook: Boolean = false,
     val hasAudiobook: Boolean = false,
     val hasReadAloud: Boolean = false,

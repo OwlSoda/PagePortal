@@ -586,12 +586,15 @@ fun BookCard(
     ) {
         Column {
             // Cover image
+            val coverUrl = book.audiobookCoverUrl ?: book.coverUrl
+            val aspectRatio = if (book.audiobookCoverUrl != null) 1f else 0.66f
+            
             AsyncImage(
-                model = book.coverUrl,
+                model = coverUrl,
                 contentDescription = book.title,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .aspectRatio(0.66f)
+                    .aspectRatio(aspectRatio)
                     .clip(MaterialTheme.shapes.medium),
                 contentScale = ContentScale.Crop
             )
