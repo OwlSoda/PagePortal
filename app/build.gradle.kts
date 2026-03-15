@@ -13,8 +13,8 @@ android {
         applicationId = "com.owlsoda.pageportal"
         minSdk = 26
         targetSdk = 34
-        versionCode = 2
-        versionName = "0.1.9"
+        versionCode = 3
+        versionName = "0.1.10"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -27,6 +27,7 @@ android {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
+            signingConfig = signingConfigs.getByName("debug")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
