@@ -701,6 +701,7 @@ private fun injectStyles(webView: WebView, state: ReaderUiState) {
     val css = if (state.isVerticalScroll) {
         // Vertical Scroll Mode
         """
+        document.documentElement.style.height = 'auto';
         document.body.style.height = 'auto';
         document.body.style.overflowY = 'scroll';
         document.body.style.overflowX = 'hidden';
@@ -711,13 +712,17 @@ private fun injectStyles(webView: WebView, state: ReaderUiState) {
     } else {
         // Horizontal Pagination Mode (CSS Columns)
         """
+        document.documentElement.style.height = '100vh';
+        document.documentElement.style.overflow = 'hidden';
         document.body.style.height = '100vh';
         document.body.style.overflowY = 'hidden';
         document.body.style.overflowX = 'hidden';
-        document.body.style.columnWidth = window.innerWidth + 'px';
+        document.body.style.columnWidth = '100vw';
         document.body.style.columnGap = '0px';
         document.body.style.columnFill = 'auto';
         document.body.style.boxSizing = 'border-box';
+        document.body.style.margin = '0';
+        document.body.style.padding = '0';
         """
     }
 

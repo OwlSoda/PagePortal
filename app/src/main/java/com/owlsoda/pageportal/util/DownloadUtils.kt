@@ -198,7 +198,7 @@ object DownloadUtils {
             
             FileOutputStream(file, isResuming).use { output ->
                 val input = body.byteStream()
-                val buffer = ByteArray(128 * 1024) // 128KB buffer
+                val buffer = ByteArray(512 * 1024) // 512KB buffer for speed
                 var bytesRead: Int
                 var totalBytesRead = if (isResuming) existingSize else 0L
                 
