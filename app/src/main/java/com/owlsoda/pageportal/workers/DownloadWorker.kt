@@ -130,21 +130,32 @@ class DownloadWorker(
             // Using inline download loop to support foreground notification updates
             val requestBuilder = okhttp3.Request.Builder().url(downloadUrl)
             
-            // Add Authorization header if available
+            // Add Authorization header ONLY if not already in URL as ?token=
+            val hasTokenInUrl = downloadUrl.contains("token=")
             val serviceEntity = serviceManager.getServiceEntity(serverId)
-            if (serviceEntity?.authToken != null) {
-                requestBuilder.addHeader("Authorization", "Bearer ${serviceEntity.authToken}")
+            if (!hasTokenInUrl && serviceEntity?.authToken != null) {
+                if (serviceEntity.serviceType == "BOOKLORE") {
+                    requestBuilder.addHeader("Authorization", serviceEntity.authToken)
+                } else {
+                    requestBuilder.addHeader("Authorization", "Bearer ${serviceEntity.authToken}")
+                }
+            } else if (hasTokenInUrl) {
+                logToFile("Auth: Using token from URL query")
             }
             
             val response = okHttpClient.newCall(requestBuilder.build()).execute()
-            if (!response.isSuccessful) throw Exception("HTTP ${response.code}")
+            if (!response.isSuccessful) {
+                logToFile("ERROR: HTTP ${response.code} (URL: $downloadUrl)")
+                throw Exception("HTTP ${response.code}")
+            }
             
             val body = response.body ?: throw Exception("Empty body")
             val contentLength = body.contentLength()
+            logToFile("Body: length=$contentLength, type=${body.contentType()}")
             
             java.io.FileOutputStream(targetFile).use { output ->
                 body.byteStream().use { input ->
-                    val buffer = ByteArray(8192)
+                    val buffer = ByteArray(64 * 1024) // 64KB buffer
                     var bytesRead = 0L
                     var read: Int
                     
@@ -157,10 +168,19 @@ class DownloadWorker(
                         
                         if (contentLength > 0) {
                             val percent = (bytesRead * 100 / contentLength).toInt()
-                            if (percent > lastNotificationProgress + 5) {
+                            if (percent > lastNotificationProgress + 2) { // More frequent updates
                                 lastNotificationProgress = percent
                                 setForeground(createForegroundInfo(percent, book.title))
                                 bookDao.updateDownloadStatus(dbBookId, DownloadStatus.DOWNLOADING.name, bytesRead.toFloat() / contentLength, null)
+                            }
+                        } else {
+                            // No content length, just update progress as "indeterminate" or incremental
+                            // Update UI every 500KB
+                            val mbRead = (bytesRead / (1024 * 512)).toInt()
+                            if (mbRead > lastNotificationProgress) {
+                                lastNotificationProgress = mbRead
+                                setForeground(createForegroundInfo(-1, book.title)) // -1 signals indeterminate to helper
+                                bookDao.updateDownloadStatus(dbBookId, DownloadStatus.DOWNLOADING.name, 0f, null)
                             }
                         }
                     }
@@ -215,13 +235,15 @@ class DownloadWorker(
             notificationManager.createNotificationChannel(channel)
         }
         
+        val progressText = if (progress == -1) "Downloading..." else "$progress%"
+        
         val notification = androidx.core.app.NotificationCompat.Builder(applicationContext, channelId)
             .setContentTitle("Downloading: $title")
             .setTicker("Downloading: $title")
-            .setContentText("$progress%")
+            .setContentText(progressText)
             .setSmallIcon(android.R.drawable.stat_sys_download)
             .setOngoing(true)
-            .setProgress(100, progress, false)
+            .setProgress(100, if (progress == -1) 0 else progress, progress == -1)
             .setOnlyAlertOnce(true)
             .build()
             
