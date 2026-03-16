@@ -471,7 +471,7 @@ fun LibraryScreen(
                                         }
 
                                         // Fast Scroller Overlay
-                                        if (uiState.viewMode == ViewMode.Grid && uiState.sortOption == SortOption.TitleAsc && uiState.books.size > 20) {
+                                        if (uiState.viewMode == ViewMode.Grid && uiState.sortOption == SortOption.TitleAsc && uiState.books.size > 5) {
                                             FastScroller(
                                                 onLetterClick = { letter ->
                                                     val index = uiState.books.indexOfFirst { 
@@ -645,7 +645,9 @@ fun BookCard(
                     text = book.title,
                     style = MaterialTheme.typography.titleSmall,
                     maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
+                    minLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.fillMaxWidth()
                 )
                 
                 if (book.authors.isNotEmpty()) {
@@ -654,8 +656,13 @@ fun BookCard(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        minLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.fillMaxWidth()
                     )
+                } else {
+                    // Placeholder for spacing consistency
+                    Spacer(modifier = Modifier.height(16.dp))
                 }
                 
                 // Format badges

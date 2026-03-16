@@ -111,8 +111,15 @@ class DownloadWorker(
             if (downloadUrl == null) {
                 val availableMimeTypes = details.files.map { "${it.filename} (${it.mimeType})" }
                 logToFile("ERROR: No URL for $downloadType. Available: $availableMimeTypes")
+                // Also log to regular Logcat
+                Log.e(TAG, "No download URL for $downloadType. Book: ${book.title}. Available: $availableMimeTypes")
                 return Result.failure()
             }
+            
+            // Log full URL for debugging (sanitized token)
+            val logUrl = downloadUrl.replace(Regex("token=[^&]+"), "token=REDACTED")
+            logToFile("Resolved URL for $downloadType: $logUrl")
+            Log.d(TAG, "Download URL: $logUrl")
             
             logToFile("Starting download: $downloadUrl")
             
@@ -140,7 +147,7 @@ class DownloadWorker(
                 }
             }
             
-            logToFile("Starting robust download: $downloadUrl")
+            logToFile("Starting robust download to: ${targetFile.absolutePath}")
             
             DownloadUtils.downloadFile(
                 client = okHttpClient,
@@ -170,25 +177,39 @@ class DownloadWorker(
                 DownloadUtils.DownloadFormat.READALOUD -> 
                     bookDao.updateReadAloudDownloaded(dbBookId, true, filePath)
             }
-            
             bookDao.updateDownloadStatus(dbBookId, DownloadStatus.COMPLETED.name, 1f, filePath)
+            
+            // Post-processing for ReadAloud
+            if (format == DownloadUtils.DownloadFormat.READALOUD) {
+                logToFile("Post-processing ReadAloud: Unzipping...")
+                try {
+                    val destDir = java.io.File(applicationContext.cacheDir, "readaloud/$dbBookId")
+                    DownloadUtils.unzipFile(targetFile, destDir)
+                    logToFile("ReadAloud unzipped to: ${destDir.absolutePath}")
+                } catch (e: Exception) {
+                    logToFile("ReadAloud unzip FAILED: ${e.message}")
+                    // Don't fail the whole download, but log it
+                }
+            }
+            
             setForeground(createForegroundInfo(100, book.title))
             logToFile("SUCCESS: $filePath")
             Result.success()
             
-        } catch (e: Exception) {
-            val urlInfo = if (downloadUrl != null) "URL: $downloadUrl" else "URL not resolved"
+        } catch (e: Throwable) {
+            val urlInfo = if (downloadUrl != null) "URL: ${downloadUrl.replace(Regex("token=[^&]+"), "token=REDACTED")}" else "URL not resolved"
             val errorDetails = "${e.javaClass.simpleName}: ${e.message}"
-            logToFile("EXCEPTION ($urlInfo): $errorDetails")
-            e.printStackTrace()
+            logToFile("CRITICAL ERROR ($urlInfo): $errorDetails")
+            Log.e(TAG, "DownloadWorker CRITICAL ERROR: $errorDetails", e)
             
             // Log stack trace summary to log file
-            val stackSummary = e.stackTrace.take(5).joinToString("\n") { "  at $it" }
+            val stackSummary = e.stackTrace.take(8).joinToString("\n") { "  at $it" }
             logToFile("Stack:\n$stackSummary")
             
             bookDao.updateDownloadStatus(dbBookId, DownloadStatus.FAILED.name, 0f, null)
             
-            if (runAttemptCount < 3) {
+            if (runAttemptCount < 3 && e is java.io.IOException) {
+                 logToFile("Retrying (attempt $runAttemptCount)...")
                  Result.retry()
             } else {
                  Result.failure()
