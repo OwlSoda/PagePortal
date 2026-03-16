@@ -87,19 +87,21 @@ class AudiobookshelfService(
                 token = response.user.token,
                 userId = response.user.id
             )
-        } catch (e: retrofit2.HttpException) {
-            val message = when (e.code()) {
-                401 -> "Invalid username or password"
-                403 -> "Access forbidden"
-                else -> "Server error: ${e.code()}"
-            }
-            AuthResult(success = false, errorMessage = message)
-        } catch (e: java.net.UnknownHostException) {
-            AuthResult(success = false, errorMessage = "Cannot reach server. Please check the URL.")
-        } catch (e: java.net.SocketTimeoutException) {
-            AuthResult(success = false, errorMessage = "Connection timeout. Server not responding.")
         } catch (e: Exception) {
-            AuthResult(success = false, errorMessage = e.message ?: "Authentication failed")
+            android.util.Log.e("AudiobookshelfService", "Authentication failed for $serverUrl", e)
+            val message = when {
+                e is java.net.UnknownHostException -> "Could not find server. Check the URL and your connection."
+                e is java.net.ConnectException -> "Connection refused. Is the server running and accessible?"
+                e is java.net.SocketTimeoutException -> "Connection timed out. The server is taking too long to respond."
+                e is javax.net.ssl.SSLHandshakeException -> "SSL Error. If your server uses a self-signed certificate, you might need to use HTTP or add the certificate to Android."
+                e is retrofit2.HttpException && e.code() == 401 -> "Invalid username or password."
+                e is retrofit2.HttpException && e.code() == 404 -> "API not found. Is the URL correct?"
+                else -> e.message ?: "Authentication failed"
+            }
+            AuthResult(
+                success = false,
+                errorMessage = message
+            )
         }
     }
     

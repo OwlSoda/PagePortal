@@ -24,6 +24,7 @@ import kotlinx.coroutines.withContext
 
 data class LoginUiState(
     val serverUrl: String = "",
+    val useHttps: Boolean = true,
     val username: String = "",
     val password: String = "",
     val selectedService: Int = 0,
@@ -52,20 +53,6 @@ class LoginViewModel @Inject constructor(
     private var absPkceState: String? = null
     
     init {
-        // Observe OAuth redirects
-        viewModelScope.launch {
-            oauthManager.redirectUri.collect { uri ->
-                val code = uri.getQueryParameter("code")
-                val state = uri.getQueryParameter("state")
-                val token = uri.getQueryParameter("token") ?: uri.fragment?.split("=").let { if (it?.size == 2 && it[0] == "access_token") it[1] else null }
-
-                if (code != null && state != null) {
-                    handleAbsSsoCallback(code, state)
-                } else if (token != null) {
-                    handleStorytellerCallback(token)
-                }
-            }
-        }
 
         // Check if user already has connected servers, ONLY if not adding a new account
         if (!isAddingAccount) {
@@ -78,12 +65,42 @@ class LoginViewModel @Inject constructor(
     }
     
     fun updateServerUrl(url: String) {
-        _uiState.value = _uiState.value.copy(serverUrl = url, error = null)
+        var cleanUrl = url.trim()
+        var useHttps = _uiState.value.useHttps
+        
+        // If user pastes a full URL, extract the scheme and the rest
+        if (cleanUrl.contains("://")) {
+            useHttps = cleanUrl.startsWith("https://", ignoreCase = true)
+            cleanUrl = cleanUrl.substringAfter("://")
+        }
+        
+        _uiState.value = _uiState.value.copy(
+            serverUrl = cleanUrl, 
+            useHttps = useHttps,
+            error = null
+        )
+        
+        val fullUrl = if (useHttps) "https://$cleanUrl" else "http://$cleanUrl"
         
         // Debounced or direct check for ABS SSO
-        if (_uiState.value.selectedService == 1 && url.startsWith("http")) {
+        if (_uiState.value.selectedService == 1 && cleanUrl.isNotBlank()) {
             viewModelScope.launch {
-                val isSsoAvailable = authRepository.checkAbsSso(url)
+                val isSsoAvailable = authRepository.checkAbsSso(fullUrl)
+                _uiState.value = _uiState.value.copy(isAbsSsoAvailable = isSsoAvailable)
+            }
+        }
+    }
+
+    fun toggleScheme() {
+        val newUseHttps = !_uiState.value.useHttps
+        _uiState.value = _uiState.value.copy(useHttps = newUseHttps)
+        
+        // Re-check SSO if needed
+        val cleanUrl = _uiState.value.serverUrl
+        if (_uiState.value.selectedService == 1 && cleanUrl.isNotBlank()) {
+            val fullUrl = if (newUseHttps) "https://$cleanUrl" else "http://$cleanUrl"
+            viewModelScope.launch {
+                val isSsoAvailable = authRepository.checkAbsSso(fullUrl)
                 _uiState.value = _uiState.value.copy(isAbsSsoAvailable = isSsoAvailable)
             }
         }
@@ -136,270 +153,6 @@ class LoginViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(browserUrl = null)
     }
 
-    fun startAbsSsoLogin() {
-        viewModelScope.launch {
-            val state = _uiState.value
-            val normalizedUrl = state.serverUrl.trim().trimEnd('/')
-            if (normalizedUrl.isBlank()) {
-                _uiState.value = state.copy(error = "Please enter a server URL")
-                return@launch
-            }
-
-            _uiState.value = state.copy(isLoading = true, error = null)
-
-            try {
-                // Prepare PKCE
-                val verifier = PkceHelper.generateVerifier()
-                val challenge = PkceHelper.generateChallenge(verifier)
-                val oauthState = PkceHelper.generateState()
-
-                absPkceVerifier = verifier
-                absPkceState = oauthState
-
-                // Build redirect URL
-                // We use a dummy redirect URI because ABS handles the internal redirect to our custom scheme
-                val redirectUri = "pageportal://oauth2redirect"
-                val authUrl = "$normalizedUrl/auth/openid?code_challenge=$challenge&code_challenge_method=S256&redirect_uri=${Uri.encode(redirectUri)}&client_id=Audiobookshelf-App&response_type=code&state=$oauthState"
-
-                _uiState.value = _uiState.value.copy(
-                    isLoading = false,
-                    browserUrl = authUrl
-                )
-            } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    isLoading = false,
-                    error = "Failed to start SSO login: ${e.message}"
-                )
-                e.printStackTrace()
-            }
-        }
-    }
-
-    fun startStorytellerBrowserLogin() {
-        viewModelScope.launch {
-            val state = _uiState.value
-            val normalizedUrl = state.serverUrl.trim().trimEnd('/')
-            if (normalizedUrl.isBlank()) {
-                _uiState.value = state.copy(error = "Please enter a server URL")
-                return@launch
-            }
-
-            // We open the web login page. Storyteller v2 handles the rest.
-            // We append a redirect_uri so the web app knows where to go after login,
-            // though Storyteller might not support this directly in its login form yet.
-            // Alternatively, we just open the login page and let the user log in.
-            // The user will have to manually return or the app detects session cookie.
-            // Actually, for Storyteller, it's simpler to just let them log in via the web UI.
-            val authUrl = "$normalizedUrl/login?redirect_uri=${Uri.encode("pageportal://oauth2redirect")}"
-
-            _uiState.value = _uiState.value.copy(
-                isLoading = false,
-                browserUrl = authUrl
-            )
-        }
-    }
-
-    fun handleStorytellerCallback(token: String) {
-        viewModelScope.launch {
-            val state = _uiState.value
-            val normalizedUrl = state.serverUrl.trim().trimEnd('/')
-            _uiState.value = state.copy(isLoading = true, error = null)
-
-            try {
-                val service = StorytellerService(authRepository.serviceManager.okHttpClient)
-                val authResult = service.authenticateWithToken(normalizedUrl, token)
-
-                if (authResult.success) {
-                    val loginResult = authRepository.loginWithToken(
-                        serviceType = ServiceType.STORYTELLER,
-                        serverUrl = normalizedUrl,
-                        token = token,
-                        username = authResult.username ?: "Browser User",
-                        userId = authResult.userId
-                    )
-
-                    loginResult.fold(
-                        onSuccess = {
-                            _uiState.value = _uiState.value.copy(
-                                isLoading = false,
-                                isLoggedIn = true
-                            )
-                        },
-                        onFailure = { error ->
-                            _uiState.value = _uiState.value.copy(
-                                isLoading = false,
-                                error = error.message ?: "Failed to save server session"
-                            )
-                        }
-                    )
-                } else {
-                    _uiState.value = _uiState.value.copy(
-                        isLoading = false,
-                        error = authResult.errorMessage ?: "Token validation failed"
-                    )
-                }
-            } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    isLoading = false,
-                    error = "Failed to handle storyteller login: ${e.message}"
-                )
-            }
-        }
-    }
-
-    fun handleAbsSsoCallback(code: String, state: String) {
-        viewModelScope.launch {
-            val uiStateValue = _uiState.value
-            val normalizedUrl = uiStateValue.serverUrl.trim().trimEnd('/')
-            
-            if (state != absPkceState) {
-                _uiState.value = uiStateValue.copy(error = "Invalid OAuth state - possible CSRF attack")
-                return@launch
-            }
-
-            val verifier = absPkceVerifier ?: run {
-                _uiState.value = uiStateValue.copy(error = "Missing PKCE verifier")
-                return@launch
-            }
-
-            _uiState.value = uiStateValue.copy(isLoading = true, error = null)
-
-            try {
-                val service = AudiobookshelfService(
-                    normalizedUrl,
-                    authRepository.serviceManager.okHttpClient
-                )
-                
-                val result = service.oauthCallback(state, code, verifier)
-                
-                if (result.success && result.token != null) {
-                    val loginResult = authRepository.loginWithToken(
-                        serviceType = ServiceType.AUDIOBOOKSHELF,
-                        serverUrl = normalizedUrl,
-                        token = result.token,
-                        username = result.username ?: "SSO User",
-                        userId = result.userId
-                    )
-
-                    loginResult.fold(
-                        onSuccess = {
-                            _uiState.value = _uiState.value.copy(
-                                isLoading = false,
-                                isLoggedIn = true
-                            )
-                        },
-                        onFailure = { error ->
-                            _uiState.value = _uiState.value.copy(
-                                isLoading = false,
-                                error = error.message ?: "Failed to save server session"
-                            )
-                        }
-                    )
-                } else {
-                    _uiState.value = _uiState.value.copy(
-                        isLoading = false,
-                        error = result.errorMessage ?: "SSO authentication failed"
-                    )
-                }
-            } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    isLoading = false,
-                    error = "SSO callback failed: ${e.message}"
-                )
-                e.printStackTrace()
-            }
-        }
-    }
-    
-    fun startOidcLogin() {
-        viewModelScope.launch {
-            val state = _uiState.value
-            val normalizedUrl = state.serverUrl.trim().trimEnd('/')
-            if (normalizedUrl.isBlank()) {
-                _uiState.value = state.copy(error = "Please enter a server URL")
-                return@launch
-            }
-            
-            _uiState.value = state.copy(isLoading = true, error = null)
-            
-            try {
-                // Fetch config from the issuer
-                val config = try {
-                    OidcHelper.fetchConfiguration(Uri.parse(normalizedUrl))
-                } catch (e: Exception) {
-                    _uiState.value = _uiState.value.copy(
-                        isLoading = false,
-                        error = "OIDC discovery failed for '$normalizedUrl'. Make sure the server URL is correct and the server supports OIDC.\n\nDetails: ${e.message}"
-                    )
-                    e.printStackTrace()
-                    return@launch
-                }
-                
-                // Build the authorization request
-                val request = AuthorizationRequest.Builder(
-                    config,
-                    "pageportal",
-                    ResponseTypeValues.CODE,
-                    Uri.parse("pageportal://oauth2redirect")
-                )
-                .setScope("openid profile offline_access")
-                .build()
-                
-                _uiState.value = _uiState.value.copy(oidcRequest = request, isLoading = false)
-            } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    isLoading = false,
-                    error = "Failed to start OIDC login: ${e.message}"
-                )
-                e.printStackTrace()
-            }
-        }
-    }
-    
-    fun exchangeToken(authService: AuthorizationService, resp: AuthorizationResponse) {
-        viewModelScope.launch {
-            val state = _uiState.value
-            val normalizedUrl = state.serverUrl.trim().trimEnd('/')
-            _uiState.value = state.copy(isLoading = true, error = null)
-            
-            authService.performTokenRequest(resp.createTokenExchangeRequest()) { response, ex ->
-                viewModelScope.launch {
-                    if (response != null && response.accessToken != null) {
-                        try {
-                            val result = authRepository.login(
-                                serviceType = ServiceType.BOOKLORE,
-                                serverUrl = normalizedUrl,
-                                username = "OIDC User", // or extract from ID token
-                                password = response.accessToken!!
-                            )
-                            
-                            result.fold(
-                                onSuccess = {
-                                    _uiState.value = _uiState.value.copy(
-                                        isLoading = false,
-                                        isLoggedIn = true
-                                    )
-                                },
-                                onFailure = { error ->
-                                    _uiState.value = _uiState.value.copy(
-                                        isLoading = false,
-                                        error = error.message ?: "Authentication failed"
-                                    )
-                                }
-                            )
-                        } catch (e: Exception) {
-                            _uiState.value = _uiState.value.copy(isLoading = false, error = "Login failed: ${e.message}")
-                        }
-                    } else {
-                        _uiState.value = _uiState.value.copy(
-                            isLoading = false,
-                            error = ex?.message ?: "Token exchange failed"
-                        )
-                    }
-                }
-            }
-        }
-    }
     
     fun login(serviceIndex: Int) {
         viewModelScope.launch {
@@ -427,7 +180,8 @@ class LoginViewModel @Inject constructor(
                 }
                 
                 // Normalize URL (remove trailing slashes)
-                val normalizedUrl = state.serverUrl.trim().trimEnd('/')
+                val scheme = state.useHttps.let { if (it) "https" else "http" }
+                val normalizedUrl = "${scheme}://${state.serverUrl.trim().trimEnd('/')}"
                 
                 _uiState.value = state.copy(isLoading = true, error = null)
                 

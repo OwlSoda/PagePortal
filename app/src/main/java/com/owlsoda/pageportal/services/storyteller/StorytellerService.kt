@@ -64,7 +64,13 @@ class StorytellerService(
                 errorMessage = null
             )
         } catch (e: Exception) {
-            AuthResult(success = false, errorMessage = "Token validation failed: ${e.message}")
+            val message = when {
+                e is java.net.UnknownHostException -> "Could not find server. Check the URL."
+                e is javax.net.ssl.SSLHandshakeException -> "SSL Error. Try using HTTP if HTTPS is not configured correctly."
+                e.message?.contains("401") == true -> "Session expired or invalid token."
+                else -> "Token validation failed: ${e.message}"
+            }
+            AuthResult(success = false, errorMessage = message)
         }
     }
     
@@ -102,9 +108,18 @@ class StorytellerService(
             )
         } catch (e: Exception) {
             android.util.Log.e("StorytellerService", "Authentication failed for $serverUrl", e)
+            val message = when {
+                e is java.net.UnknownHostException -> "Could not find server. Check the URL and your connection."
+                e is java.net.ConnectException -> "Connection refused. Is the server running and accessible?"
+                e is java.net.SocketTimeoutException -> "Connection timed out. The server is taking too long to respond."
+                e is javax.net.ssl.SSLHandshakeException -> "SSL Error. If your server uses a self-signed certificate, you might need to use HTTP or add the certificate to Android."
+                e.message?.contains("401") == true -> "Invalid username or password."
+                e.message?.contains("404") == true -> "Storyteller API not found. Is the URL correct?"
+                else -> e.message ?: "Authentication failed"
+            }
             AuthResult(
                 success = false,
-                errorMessage = e.message ?: "Authentication failed"
+                errorMessage = message
             )
         }
     }

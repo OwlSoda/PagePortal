@@ -109,20 +109,21 @@ class BookloreService(
             configure(finalUrl, token)
             
             AuthResult(success = true, token = token, userId = username)
-        } catch (e: retrofit2.HttpException) {
-            val message = when (e.code()) {
-                401 -> "Invalid username or password"
-                403 -> "Access forbidden"
-                404 -> "OPDS feed not found at this URL"
-                else -> "Server error: ${e.code()}"
-            }
-            AuthResult(success = false, errorMessage = message)
-        } catch (e: java.net.UnknownHostException) {
-            AuthResult(success = false, errorMessage = "Cannot reach server. Please check the URL.")
-        } catch (e: java.net.SocketTimeoutException) {
-            AuthResult(success = false, errorMessage = "Connection timeout. Server not responding.")
         } catch (e: Exception) {
-            AuthResult(success = false, errorMessage = e.message ?: "Authentication failed")
+            android.util.Log.e("BookloreService", "Authentication failed for $serverUrl", e)
+            val message = when {
+                e is java.net.UnknownHostException -> "Could not find server. Check the URL."
+                e is java.net.ConnectException -> "Connection refused. Is the server running?"
+                e is java.net.SocketTimeoutException -> "Connection timed out."
+                e is javax.net.ssl.SSLHandshakeException -> "SSL Error. Try using HTTP."
+                e is retrofit2.HttpException && e.code() == 401 -> "Invalid username or password."
+                e is retrofit2.HttpException && e.code() == 404 -> "OPDS feed not found at this URL."
+                else -> e.message ?: "Authentication failed"
+            }
+            AuthResult(
+                success = false,
+                errorMessage = message
+            )
         }
     }
 

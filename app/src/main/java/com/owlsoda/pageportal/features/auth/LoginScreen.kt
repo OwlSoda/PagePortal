@@ -54,45 +54,7 @@ fun LoginScreen(
     val context = LocalContext.current
     val authService = remember { AuthorizationService(context) }
     
-    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-        val data = result.data
-        if (data != null) {
-            val response = AuthorizationResponse.fromIntent(data)
-            val exception = AuthorizationException.fromIntent(data)
-            if (response != null) {
-                viewModel.exchangeToken(authService, response)
-            } else if (exception != null) {
-                viewModel.updateError("Login failed: ${exception.message}")
-            }
-        }
-    }
     
-    LaunchedEffect(uiState.browserUrl) {
-        uiState.browserUrl?.let { url ->
-            try {
-                val customTabsIntent = CustomTabsIntent.Builder().build()
-                customTabsIntent.launchUrl(context, Uri.parse(url))
-            } catch (e: Exception) {
-                viewModel.updateError("Could not open browser: ${e.message}")
-            } finally {
-                viewModel.clearBrowserUrl()
-            }
-        }
-    }
-    
-    LaunchedEffect(uiState.oidcRequest) {
-        uiState.oidcRequest?.let { req ->
-            try {
-                val intent = authService.getAuthorizationRequestIntent(req)
-                launcher.launch(intent)
-            } catch (e: Exception) {
-                viewModel.updateError("Could not open login page: ${e.message}")
-                e.printStackTrace()
-            } finally {
-                viewModel.clearOidcRequest()
-            }
-        }
-    }
     
     Column(
         modifier = Modifier
@@ -200,7 +162,7 @@ fun LoginScreen(
                         
                         Spacer(modifier = Modifier.height(24.dp))
                         
-                        // Server URL
+                        // Server URL with Scheme Toggle
                         OutlinedTextField(
                             value = uiState.serverUrl,
                             onValueChange = { viewModel.updateServerUrl(it) },
@@ -208,15 +170,30 @@ fun LoginScreen(
                             placeholder = { 
                                 Text(
                                     when (uiState.selectedService) {
-                                        0 -> "https://storyteller.example.com"
-                                        1 -> "https://abs.example.com"
-                                        else -> "https://booklore.example.com"
+                                        0 -> "storyteller.example.com"
+                                        1 -> "abs.example.com"
+                                        else -> "booklore.example.com"
                                     }
                                 )
                             },
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true,
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri)
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+                            leadingIcon = {
+                                Surface(
+                                    onClick = { viewModel.toggleScheme() },
+                                    color = if (uiState.useHttps) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
+                                    shape = MaterialTheme.shapes.small,
+                                    modifier = Modifier.padding(start = 8.dp)
+                                ) {
+                                    Text(
+                                        text = if (uiState.useHttps) "HTTPS" else "HTTP",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                        color = if (uiState.useHttps) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
                         )
                         
                         val isBooklore = uiState.selectedService == 2
@@ -298,32 +275,7 @@ fun LoginScreen(
                             )
                         }
 
-                        // Browser-based Login Options
-                        if (uiState.selectedService == 1 && uiState.isAbsSsoAvailable) {
-                            Spacer(modifier = Modifier.height(16.dp))
-                            OutlinedButton(
-                                onClick = { viewModel.startAbsSsoLogin() },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(56.dp),
-                                enabled = !uiState.isLoading
-                            ) {
-                                Text("Login with SSO")
-                            }
-                        }
 
-                        if (uiState.selectedService == 0) {
-                            Spacer(modifier = Modifier.height(16.dp))
-                            OutlinedButton(
-                                onClick = { viewModel.startStorytellerBrowserLogin() },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(56.dp),
-                                enabled = !uiState.isLoading
-                            ) {
-                                Text("Login with Browser")
-                            }
-                        }
                     }
                 }
                 
