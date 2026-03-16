@@ -46,6 +46,9 @@ import androidx.compose.foundation.background
 import coil.compose.AsyncImage
 import com.owlsoda.pageportal.features.auth.LoginScreen
 import com.owlsoda.pageportal.ui.components.EmptyState
+import com.owlsoda.pageportal.features.library.components.FastScroller
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import kotlinx.coroutines.launch
 
 private data class EmptyStateInfo(
     val icon: String,
@@ -65,6 +68,8 @@ fun LibraryScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var showSortMenu by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    val gridState = rememberLazyGridState()
     
     val importLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
@@ -444,21 +449,55 @@ fun LibraryScreen(
                                     }
                                 } else if (uiState.viewMode != ViewMode.Home) {
                                     // Grid View (Standard or Keyed Filter)
-                                    LazyVerticalGrid(
-                                        columns = GridCells.Adaptive(minSize = uiState.gridMinWidth.dp),
-                                        contentPadding = PaddingValues(16.dp),
-                                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                                        modifier = Modifier.fillMaxSize()
-                                    ) {
-                                        items(
-                                            items = uiState.books,
-                                            key = { it.id }
-                                        ) { book ->
-                                            BookCard(
-                                                book = book,
-                                                modifier = Modifier.animateItem(),
-                                                onClick = { onBookClick("u_${book.id}") }
+                                    Box(modifier = Modifier.fillMaxSize()) {
+                                        LazyVerticalGrid(
+                                            state = gridState,
+                                            columns = GridCells.Adaptive(minSize = uiState.gridMinWidth.dp),
+                                            contentPadding = PaddingValues(16.dp),
+                                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                                            modifier = Modifier.fillMaxSize()
+                                        ) {
+                                            items(
+                                                items = uiState.books,
+                                                key = { it.id }
+                                            ) { book ->
+                                                BookCard(
+                                                    book = book,
+                                                    modifier = Modifier.animateItem(),
+                                                    onClick = { onBookClick("u_${book.id}") }
+                                                )
+                                            }
+                                        }
+
+                                        // Fast Scroller Overlay
+                                        if (uiState.viewMode == ViewMode.Grid && uiState.sortOption == SortOption.TitleAsc && uiState.books.size > 20) {
+                                            FastScroller(
+                                                onLetterClick = { letter ->
+                                                    val index = uiState.books.indexOfFirst { 
+                                                        val title = it.title.trim().lowercase()
+                                                        val normalized = when {
+                                                            title.startsWith("the ") -> title.removePrefix("the ")
+                                                            title.startsWith("a ") -> title.removePrefix("a ")
+                                                            title.startsWith("an ") -> title.removePrefix("an ")
+                                                            else -> title
+                                                        }
+                                                        if (letter == '#') {
+                                                            normalized.isNotEmpty() && normalized[0].isDigit()
+                                                        } else {
+                                                            normalized.isNotEmpty() && normalized[0].uppercaseChar() == letter
+                                                        }
+                                                    }
+                                                    if (index != -1) {
+                                                        scope.launch {
+                                                            gridState.animateScrollToItem(index)
+                                                        }
+                                                    }
+                                                },
+                                                modifier = Modifier
+                                                    .align(Alignment.CenterEnd)
+                                                    .padding(end = 4.dp)
+                                                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.5f), MaterialTheme.shapes.medium)
                                             )
                                         }
                                     }
@@ -587,14 +626,13 @@ fun BookCard(
         Column {
             // Cover image
             val coverUrl = book.audiobookCoverUrl ?: book.coverUrl
-            val aspectRatio = if (book.audiobookCoverUrl != null) 1f else 0.66f
             
             AsyncImage(
                 model = coverUrl,
                 contentDescription = book.title,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .aspectRatio(aspectRatio)
+                    .aspectRatio(0.66f) // Standard 2:3 book ratio
                     .clip(MaterialTheme.shapes.medium),
                 contentScale = ContentScale.Crop
             )
