@@ -167,14 +167,17 @@ object DownloadUtils {
             .build()
             
         client.newCall(request).execute().use { response ->
-            // 206 = Partial Content (resume successful)
-            // 416 = Range Not Satisfiable (file already complete)
+            Log.d(TAG, "Download Response: ${response.code} ${response.message}")
             if (!response.isSuccessful && response.code != 206) {
                 if (response.code == 416) {
                     Log.d(TAG, "File already complete (416)")
                     onProgress(1f)
                     return
                 }
+                
+                // Log headers for debugging
+                val headersStr = response.headers.names().joinToString { "$it: ${response.header(it)}" }
+                Log.e(TAG, "Download failed: HTTP ${response.code}. Headers: $headersStr")
                 throw Exception("HTTP Error ${response.code}: ${response.message}")
             }
 
@@ -186,15 +189,18 @@ object DownloadUtils {
             
             val body = response.body ?: throw Exception("Empty response body")
             val contentLength = body.contentLength()
-            val totalSize = if (response.code == 206) contentLength + existingSize else contentLength
             
-            // Append if resuming, otherwise overwrite
-            val append = response.code == 206
-            FileOutputStream(file, append).use { output ->
+            // Append if resuming (206 Partial Content), otherwise overwrite
+            val isResuming = response.code == 206
+            val totalSize = if (isResuming) contentLength + existingSize else contentLength
+            
+            Log.d(TAG, "Body: length=$contentLength, totalSize=$totalSize, resuming=$isResuming")
+            
+            FileOutputStream(file, isResuming).use { output ->
                 val input = body.byteStream()
                 val buffer = ByteArray(128 * 1024) // 128KB buffer
                 var bytesRead: Int
-                var totalBytesRead = existingSize
+                var totalBytesRead = if (isResuming) existingSize else 0L
                 
                 while (input.read(buffer).also { bytesRead = it } != -1) {
                     output.write(buffer, 0, bytesRead)
@@ -203,6 +209,7 @@ object DownloadUtils {
                         onProgress(totalBytesRead.toFloat() / totalSize)
                     }
                 }
+                output.flush()
             }
         }
 

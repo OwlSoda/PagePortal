@@ -178,8 +178,14 @@ class DownloadWorker(
             
         } catch (e: Exception) {
             val urlInfo = if (downloadUrl != null) "URL: $downloadUrl" else "URL not resolved"
-            logToFile("EXCEPTION ($urlInfo): ${e.message}")
+            val errorDetails = "${e.javaClass.simpleName}: ${e.message}"
+            logToFile("EXCEPTION ($urlInfo): $errorDetails")
             e.printStackTrace()
+            
+            // Log stack trace summary to log file
+            val stackSummary = e.stackTrace.take(5).joinToString("\n") { "  at $it" }
+            logToFile("Stack:\n$stackSummary")
+            
             bookDao.updateDownloadStatus(dbBookId, DownloadStatus.FAILED.name, 0f, null)
             
             if (runAttemptCount < 3) {
