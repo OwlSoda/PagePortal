@@ -143,7 +143,8 @@ object DownloadUtils {
         client: OkHttpClient,
         url: String,
         file: File,
-        onProgress: (Float) -> Unit
+        headers: Map<String, String> = emptyMap(),
+        onProgress: suspend (Float) -> Unit
     ) {
         var serverHash: String? = null
         val existingSize = if (file.exists()) file.length() else 0L
@@ -158,6 +159,9 @@ object DownloadUtils {
                 if (existingSize > 0) {
                     addHeader("Range", "bytes=$existingSize-")
                     Log.d(TAG, "Resuming download from byte $existingSize")
+                }
+                headers.forEach { (key, value) ->
+                    addHeader(key, value)
                 }
             }
             .build()

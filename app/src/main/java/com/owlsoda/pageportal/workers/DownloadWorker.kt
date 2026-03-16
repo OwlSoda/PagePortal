@@ -127,65 +127,37 @@ class DownloadWorker(
             var lastLoggedProgress = 0
             var lastNotificationProgress = 0
             
-            // Using inline download loop to support foreground notification updates
-            val requestBuilder = okhttp3.Request.Builder().url(downloadUrl)
-            
-            // Add Authorization header ONLY if not already in URL as ?token=
+            // Prepare headers
+            val headers = mutableMapOf<String, String>()
             val hasTokenInUrl = downloadUrl.contains("token=")
             val serviceEntity = serviceManager.getServiceEntity(serverId)
+            
             if (!hasTokenInUrl && serviceEntity?.authToken != null) {
                 if (serviceEntity.serviceType == "BOOKLORE") {
-                    requestBuilder.addHeader("Authorization", serviceEntity.authToken)
+                    headers["Authorization"] = serviceEntity.authToken
                 } else {
-                    requestBuilder.addHeader("Authorization", "Bearer ${serviceEntity.authToken}")
+                    headers["Authorization"] = "Bearer ${serviceEntity.authToken}"
                 }
-            } else if (hasTokenInUrl) {
-                logToFile("Auth: Using token from URL query")
             }
             
-            val response = okHttpClient.newCall(requestBuilder.build()).execute()
-            if (!response.isSuccessful) {
-                logToFile("ERROR: HTTP ${response.code} (URL: $downloadUrl)")
-                throw Exception("HTTP ${response.code}")
-            }
+            logToFile("Starting robust download: $downloadUrl")
             
-            val body = response.body ?: throw Exception("Empty body")
-            val contentLength = body.contentLength()
-            logToFile("Body: length=$contentLength, type=${body.contentType()}")
-            
-            java.io.FileOutputStream(targetFile).use { output ->
-                body.byteStream().use { input ->
-                    val buffer = ByteArray(64 * 1024) // 64KB buffer
-                    var bytesRead = 0L
-                    var read: Int
+            DownloadUtils.downloadFile(
+                client = okHttpClient,
+                url = downloadUrl,
+                file = targetFile,
+                headers = headers,
+                onProgress = { progress ->
+                    val percent = (progress * 100).toInt()
                     
-                    while (input.read(buffer).also { read = it } != -1) {
-                         // Check cancellation
-                        if (isStopped) throw java.util.concurrent.CancellationException()
-                        
-                        output.write(buffer, 0, read)
-                        bytesRead += read
-                        
-                        if (contentLength > 0) {
-                            val percent = (bytesRead * 100 / contentLength).toInt()
-                            if (percent > lastNotificationProgress + 2) { // More frequent updates
-                                lastNotificationProgress = percent
-                                setForeground(createForegroundInfo(percent, book.title))
-                                bookDao.updateDownloadStatus(dbBookId, DownloadStatus.DOWNLOADING.name, bytesRead.toFloat() / contentLength, null)
-                            }
-                        } else {
-                            // No content length, just update progress as "indeterminate" or incremental
-                            // Update UI every 500KB
-                            val mbRead = (bytesRead / (1024 * 512)).toInt()
-                            if (mbRead > lastNotificationProgress) {
-                                lastNotificationProgress = mbRead
-                                setForeground(createForegroundInfo(-1, book.title)) // -1 signals indeterminate to helper
-                                bookDao.updateDownloadStatus(dbBookId, DownloadStatus.DOWNLOADING.name, 0f, null)
-                            }
-                        }
+                    // Reporting to DB and Notification
+                    if (percent > lastNotificationProgress + 2) {
+                        lastNotificationProgress = percent
+                        setForeground(createForegroundInfo(percent, book.title))
+                        bookDao.updateDownloadStatus(dbBookId, DownloadStatus.DOWNLOADING.name, progress, null)
                     }
                 }
-            }
+            )
 
             val filePath = targetFile.absolutePath
             when (format) {
@@ -200,19 +172,15 @@ class DownloadWorker(
             }
             
             bookDao.updateDownloadStatus(dbBookId, DownloadStatus.COMPLETED.name, 1f, filePath)
-            setForeground(createForegroundInfo(100, book.title)) // 100%
+            setForeground(createForegroundInfo(100, book.title))
             logToFile("SUCCESS: $filePath")
             Result.success()
             
         } catch (e: Exception) {
             val urlInfo = if (downloadUrl != null) "URL: $downloadUrl" else "URL not resolved"
             logToFile("EXCEPTION ($urlInfo): ${e.message}")
+            e.printStackTrace()
             bookDao.updateDownloadStatus(dbBookId, DownloadStatus.FAILED.name, 0f, null)
-             // Clean up file
-            try {
-                // targetFile variable scope issue here... I'll re-resolve or just catch.
-                // Ignoring cleanup for brevity/safety of this patch.
-            } catch(ex: Exception) {}
             
             if (runAttemptCount < 3) {
                  Result.retry()
