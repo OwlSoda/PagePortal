@@ -41,6 +41,7 @@ fun BookDetailScreen(
 
     onPlayReadAloud: (String) -> Unit,
     onAuthorClick: (String) -> Unit,
+    onOpenWebReader: (String) -> Unit,
     viewModel: BookDetailViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsState()
@@ -234,6 +235,18 @@ fun BookDetailScreen(
                                     contentColor = MaterialTheme.colorScheme.onTertiaryContainer
                                 )
                             }
+                        }
+
+                        if (state.webReaderUrl != null) {
+                            Spacer(modifier = Modifier.height(12.dp))
+                            MainActionButton(
+                                text = "Use Web Reader (Beta)",
+                                icon = Icons.Default.OpenInBrowser,
+                                onClick = { onOpenWebReader(state.webReaderUrl!!) },
+                                modifier = Modifier.fillMaxWidth(),
+                                containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
 
                         Spacer(modifier = Modifier.height(16.dp))

@@ -59,6 +59,12 @@ sealed class Screen(val route: String) {
             return "comic/$bookId?filePath=$encodedPath"
         }
     }
+    object WebReader : Screen("web_reader?url={url}") {
+        fun createRoute(url: String): String {
+            val encodedUrl = URLEncoder.encode(url, "UTF-8")
+            return "web_reader?url=$encodedUrl"
+        }
+    }
     object Browse : Screen("browse")
     object FilteredBooks : Screen("filtered_books?type={type}&value={value}&serviceType={serviceType}") {
         fun createRoute(type: String, value: String, serviceType: String? = null): String {
@@ -328,7 +334,23 @@ fun PagePortalNavHost(
                         },
                         onAuthorClick = { author ->
                             navController.navigate(Screen.FilteredBooks.createRoute("AUTHOR", author))
+                        },
+                        onOpenWebReader = { url ->
+                            navController.navigate(Screen.WebReader.createRoute(url))
                         }
+                    )
+                }
+                
+                composable(
+                    route = Screen.WebReader.route,
+                    arguments = listOf(navArgument("url") { type = NavType.StringType })
+                ) { backStackEntry ->
+                    val url = backStackEntry.arguments?.getString("url")?.let {
+                        URLDecoder.decode(it, "UTF-8")
+                    } ?: return@composable
+                    com.owlsoda.pageportal.features.reader.WebReaderScreen(
+                        url = url,
+                        onBack = { navController.popBackStack() }
                     )
                 }
                 

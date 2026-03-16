@@ -284,6 +284,15 @@ class StorytellerService(
         return "$base/api/v2/books/$bookId/files?format=readaloud&token=$encodedToken"
     }
     
+    fun getWebReaderUrl(bookId: String): String {
+        val base = baseUrl?.trimEnd('/') ?: return ""
+        val token = authToken ?: ""
+        // Storyteller v2 web reader usually lives at /books/{uuid} in the web UI.
+        // We append the token for auto-login if the server supports it,
+        // or we'll handle cookie injection in the WebView.
+        return "$base/books/$bookId?token=$token"
+    }
+    
     private fun getApi(): StorytellerApi {
         return api ?: throw IllegalStateException("StorytellerService not configured. Call configure() first.")
     }

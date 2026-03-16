@@ -23,7 +23,8 @@ data class BookDetailState(
     val isDownloading: Boolean = false,
     val downloadProgress: Float = 0f,
     val isLoading: Boolean = true,
-    val error: String? = null
+    val error: String? = null,
+    val webReaderUrl: String? = null
 )
 
 @HiltViewModel
@@ -84,6 +85,7 @@ class BookDetailViewModel @Inject constructor(
                     _state.value = _state.value.copy(
                         book = displayBook,
                         progressPercent = progress?.percentComplete ?: 0f,
+                        webReaderUrl = getWebReaderUrl(base),
                         isLoading = false
                     )
                     
@@ -105,6 +107,7 @@ class BookDetailViewModel @Inject constructor(
                     _state.value = _state.value.copy(
                         book = book,
                         progressPercent = progress?.percentComplete ?: 0f,
+                        webReaderUrl = getWebReaderUrl(book),
                         isLoading = false
                     )
                 }
@@ -187,6 +190,15 @@ class BookDetailViewModel @Inject constructor(
             } catch (e: Exception) {
                 _state.value = _state.value.copy(error = "Failed to unlink: ${e.message}")
             }
+        }
+    }
+    
+    private suspend fun getWebReaderUrl(book: BookEntity): String? {
+        val service = serviceManager.getService(book.serverId)
+        return if (service is com.owlsoda.pageportal.services.storyteller.StorytellerService) {
+            service.getWebReaderUrl(book.serviceBookId)
+        } else {
+            null
         }
     }
 }
