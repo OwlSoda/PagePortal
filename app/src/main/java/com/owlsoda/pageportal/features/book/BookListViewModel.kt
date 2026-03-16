@@ -73,8 +73,7 @@ class BookListViewModel @Inject constructor(
                      if (collection != null) {
                          _uiState.update { it.copy(title = collection.name) }
                          val gson = com.google.gson.Gson()
-                         val type = object : com.google.gson.reflect.TypeToken<List<String>>() {}.type
-                         val bookIds: List<String> = gson.fromJson(collection.bookIds, type)
+                         val bookIds: List<String> = gson.fromJson(collection.bookIds, Array<String>::class.java).toList()
                          bookDao.getBooksByServiceIds(collection.serverId, bookIds)
                      } else {
                          kotlinx.coroutines.flow.flowOf(emptyList())

@@ -3,8 +3,17 @@
 # proguardFiles setting in build.gradle.
 
 # Preserve all generic signatures for reflection
--keepattributes Signature, InnerClasses, EnclosingMethod
+-keepattributes Signature, InnerClasses, EnclosingMethod, *Annotation*, EnclosingMethod, SourceFile, LineNumberTable
 -keepattributes RuntimeVisibleAnnotations, RuntimeVisibleParameterAnnotations, AnnotationDefault
+
+# Retrofit 2
+-dontwarn retrofit2.**
+-keep class retrofit2.** { *; }
+-keep interface retrofit2.** { *; }
+-keepattributes RuntimeVisibleAnnotations, RuntimeVisibleParameterAnnotations
+-keepclassmembers interface * {
+    @retrofit2.http.* <methods>;
+}
 
 # Kotlin Coroutines - Fix for suspend functions in Retrofit
 -keepnames class kotlinx.coroutines.internal.MainDispatcherLoader { *; }

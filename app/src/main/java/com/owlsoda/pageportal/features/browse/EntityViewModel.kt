@@ -136,8 +136,7 @@ class EntityViewModel @Inject constructor(
             
             try {
                 // Parse book IDs JSON
-                val type = object : com.google.gson.reflect.TypeToken<List<String>>() {}.type
-                val bookIds: List<String> = gson.fromJson(collection.bookIds, type)
+                val bookIds: List<String> = gson.fromJson(collection.bookIds, Array<String>::class.java).toList()
                 count = bookIds.size
                 
                 // Find first book to get cover
