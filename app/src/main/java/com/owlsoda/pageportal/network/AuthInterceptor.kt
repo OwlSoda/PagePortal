@@ -26,9 +26,9 @@ class AuthInterceptor @Inject constructor(
         // Log request for debugging
         android.util.Log.d("AuthInterceptor", "Intercepting: $url")
 
-        // Skip if already has Authorization header
-        if (originalRequest.header("Authorization") != null) {
-            android.util.Log.d("AuthInterceptor", "Skipping: Auth header already present")
+        // Skip if already has Authorization header or is an external API (like GitHub)
+        if (originalRequest.header("Authorization") != null || url.contains("api.github.com")) {
+            android.util.Log.d("AuthInterceptor", "Skipping: Auth header present or external API ($url)")
             return chain.proceed(originalRequest)
         }
 
