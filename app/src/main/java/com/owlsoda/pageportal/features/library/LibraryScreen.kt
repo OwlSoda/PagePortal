@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.filled.MoreVert
 
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Person
@@ -47,6 +48,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.owlsoda.pageportal.services.ServiceType
 import androidx.compose.foundation.background
+import androidx.compose.material3.LocalContentColor
 import com.owlsoda.pageportal.ui.theme.BookCampPlayerBackground
 import com.owlsoda.pageportal.ui.theme.BookCampPlayerText
 import com.owlsoda.pageportal.ui.theme.BookCampPurple
@@ -81,6 +83,8 @@ fun LibraryScreen(
     val scope = rememberCoroutineScope()
     val gridState = rememberLazyGridState()
     
+    var showOverflowMenu by remember { mutableStateOf(false) }
+    
     val importLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri ->
@@ -106,7 +110,8 @@ fun LibraryScreen(
                     )
                 },
                 actions = {
-                    // View mode toggle
+                    // Search (Primary) - Only if not already in main content area
+                    // Link: View Mode toggle
                     IconButton(onClick = { 
                         val nextMode = when (uiState.viewMode) {
                             ViewMode.Home -> ViewMode.Grid
@@ -127,64 +132,77 @@ fun LibraryScreen(
                             contentDescription = "View: ${uiState.viewMode.name}"
                         )
                     }
-                    
-                    // Sort dropdown
-                    Box {
-                        IconButton(onClick = { showSortMenu = true }) {
-                            Icon(Icons.AutoMirrored.Filled.Sort, contentDescription = "Sort")
-                        }
-                        DropdownMenu(
-                            expanded = showSortMenu,
-                            onDismissRequest = { showSortMenu = false }
-                        ) {
-                            SortOption.entries.forEach { option ->
-                                DropdownMenuItem(
-                                    text = { 
-                                        Text(
-                                            option.displayName,
-                                            color = if (option == uiState.sortOption) 
-                                                MaterialTheme.colorScheme.primary 
-                                            else 
-                                                MaterialTheme.colorScheme.onSurface
-                                        )
-                                    },
-                                    onClick = { 
-                                        viewModel.setSortOption(option)
-                                        showSortMenu = false
-                                    }
-                                )
-                            }
-                        }
-                    }
-                    
-                    IconToggleButton(
-                        checked = uiState.isOfflineFilterActive,
-                        onCheckedChange = { viewModel.toggleOfflineFilter() }
-                    ) {
-                        if (uiState.isOfflineFilterActive) {
-                            Icon(Icons.Default.OfflinePin, "Show All", tint = MaterialTheme.colorScheme.primary)
-                        } else {
-                            Icon(Icons.Default.CloudQueue, "Show Downloaded Only")
-                        }
-                    }
-                    IconButton(onClick = { viewModel.refresh() }) {
-                        Icon(Icons.Default.Refresh, contentDescription = "Refresh")
-                    }
-                    IconButton(onClick = onBrowseClick) {
-                        Icon(
-                            imageVector = Icons.Default.Category,
-                            contentDescription = "Browse"
-                        )
-                    }
+
+                    // Settings (Primary)
                     IconButton(onClick = onSettingsClick) {
                         Icon(Icons.Default.Settings, contentDescription = "Settings")
                     }
                     
-                    // Import Button
-                    IconButton(onClick = { 
-                        importLauncher.launch(arrayOf("application/epub+zip", "audio/*"))
-                    }) {
-                        Icon(Icons.Default.Add, contentDescription = "Import Book")
+                    // Overflow for secondary actions
+                    Box {
+                        IconButton(onClick = { showOverflowMenu = true }) {
+                            Icon(Icons.Default.MoreVert, contentDescription = "More")
+                        }
+                        DropdownMenu(
+                            expanded = showOverflowMenu,
+                            onDismissRequest = { showOverflowMenu = false }
+                        ) {
+                            // Sort
+                            DropdownMenuItem(
+                                text = { Text("Sort Books") },
+                                onClick = { 
+                                    showSortMenu = true
+                                    showOverflowMenu = false
+                                },
+                                leadingIcon = { Icon(Icons.AutoMirrored.Filled.Sort, null) }
+                            )
+                            
+                            // Refresh
+                            DropdownMenuItem(
+                                text = { Text("Refresh Library") },
+                                onClick = { 
+                                    viewModel.refresh()
+                                    showOverflowMenu = false
+                                },
+                                leadingIcon = { Icon(Icons.Default.Refresh, null) }
+                            )
+                            
+                            // Import
+                            DropdownMenuItem(
+                                text = { Text("Import Content") },
+                                onClick = { 
+                                    importLauncher.launch(arrayOf("application/epub+zip", "audio/*"))
+                                    showOverflowMenu = false
+                                },
+                                leadingIcon = { Icon(Icons.Default.Add, null) }
+                            )
+
+                            // Browse
+                            DropdownMenuItem(
+                                text = { Text("Browse Services") },
+                                onClick = { 
+                                    onBrowseClick()
+                                    showOverflowMenu = false
+                                },
+                                leadingIcon = { Icon(Icons.Default.Category, null) }
+                            )
+                            
+                            // Offline Toggle
+                            DropdownMenuItem(
+                                text = { Text(if (uiState.isOfflineFilterActive) "Show Online Content" else "Offline Only") },
+                                onClick = { 
+                                    viewModel.toggleOfflineFilter()
+                                    showOverflowMenu = false
+                                },
+                                leadingIcon = { 
+                                    Icon(
+                                        if (uiState.isOfflineFilterActive) Icons.Default.OfflinePin else Icons.Default.CloudQueue, 
+                                        null,
+                                        tint = if (uiState.isOfflineFilterActive) MaterialTheme.colorScheme.primary else LocalContentColor.current
+                                    ) 
+                                }
+                            )
+                        }
                     }
                 }
             )
@@ -595,11 +613,20 @@ fun ContinueReadingSection(
     val listState = rememberLazyListState()
     
     Column(modifier = Modifier.padding(vertical = 12.dp)) {
-        Text(
-            text = "Continue Reading",
-            style = MaterialTheme.typography.titleLarge,
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
-        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Continue Reading",
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.weight(1f),
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
         
         LazyRow(
             state = listState,
@@ -625,11 +652,20 @@ fun HomeAuthorsSection(
     isGrid: Boolean = false
 ) {
     Column(modifier = Modifier.padding(vertical = 12.dp)) {
-        Text(
-            text = "Authors",
-            style = MaterialTheme.typography.titleLarge,
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
-        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Authors",
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.weight(1f),
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
         
         if (isGrid) {
             // Responsive flow layout for authors (scales to fill width)
@@ -691,9 +727,9 @@ fun HomeAuthorItem(
             text = author.name,
             style = MaterialTheme.typography.labelMedium,
             textAlign = TextAlign.Center,
-            maxLines = 1,
+            maxLines = 2,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(top = 8.dp)
+            modifier = Modifier.padding(top = 8.dp).padding(horizontal = 4.dp)
         )
         
         Text(
@@ -721,7 +757,10 @@ fun ServiceCarousel(
         ) {
             Text(
                 text = title,
-                style = MaterialTheme.typography.titleLarge
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.weight(1f),
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
             )
             TextButton(onClick = { /* TODO: Filter by service */ }) {
                 Text("See All")
