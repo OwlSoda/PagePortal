@@ -13,8 +13,8 @@ android {
         applicationId = "com.owlsoda.pageportal"
         minSdk = 26
         targetSdk = 34
-        versionCode = 24
-        versionName = "0.1.31"
+        versionCode = 26
+        versionName = "0.1.33"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -23,11 +23,20 @@ android {
         manifestPlaceholders += mapOf("appAuthRedirectScheme" to "pageportal")
     }
 
+    signingConfigs {
+        create("release") {
+            storeFile = file("../portal-release.jks")
+            storePassword = "retcon"
+            keyAlias = "portal-alias"
+            keyPassword = "retcon"
+        }
+    }
+
     buildTypes {
         release {
-            isMinifyEnabled = false
-            isShrinkResources = false
-            signingConfig = signingConfigs.getByName("debug")
+            isMinifyEnabled = true
+            isShrinkResources = true
+            signingConfig = signingConfigs.getByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
