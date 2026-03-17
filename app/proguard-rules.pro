@@ -1,4 +1,7 @@
 # Preservation for reflection and GSON
+-dontshrink
+-dontoptimize
+-dontobfuscate
 -keepattributes Signature, InnerClasses, EnclosingMethod, *Annotation*, SourceFile, LineNumberTable
 -keepattributes RuntimeVisibleAnnotations, RuntimeVisibleParameterAnnotations, AnnotationDefault
 
@@ -22,32 +25,43 @@
 -keep class * extends androidx.room.RoomDatabase
 -keep class * implements androidx.room.Entity
 -keep class * implements androidx.room.Dao
+-keep class * extends androidx.room.TypeConverter
+-keep class com.owlsoda.pageportal.core.database.dao.**_Impl { *; }
 
-# PagePortal Data Models (Protect from stripping and obfuscation)
-# We use allowoptimization but explicitly keep fields and constructors
--keep,allowoptimization class com.owlsoda.pageportal.core.database.entity.** { *; }
--keep,allowoptimization class com.owlsoda.pageportal.services.** { *; }
--keep,allowoptimization class com.owlsoda.pageportal.services.storyteller.** { *; }
--keep,allowoptimization class com.owlsoda.pageportal.services.audiobookshelf.** { *; }
--keep,allowoptimization class com.owlsoda.pageportal.services.booklore.** { *; }
--keep,allowoptimization class com.owlsoda.pageportal.network.** { *; }
--keep,allowoptimization class com.owlsoda.pageportal.data.preferences.** { *; }
--keep,allowoptimization class com.owlsoda.pageportal.data.importer.** { *; }
+# PagePortal Core Models & Database Entities
+-keep class com.owlsoda.pageportal.core.database.entity.** { *; }
+-keep class com.owlsoda.pageportal.services.** { *; }
+-keep class com.owlsoda.pageportal.services.storyteller.** { *; }
+-keep class com.owlsoda.pageportal.services.audiobookshelf.** { *; }
+-keep class com.owlsoda.pageportal.services.booklore.** { *; }
+-keep class com.owlsoda.pageportal.network.** { *; }
+-keep class com.owlsoda.pageportal.data.preferences.** { *; }
+-keep class com.owlsoda.pageportal.data.importer.** { *; }
+
+# PagePortal Features (Broad protection for UI models and states)
+-keep class com.owlsoda.pageportal.features.** { *; }
+
+# ViewModels (Explicitly keep all ViewModels and their constructors/members)
+-keep class * extends androidx.lifecycle.ViewModel { *; }
+-keepclassmembers class * extends androidx.lifecycle.ViewModel {
+    <init>(...);
+}
+
+# Hilt/Dagger (Broad protection for injected classes and modules)
+-keep class dagger.hilt.** { *; }
+-keep class com.google.dagger.** { *; }
+-dontwarn com.google.dagger.**
+-keep @dagger.hilt.android.lifecycle.HiltViewModel class * { *; }
+-keep class * {
+    @javax.inject.Inject <fields>;
+    @javax.inject.Inject <init>(...);
+}
 
 # Ensure data class constructors and fields are kept specifically
 -keepclassmembers class com.owlsoda.pageportal.** {
     @com.google.gson.annotations.SerializedName <fields>;
     <init>(...);
 }
-
-# Keep the models themselves even if not explicitly referenced in code
--keep class com.owlsoda.pageportal.services.storyteller.* { *; }
--keep class com.owlsoda.pageportal.network.GitHub* { *; }
-
-# Hilt/Dagger
--keep class dagger.hilt.** { *; }
--keep class com.google.dagger.** { *; }
--dontwarn com.google.dagger.**
 
 # Logging
 -dontwarn org.slf4j.**
