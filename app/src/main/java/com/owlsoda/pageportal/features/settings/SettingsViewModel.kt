@@ -12,6 +12,9 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.update
 import javax.inject.Inject
+import com.owlsoda.pageportal.network.GitHubRelease
+import com.owlsoda.pageportal.features.settings.UpdateManager
+import com.owlsoda.pageportal.features.settings.UpdateState
 import android.content.Context
 import android.net.Uri
 import com.google.gson.Gson
@@ -54,8 +57,11 @@ data class SettingsState(
 class SettingsViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val preferencesRepository: PreferencesRepository,
-    private val bookDao: BookDao
+    private val bookDao: BookDao,
+    private val updateManager: UpdateManager
 ) : ViewModel() {
+
+    val updateState = updateManager.updateState
 
     private val _state = MutableStateFlow(SettingsState())
     val state: StateFlow<SettingsState> = _state.asStateFlow()
@@ -242,6 +248,16 @@ class SettingsViewModel @Inject constructor(
     
     fun clearToastMessage() {
         _state.update { it.copy(toastMessage = null) }
+    }
+
+    fun checkForUpdates() {
+        viewModelScope.launch {
+            updateManager.checkForUpdates()
+        }
+    }
+
+    fun downloadAndInstallUpdate(release: GitHubRelease) {
+        updateManager.downloadAndInstall(release)
     }
 
     private fun calculateCacheSize() {

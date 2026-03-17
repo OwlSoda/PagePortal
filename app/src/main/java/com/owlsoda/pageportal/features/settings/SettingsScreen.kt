@@ -23,6 +23,10 @@ import androidx.compose.ui.platform.LocalContext
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import android.os.Environment
+import androidx.core.content.FileProvider
+import com.owlsoda.pageportal.BuildConfig
+import com.owlsoda.pageportal.network.GitHubUpdateService
 import com.owlsoda.pageportal.ui.theme.BookCampPurple
 import com.owlsoda.pageportal.ui.theme.BookCampTextSecondary
 import com.owlsoda.pageportal.ui.components.ListDetailLayout
@@ -205,7 +209,7 @@ fun SettingsCategoryDetail(
             "library" -> item { LibrarySettings(state, onServersClick, onMatchReviewClick) }
             "storage" -> item { StorageSettings(state, viewModel, onStorageClick) }
             "accessibility" -> item { AccessibilitySettings(state, viewModel) }
-            "about" -> item { AboutSettings(state) }
+            "about" -> item { AboutSettings(state, viewModel) }
         }
     }
 }
@@ -659,8 +663,10 @@ fun AccessibilitySettings(state: SettingsState, viewModel: SettingsViewModel) {
 
 // ABOUT SETTINGS
 @Composable
-fun AboutSettings(state: SettingsState) {
+fun AboutSettings(state: SettingsState, viewModel: SettingsViewModel) {
     val context = LocalContext.current
+    val updateState by viewModel.updateState.collectAsState()
+    
     val versionName = remember {
         try {
             context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "Unknown"
@@ -681,6 +687,51 @@ fun AboutSettings(state: SettingsState) {
                 context.startActivity(intent)
             }
         )
+
+        Spacer(Modifier.height(8.dp))
+        SettingsSectionHeader("Updates")
+        
+        when (val s = updateState) {
+            is UpdateState.Idle, is UpdateState.NoUpdate -> {
+                SettingsItem(
+                    icon = Icons.Default.SystemUpdate,
+                    title = "Check for Updates",
+                    subtitle = if (s is UpdateState.NoUpdate) "App is up to date" else "Latest version from GitHub",
+                    onClick = { viewModel.checkForUpdates() }
+                )
+            }
+            is UpdateState.Checking -> {
+                ListItem(
+                    headlineContent = { Text("Checking for updates...") },
+                    leadingContent = { CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp) }
+                )
+            }
+            is UpdateState.UpdateAvailable -> {
+                SettingsItem(
+                    icon = Icons.Default.DownloadForOffline,
+                    title = "Update Available: ${s.release.tagName}",
+                    subtitle = "Click to download and install",
+                    onClick = { viewModel.downloadAndInstallUpdate(s.release) },
+                    tint = BookCampPurple
+                )
+            }
+            is UpdateState.Downloading -> {
+                ListItem(
+                    headlineContent = { Text("Downloading update...") },
+                    supportingContent = { LinearProgressIndicator(modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) },
+                    leadingContent = { Icon(Icons.Default.Download, contentDescription = null, tint = BookCampPurple) }
+                )
+            }
+            is UpdateState.Error -> {
+                SettingsItem(
+                    icon = Icons.Default.Error,
+                    title = "Update Error",
+                    subtitle = s.message,
+                    onClick = { viewModel.checkForUpdates() },
+                    tint = MaterialTheme.colorScheme.error
+                )
+            }
+        }
     }
 }
 
@@ -905,6 +956,7 @@ fun SettingsItem(
     title: String,
     subtitle: String? = null,
     showChevron: Boolean = true,
+    tint: Color = BookCampPurple.copy(alpha = 0.7f),
     onClick: () -> Unit
 ) {
     ListItem(
@@ -925,7 +977,7 @@ fun SettingsItem(
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                tint = BookCampPurple.copy(alpha = 0.7f),
+                tint = tint,
                 modifier = Modifier.size(24.dp)
             )
         },

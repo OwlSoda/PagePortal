@@ -12,6 +12,10 @@ import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import java.util.concurrent.TimeUnit
 import javax.inject.Singleton
+import javax.inject.Named
+import retrofit2.Retrofit
+import retrofit2.converter.gson.GsonConverterFactory
+import com.owlsoda.pageportal.network.GitHubUpdateService
 
 /**
  * Network module providing OkHttpClient.
@@ -50,6 +54,22 @@ object NetworkModule {
             .okHttpClient(okHttpClient)
             .crossfade(true)
             .build()
+    }
+
+    @Provides
+    @Singleton
+    @Named("GitHubRetrofit")
+    fun provideGitHubRetrofit(): Retrofit {
+        return Retrofit.Builder()
+            .baseUrl("https://api.github.com/")
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+    }
+
+    @Provides
+    @Singleton
+    fun provideGitHubUpdateService(@Named("GitHubRetrofit") retrofit: Retrofit): GitHubUpdateService {
+        return retrofit.create(GitHubUpdateService::class.java)
     }
 }
 
