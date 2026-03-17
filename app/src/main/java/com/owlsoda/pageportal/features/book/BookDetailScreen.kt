@@ -2,6 +2,8 @@ package com.owlsoda.pageportal.features.book
 
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -27,6 +29,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.TextUnitType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import com.owlsoda.pageportal.core.database.entity.BookEntity
@@ -90,30 +93,22 @@ fun BookDetailScreen(
         containerColor = MaterialTheme.colorScheme.surface
     ) { padding ->
         Box(modifier = Modifier.fillMaxSize()) {
-            // Background Artwork (Blurred)
+            // Background Artwork (Fixed Full-Screen Blur)
             state.book?.coverUrl?.let { coverUrl ->
                 AsyncImage(
                     model = coverUrl,
                     contentDescription = null,
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .height(450.dp)
-                        .blur(50.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded),
+                        .fillMaxSize()
+                        .blur(60.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded),
                     contentScale = ContentScale.Crop,
-                    alpha = 0.4f
+                    alpha = 0.25f // Reduced alpha for better legibility on fixed background
                 )
-                // Gradient overlay to fade bottom
+                // Subtle dark overlay for better text contrast
                 Box(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .height(450.dp)
-                        .background(
-                            Brush.verticalGradient(
-                                colors = listOf(Color.Transparent, MaterialTheme.colorScheme.surface),
-                                startY = 0f,
-                                endY = Float.POSITIVE_INFINITY
-                            )
-                        )
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.5f))
                 )
             }
 
@@ -156,9 +151,13 @@ fun BookDetailScreen(
                         // Title & Author
                         Text(
                             text = book.title,
-                            style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
+                            style = MaterialTheme.typography.headlineMedium.copy(
+                                fontWeight = FontWeight.Bold,
+                                fontSize = if (book.title.length > 30) 24.sp else 28.sp
+                            ),
                             textAlign = TextAlign.Center,
-                            modifier = Modifier.padding(horizontal = 16.dp)
+                            modifier = Modifier.padding(horizontal = 16.dp),
+                            lineHeight = 32.sp
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
@@ -200,10 +199,12 @@ fun BookDetailScreen(
 
                         Spacer(modifier = Modifier.height(32.dp))
 
-                        // Primary Actions
-                        Row(
+                        // Primary Actions (FlowRow for responsiveness)
+                        @OptIn(ExperimentalLayoutApi::class)
+                        FlowRow(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
                             // Listen Button
                             if (book.hasAudiobook) {
@@ -211,7 +212,7 @@ fun BookDetailScreen(
                                     text = "Listen",
                                     icon = Icons.Default.Headphones,
                                     onClick = { onPlayAudiobook(book.id.toString()) },
-                                    modifier = Modifier.weight(1f),
+                                    modifier = Modifier.weight(1f, fill = false).widthIn(min = 100.dp),
                                     containerColor = BookCampPurple,
                                     contentColor = Color.White
                                 )
@@ -223,7 +224,7 @@ fun BookDetailScreen(
                                     text = "Read",
                                     icon = Icons.AutoMirrored.Filled.MenuBook,
                                     onClick = { onReadEbook(book.id.toString()) },
-                                    modifier = Modifier.weight(1f),
+                                    modifier = Modifier.weight(1f, fill = false).widthIn(min = 100.dp),
                                     containerColor = MaterialTheme.colorScheme.secondaryContainer,
                                     contentColor = MaterialTheme.colorScheme.onSecondaryContainer
                                 )
@@ -235,7 +236,7 @@ fun BookDetailScreen(
                                     text = "ReadAloud",
                                     icon = Icons.Default.AutoFixHigh,
                                     onClick = { onPlayReadAloud(book.id.toString()) },
-                                    modifier = Modifier.weight(1f),
+                                    modifier = Modifier.weight(1f, fill = false).widthIn(min = 100.dp),
                                     containerColor = MaterialTheme.colorScheme.tertiaryContainer,
                                     contentColor = MaterialTheme.colorScheme.onTertiaryContainer
                                 )
@@ -409,11 +410,20 @@ fun MainActionButton(
             containerColor = containerColor,
             contentColor = contentColor
         ),
-        elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)
+        elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp),
+        contentPadding = PaddingValues(horizontal = 12.dp)
     ) {
         Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp))
         Spacer(modifier = Modifier.width(8.dp))
-        Text(text, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
+        Text(
+            text = text, 
+            style = MaterialTheme.typography.titleMedium.copy(
+                fontWeight = FontWeight.Bold,
+                fontSize = 14.sp // Slightly smaller for better fit
+            ),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }
 
