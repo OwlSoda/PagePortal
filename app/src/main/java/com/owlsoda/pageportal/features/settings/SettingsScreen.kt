@@ -1,4 +1,7 @@
 package com.owlsoda.pageportal.features.settings
+ 
+import android.content.Intent
+import android.net.Uri
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -650,8 +653,11 @@ fun AboutSettings(state: SettingsState) {
             icon = Icons.Default.Info,
             title = "Version",
             subtitle = versionName,
-            showChevron = false,
-            onClick = { }
+            showChevron = true,
+            onClick = {
+                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/OwlSoda/PagePortal/releases"))
+                context.startActivity(intent)
+            }
         )
     }
 }
