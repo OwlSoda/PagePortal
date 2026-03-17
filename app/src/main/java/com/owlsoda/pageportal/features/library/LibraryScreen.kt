@@ -2,6 +2,9 @@ package com.owlsoda.pageportal.features.library
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -53,6 +56,8 @@ import com.owlsoda.pageportal.ui.components.EmptyState
 import com.owlsoda.pageportal.features.library.components.FastScroller
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
+import androidx.compose.foundation.lazy.rememberLazyListState
 import kotlinx.coroutines.launch
 
 private data class EmptyStateInfo(
@@ -504,9 +509,12 @@ fun LibraryScreen(
                                 } else {
                                     // Home Dashboard
                                     HomeView(
+                                        selectedTabId = uiState.serverTabs.getOrNull(uiState.selectedTabIndex)?.id ?: -1L,
                                         recentBooks = uiState.recentBooks,
+                                        homeAuthors = uiState.homeAuthors,
                                         serviceMap = uiState.booksByService,
-                                        onBookClick = onBookClick
+                                        onBookClick = onBookClick,
+                                        onSettingsClick = onSettingsClick
                                     )
                                 }
                             }
@@ -524,43 +532,69 @@ fun LibraryScreen(
 
 @Composable
 fun HomeView(
+    selectedTabId: Long,
     recentBooks: List<UnifiedBookDisplay>,
+    homeAuthors: List<AuthorDisplay>,
     serviceMap: Map<String, List<UnifiedBookDisplay>>,
-    onBookClick: (String) -> Unit
+    onBookClick: (String) -> Unit,
+    onSettingsClick: () -> Unit
 ) {
+    val isAllTab = selectedTabId == -1L
+    
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = 24.dp)
     ) {
-        // Recent Activity
+        // Continue Reading Section
         if (recentBooks.isNotEmpty()) {
             item {
-                RecentActivitySection(books = recentBooks, onBookClick = onBookClick)
+                ContinueReadingSection(
+                    books = recentBooks, 
+                    onBookClick = onBookClick,
+                    isCompact = !isAllTab
+                )
             }
         }
         
-        // Service Rows
-        serviceMap.forEach { (serviceName, books) ->
+        // Authors Section (Scalable Grid if specific tab, Carousel if All)
+        if (homeAuthors.isNotEmpty()) {
             item {
-                ServiceCarousel(
-                    title = serviceName,
-                    books = books,
-                    onBookClick = onBookClick
+                HomeAuthorsSection(
+                    authors = homeAuthors,
+                    isGrid = !isAllTab
                 )
             }
+        }
+        
+        // Service Rows (Only for "All" tab)
+        if (isAllTab) {
+            serviceMap.forEach { (serviceName, books) ->
+                item {
+                    ServiceCarousel(
+                        title = serviceName,
+                        books = books,
+                        onBookClick = onBookClick
+                    )
+                }
+            }
+        } else {
+            // If on a specific tab, show all books from this server in a grid at the bottom?
+            // Or just rely on the sections above. 
+            // The user said "RECENTS and AUTHORS sections are cutoff", so I'll focus on making those sections scalable.
         }
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun RecentActivitySection(
+fun ContinueReadingSection(
     books: List<UnifiedBookDisplay>,
-    onBookClick: (String) -> Unit
+    onBookClick: (String) -> Unit,
+    isCompact: Boolean = false
 ) {
-    val inProgressBooks = books.filter { it.listeningProgress > 0 && it.listeningProgress < 0.99f }
-    if (inProgressBooks.isEmpty()) return
-
-    Column(modifier = Modifier.padding(vertical = 16.dp)) {
+    val listState = rememberLazyListState()
+    
+    Column(modifier = Modifier.padding(vertical = 12.dp)) {
         Text(
             text = "Continue Reading",
             style = MaterialTheme.typography.titleLarge,
@@ -568,13 +602,15 @@ fun RecentActivitySection(
         )
         
         LazyRow(
+            state = listState,
             contentPadding = PaddingValues(horizontal = 20.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            flingBehavior = rememberSnapFlingBehavior(lazyListState = listState)
         ) {
-            items(inProgressBooks) { book ->
+            items(books) { book ->
                 BookCard(
                     book = book,
-                    modifier = Modifier.width(160.dp),
+                    modifier = Modifier.width(if (isCompact) 140.dp else 180.dp),
                     onClick = { onBookClick("u_${book.id}") }
                 )
             }
@@ -582,31 +618,126 @@ fun RecentActivitySection(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun HomeAuthorsSection(
+    authors: List<AuthorDisplay>,
+    isGrid: Boolean = false
+) {
+    Column(modifier = Modifier.padding(vertical = 12.dp)) {
+        Text(
+            text = "Authors",
+            style = MaterialTheme.typography.titleLarge,
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
+        )
+        
+        if (isGrid) {
+            // Responsive flow layout for authors (scales to fill width)
+            FlowRow(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                maxItemsInEachRow = Int.MAX_VALUE
+            ) {
+                authors.forEach { author ->
+                    HomeAuthorItem(
+                        author = author,
+                        modifier = Modifier.width(90.dp)
+                    )
+                }
+            }
+        } else {
+            // Horizontal carousel
+            val listState = rememberLazyListState()
+            LazyRow(
+                state = listState,
+                contentPadding = PaddingValues(horizontal = 20.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                flingBehavior = rememberSnapFlingBehavior(lazyListState = listState)
+            ) {
+                items(authors) { author ->
+                    HomeAuthorItem(
+                        author = author,
+                        modifier = Modifier.width(100.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun HomeAuthorItem(
+    author: AuthorDisplay,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier.clickable { /* TODO: Nav to author search */ },
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        AsyncImage(
+            model = author.coverUrl,
+            contentDescription = author.name,
+            modifier = Modifier
+                .size(70.dp)
+                .clip(androidx.compose.foundation.shape.CircleShape)
+                .background(MaterialTheme.colorScheme.surfaceVariant),
+            contentScale = ContentScale.Crop
+        )
+        
+        Text(
+            text = author.name,
+            style = MaterialTheme.typography.labelMedium,
+            textAlign = TextAlign.Center,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(top = 8.dp)
+        )
+        
+        Text(
+            text = "${author.bookCount} books",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ServiceCarousel(
     title: String,
     books: List<UnifiedBookDisplay>,
     onBookClick: (String) -> Unit
 ) {
-    Column(modifier = Modifier.padding(vertical = 16.dp)) {
+    val listState = rememberLazyListState()
+    
+    Column(modifier = Modifier.padding(vertical = 12.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Text(
                 text = title,
                 style = MaterialTheme.typography.titleLarge
             )
+            TextButton(onClick = { /* TODO: Filter by service */ }) {
+                Text("See All")
+            }
         }
         
         LazyRow(
+            state = listState,
             contentPadding = PaddingValues(horizontal = 20.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            flingBehavior = rememberSnapFlingBehavior(lazyListState = listState)
         ) {
             items(books) { book ->
                 BookCard(
                     book = book,
-                    modifier = Modifier.width(140.dp),
+                    modifier = Modifier.width(150.dp),
                     onClick = { onBookClick("u_${book.id}") }
                 )
             }

@@ -31,6 +31,12 @@ data class UnifiedBookDisplay(
     val addedAt: Long = 0L,
     val listeningProgress: Float = 0f
 )
+ 
+data class AuthorDisplay(
+    val name: String,
+    val bookCount: Int,
+    val coverUrl: String? = null
+)
 
 data class ServerTab(
     val id: Long,
@@ -63,6 +69,7 @@ data class LibraryUiState(
     val books: List<UnifiedBookDisplay> = emptyList(),
     // Grouped content for Home Screen
     val recentBooks: List<UnifiedBookDisplay> = emptyList(),
+    val homeAuthors: List<AuthorDisplay> = emptyList(),
     val booksByService: Map<String, List<UnifiedBookDisplay>> = emptyMap(),
     
     val servers: List<ServerEntity> = emptyList(),
@@ -382,22 +389,41 @@ class LibraryViewModel @Inject constructor(
             // Apply sorting
             filtered = applySorting(filtered, state.sortOption, state.viewMode, state.selectedFilter)
             
-            // Home Screen Data
-            val recent = allUnifiedBooks.take(10)
+            // Home Screen Data - Filtered by tab if not All
+            val homeSource = if (selectedTab?.id == -1L) allUnifiedBooks else filtered
+            val recent = homeSource.filter { it.listeningProgress > 0 }.take(10)
+            
+            // Group by Author for Home
+            val homeAuthors = homeSource
+                .groupBy { it.authors }
+                .map { (name, books) ->
+                    AuthorDisplay(
+                        name = name,
+                        bookCount = books.size,
+                        coverUrl = books.firstOrNull { it.audiobookCoverUrl != null || it.coverUrl != null }?.let { it.audiobookCoverUrl ?: it.coverUrl }
+                    )
+                }
+                .sortedByDescending { it.bookCount }
+                .take(15)
             
             // Group by Service Name
-            val serviceMap = newTabs
-                .filter { it.id != -1L } // Exclude "All"
-                .associate { tab ->
-                    val tabBooks = allUnifiedBooks.filter { book -> book.serverIds.contains(tab.id) }
-                    tab.name to tabBooks
-                }
-                .filter { it.value.isNotEmpty() }
+            val serviceMap = if (selectedTab?.id == -1L) {
+                newTabs
+                    .filter { it.id != -1L }
+                    .associate { tab ->
+                        val tabBooks = allUnifiedBooks.filter { book -> book.serverIds.contains(tab.id) }
+                        tab.name to tabBooks
+                    }
+                    .filter { it.value.isNotEmpty() }
+            } else {
+                emptyMap() // On specific tab, we'll show other sections like Authors/Series
+            }
             
             _uiState.update {
                 it.copy(
                     books = filtered,
                     recentBooks = recent,
+                    homeAuthors = homeAuthors,
                     booksByService = serviceMap,
                     serverTabs = newTabs,
                     selectedTabIndex = newIndex,
