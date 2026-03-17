@@ -157,7 +157,15 @@ class BookDetailViewModel @Inject constructor(
         
         viewModelScope.launch {
             try {
-                 downloadRepository.startDownload(target.id, target.serverId, target.serviceBookId, type)
+                // If readaloud requested, also ensure ebook is downloaded
+                if (type == "readaloud") {
+                    val hasEbook = target.isEbookDownloaded || linkedBooks.any { it.isEbookDownloaded }
+                    if (!hasEbook && target.hasEbook) {
+                        downloadRepository.startDownload(target.id, target.serverId, target.serviceBookId, "ebook")
+                    }
+                }
+                
+                downloadRepository.startDownload(target.id, target.serverId, target.serviceBookId, type)
             } catch (e: Exception) {
                  _state.value = _state.value.copy(error = e.message)
             }

@@ -6,7 +6,12 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
 import java.io.FileOutputStream
+import java.io.InputStream
+import java.io.RandomAccessFile
 import java.security.MessageDigest
+import java.util.zip.ZipInputStream
+import kotlinx.coroutines.*
+import okhttp3.Response
 
 /**
  * Utility class for handling book downloads.
@@ -130,16 +135,122 @@ object DownloadUtils {
 
     /**
      * Download a file with support for:
+     * - Parallel multi-part downloads (for speed)
      * - Resumable downloads (Range header)
      * - Progress callbacks
-     * - SHA-256 hash verification (if server provides X-Storyteller-Hash header)
+     * - SHA-256 hash verification
      * 
-     * @param client OkHttpClient configured with auth headers
+     * @param client OkHttpClient
      * @param url The download URL
      * @param file The destination file
-     * @param onProgress Callback for progress updates (0.0 to 1.0)
+     * @param numParts Number of parallel parts to download
      */
     suspend fun downloadFile(
+        client: OkHttpClient,
+        url: String,
+        file: File,
+        headers: Map<String, String> = emptyMap(),
+        numParts: Int = 1,
+        onProgress: suspend (Float) -> Unit
+    ) = coroutineScope {
+        if (numParts <= 1) {
+            downloadFileSingle(client, url, file, headers, onProgress)
+            return@coroutineScope
+        }
+
+        file.parentFile?.mkdirs()
+        
+        // 1. Get total size and check if server supports ranges
+        val headRequest = Request.Builder()
+            .url(url)
+            .head()
+            .apply { headers.forEach { (k, v) -> addHeader(k, v) } }
+            .build()
+            
+        val (contentLength, acceptsRanges) = withContext(Dispatchers.IO) {
+            client.newCall(headRequest).execute().use { resp ->
+                val length = resp.header("Content-Length")?.toLongOrNull() ?: -1L
+                val ranges = resp.header("Accept-Ranges") == "bytes" || resp.code == 206
+                length to ranges
+            }
+        }
+
+        if (contentLength <= 0 || !acceptsRanges) {
+            Log.d(TAG, "Server doesn't support ranges or size unknown. Falling back to single stream.")
+            downloadFileSingle(client, url, file, headers, onProgress)
+            return@coroutineScope
+        }
+
+        Log.d(TAG, "Starting multi-part download ($numParts parts, size=$contentLength)")
+        
+        val partSize = contentLength / numParts
+        val progressMap = java.util.concurrent.ConcurrentHashMap<Int, Long>()
+        var lastReportedProgress = 0L
+
+        // Initialize file size
+        withContext(Dispatchers.IO) {
+            RandomAccessFile(file, "rw").use { raf ->
+                raf.setLength(contentLength)
+            }
+        }
+
+        (0 until numParts).map { i ->
+            async(Dispatchers.IO) {
+                val start = i * partSize
+                val end = if (i == numParts - 1) contentLength - 1 else (i + 1) * partSize - 1
+                
+                downloadPart(client, url, file, start, end, headers) { bytesRead ->
+                    progressMap[i] = bytesRead
+                    val totalRead = progressMap.values.sum()
+                    if (totalRead > lastReportedProgress + (contentLength / 100)) {
+                        lastReportedProgress = totalRead
+                        onProgress(totalRead.toFloat() / contentLength)
+                    }
+                }
+            }
+        }.awaitAll()
+        
+        onProgress(1.0f)
+    }
+
+    private suspend fun downloadPart(
+        client: OkHttpClient,
+        url: String,
+        file: File,
+        start: Long,
+        end: Long,
+        headers: Map<String, String>,
+        onProgress: suspend (Long) -> Unit
+    ) {
+        val request = Request.Builder()
+            .url(url)
+            .addHeader("Range", "bytes=$start-$end")
+            .apply { headers.forEach { (k, v) -> addHeader(k, v) } }
+            .build()
+
+        client.newCall(request).execute().use { response ->
+            if (!response.isSuccessful && response.code != 206) {
+                throw Exception("Part download failed: ${response.code}")
+            }
+
+            val body = response.body ?: throw Exception("Empty part body")
+            RandomAccessFile(file, "rw").use { raf ->
+                raf.seek(start)
+                val input = body.byteStream()
+                val buffer = ByteArray(256 * 1024)
+                var bytesRead: Int
+                var totalPartRead = 0L
+                
+                while (input.read(buffer).also { bytesRead = it } != -1) {
+                    raf.write(buffer, 0, bytesRead)
+                    totalPartRead += bytesRead
+                    onProgress(totalPartRead)
+                }
+            }
+        }
+    }
+
+    private suspend fun downloadFileSingle(
         client: OkHttpClient,
         url: String,
         file: File,
@@ -148,57 +259,36 @@ object DownloadUtils {
     ) {
         var serverHash: String? = null
         val existingSize = if (file.exists()) file.length() else 0L
-        
-        // Ensure parent directory exists
         file.parentFile?.mkdirs()
         
         val request = Request.Builder()
             .url(url)
             .apply {
-                // Request resume from existing position if file exists
                 if (existingSize > 0) {
                     addHeader("Range", "bytes=$existingSize-")
-                    Log.d(TAG, "Resuming download from byte $existingSize")
                 }
-                headers.forEach { (key, value) ->
-                    addHeader(key, value)
-                }
+                headers.forEach { (key, value) -> addHeader(key, value) }
             }
             .build()
             
         client.newCall(request).execute().use { response ->
-            Log.d(TAG, "Download Response: ${response.code} ${response.message}")
             if (!response.isSuccessful && response.code != 206) {
                 if (response.code == 416) {
-                    Log.d(TAG, "File already complete (416)")
                     onProgress(1f)
                     return
                 }
-                
-                // Log headers for debugging
-                val headersStr = response.headers.names().joinToString { "$it: ${response.header(it)}" }
-                Log.e(TAG, "Download failed: HTTP ${response.code}. Headers: $headersStr")
                 throw Exception("HTTP Error ${response.code}: ${response.message}")
             }
 
-            // Check for Storyteller hash header for verification
             serverHash = response.header("X-Storyteller-Hash")
-            if (serverHash != null) {
-                Log.i(TAG, "Server provided hash for verification: $serverHash")
-            }
-            
             val body = response.body ?: throw Exception("Empty response body")
             val contentLength = body.contentLength()
-            
-            // Append if resuming (206 Partial Content), otherwise overwrite
             val isResuming = response.code == 206
             val totalSize = if (isResuming) contentLength + existingSize else contentLength
             
-            Log.d(TAG, "Body: length=$contentLength, totalSize=$totalSize, resuming=$isResuming")
-            
             FileOutputStream(file, isResuming).use { output ->
                 val input = body.byteStream()
-                val buffer = ByteArray(512 * 1024) // 512KB buffer for speed
+                val buffer = ByteArray(512 * 1024)
                 var bytesRead: Int
                 var totalBytesRead = if (isResuming) existingSize else 0L
                 
@@ -213,7 +303,6 @@ object DownloadUtils {
             }
         }
 
-        // Verify hash if server provided one
         if (serverHash != null && file.exists()) {
             verifyHash(file, serverHash!!)
         }
@@ -256,7 +345,6 @@ object DownloadUtils {
             while (entries.hasMoreElements()) {
                 val entry = entries.nextElement()
                 
-                // Prevent Zip Slip vulnerability
                 val newFile = File(requestDestDir, entry.name)
                 if (!newFile.canonicalPath.startsWith(requestDestDir.canonicalPath)) {
                     throw SecurityException("Zip Path Traversal detected: ${entry.name}")
@@ -266,13 +354,40 @@ object DownloadUtils {
                     newFile.mkdirs()
                 } else {
                     newFile.parentFile?.mkdirs()
-                    // Use FileOutputStream with buffer
                     zip.getInputStream(entry).use { input ->
                         FileOutputStream(newFile).use { output ->
                             input.copyTo(output)
                         }
                     }
                 }
+            }
+        }
+    }
+
+    /**
+     * Unzip from an input stream. Useful for streaming processing.
+     */
+    fun unzipStream(inputStream: InputStream, destDir: File) {
+        if (!destDir.exists()) destDir.mkdirs()
+        
+        ZipInputStream(inputStream).use { zip ->
+            var entry = zip.nextEntry
+            while (entry != null) {
+                val newFile = File(destDir, entry.name)
+                if (!newFile.canonicalPath.startsWith(destDir.canonicalPath)) {
+                    throw SecurityException("Zip Path Traversal detected: ${entry.name}")
+                }
+                
+                if (entry.isDirectory) {
+                    newFile.mkdirs()
+                } else {
+                    newFile.parentFile?.mkdirs()
+                    FileOutputStream(newFile).use { output ->
+                        zip.copyTo(output)
+                    }
+                }
+                zip.closeEntry()
+                entry = zip.nextEntry
             }
         }
     }
