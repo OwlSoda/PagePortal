@@ -40,14 +40,19 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.Color
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.owlsoda.pageportal.services.ServiceType
 import androidx.compose.foundation.background
+import com.owlsoda.pageportal.ui.theme.BookCampPlayerBackground
+import com.owlsoda.pageportal.ui.theme.BookCampPlayerText
+import com.owlsoda.pageportal.ui.theme.BookCampPurple
 import coil.compose.AsyncImage
 import com.owlsoda.pageportal.features.auth.LoginScreen
 import com.owlsoda.pageportal.ui.components.EmptyState
 import com.owlsoda.pageportal.features.library.components.FastScroller
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.ui.graphics.vector.ImageVector
 import kotlinx.coroutines.launch
 
 private data class EmptyStateInfo(
@@ -88,17 +93,12 @@ fun LibraryScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { 
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.MenuBook,
-                            contentDescription = null,
-                            modifier = Modifier.size(24.dp),
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("PagePortal")
-                    }
+                title = {
+                    Text(
+                        text = "PagePortal",
+                        style = MaterialTheme.typography.headlineMedium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
                 },
                 actions = {
                     // View mode toggle
@@ -452,10 +452,10 @@ fun LibraryScreen(
                                     Box(modifier = Modifier.fillMaxSize()) {
                                         LazyVerticalGrid(
                                             state = gridState,
-                                            columns = GridCells.Adaptive(minSize = uiState.gridMinWidth.dp),
-                                            contentPadding = PaddingValues(16.dp),
-                                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                                            columns = GridCells.Fixed(2), // Force 2-column for BookCamp feel
+                                            contentPadding = PaddingValues(20.dp),
+                                            horizontalArrangement = Arrangement.spacedBy(20.dp),
+                                            verticalArrangement = Arrangement.spacedBy(24.dp),
                                             modifier = Modifier.fillMaxSize()
                                         ) {
                                             items(
@@ -557,21 +557,24 @@ fun RecentActivitySection(
     books: List<UnifiedBookDisplay>,
     onBookClick: (String) -> Unit
 ) {
-    Column(modifier = Modifier.padding(vertical = 12.dp)) {
+    val inProgressBooks = books.filter { it.listeningProgress > 0 && it.listeningProgress < 0.99f }
+    if (inProgressBooks.isEmpty()) return
+
+    Column(modifier = Modifier.padding(vertical = 16.dp)) {
         Text(
-            text = "Recent Activity",
-            style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+            text = "Continue Reading",
+            style = MaterialTheme.typography.titleLarge,
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
         )
         
         LazyRow(
-            contentPadding = PaddingValues(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            contentPadding = PaddingValues(horizontal = 20.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            items(books) { book ->
+            items(inProgressBooks) { book ->
                 BookCard(
                     book = book,
-                    modifier = Modifier.width(130.dp),
+                    modifier = Modifier.width(160.dp),
                     onClick = { onBookClick("u_${book.id}") }
                 )
             }
@@ -585,25 +588,25 @@ fun ServiceCarousel(
     books: List<UnifiedBookDisplay>,
     onBookClick: (String) -> Unit
 ) {
-    Column(modifier = Modifier.padding(vertical = 12.dp)) {
+    Column(modifier = Modifier.padding(vertical = 16.dp)) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
                 text = title,
-                style = MaterialTheme.typography.titleMedium
+                style = MaterialTheme.typography.titleLarge
             )
         }
         
         LazyRow(
-            contentPadding = PaddingValues(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            contentPadding = PaddingValues(horizontal = 20.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             items(books) { book ->
                 BookCard(
                     book = book,
-                    modifier = Modifier.width(120.dp),
+                    modifier = Modifier.width(140.dp),
                     onClick = { onBookClick("u_${book.id}") }
                 )
             }
@@ -617,109 +620,100 @@ fun BookCard(
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
-    Card(
+    Column(
         modifier = modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            .clickable(onClick = onClick)
     ) {
-        Column {
-            // Cover image
-            val coverUrl = book.audiobookCoverUrl ?: book.coverUrl
-            
+        // Cover image with large rounded corners and subtle shadow
+        val coverUrl = book.audiobookCoverUrl ?: book.coverUrl
+        
+        Surface(
+            shape = MaterialTheme.shapes.medium,
+            shadowElevation = 4.dp,
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(0.66f)
+        ) {
             AsyncImage(
                 model = coverUrl,
                 contentDescription = book.title,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(0.66f) // Standard 2:3 book ratio
-                    .clip(MaterialTheme.shapes.medium),
+                modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop
             )
             
-            // Book info
-            Column(
-                modifier = Modifier.padding(8.dp)
-            ) {
-                Text(
-                    text = book.title,
-                    style = MaterialTheme.typography.titleSmall,
-                    maxLines = 2,
-                    minLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                
-                if (book.authors.isNotEmpty()) {
-                    Text(
-                        text = book.authors,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        minLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                } else {
-                    // Placeholder for spacing consistency
-                    Spacer(modifier = Modifier.height(16.dp))
-                }
-                
-                // Format badges
+            // Format badges overlay (top right)
+            Box(modifier = Modifier.fillMaxSize().padding(8.dp)) {
                 Row(
-                    modifier = Modifier.padding(top = 4.dp),
+                    modifier = Modifier.align(Alignment.TopEnd),
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     if (book.hasEbook) {
-                        Surface(
-                            color = MaterialTheme.colorScheme.secondaryContainer,
-                            shape = MaterialTheme.shapes.extraSmall,
-                            modifier = Modifier.height(24.dp)
-                        ) {
-                            Box(
-                                contentAlignment = Alignment.Center,
-                                modifier = Modifier.padding(horizontal = 6.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Filled.MenuBook,
-                                    contentDescription = "Ebook available",
-                                    modifier = Modifier.size(14.dp),
-                                    tint = MaterialTheme.colorScheme.onSecondaryContainer
-                                )
-                            }
-                        }
+                        BadgeIcon(Icons.AutoMirrored.Filled.MenuBook)
                     }
                     if (book.hasAudiobook) {
-                        Surface(
-                            color = MaterialTheme.colorScheme.secondaryContainer,
-                            shape = MaterialTheme.shapes.extraSmall,
-                            modifier = Modifier.height(24.dp)
-                        ) {
-                            Box(
-                                contentAlignment = Alignment.Center,
-                                modifier = Modifier.padding(horizontal = 6.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Headphones,
-                                    contentDescription = "Audiobook available",
-                                    modifier = Modifier.size(14.dp),
-                                    tint = MaterialTheme.colorScheme.onSecondaryContainer
-                                )
-                            }
-                        }
+                        BadgeIcon(Icons.Default.Headphones)
                     }
                 }
-                
-                if (book.isDownloading) {
-                    LinearProgressIndicator(
-                        progress = { book.downloadProgress },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 8.dp)
-                            .height(4.dp)
-                    )
-                }
             }
+        }
+        
+        // Book info
+        Column(
+            modifier = Modifier.padding(top = 12.dp, start = 4.dp, end = 4.dp)
+        ) {
+            Text(
+                text = book.title,
+                style = MaterialTheme.typography.titleMedium,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.fillMaxWidth()
+            )
+            
+            if (book.authors.isNotEmpty()) {
+                Text(
+                    text = book.authors,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.fillMaxWidth().padding(top = 2.dp)
+                )
+            }
+            
+            if (book.isDownloading || book.listeningProgress > 0) {
+                val progressValue = if (book.isDownloading) book.downloadProgress else book.listeningProgress
+                val progressColor = if (book.isDownloading) MaterialTheme.colorScheme.primary else BookCampPurple
+                
+                LinearProgressIndicator(
+                    progress = { progressValue },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 10.dp)
+                        .height(4.dp)
+                        .clip(MaterialTheme.shapes.extraSmall),
+                    color = progressColor,
+                    trackColor = progressColor.copy(alpha = 0.2f)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun BadgeIcon(icon: ImageVector) {
+    Surface(
+        color = Color.Black.copy(alpha = 0.6f),
+        shape = androidx.compose.foundation.shape.CircleShape,
+        modifier = Modifier.size(28.dp)
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                modifier = Modifier.size(16.dp),
+                tint = Color.White
+            )
         }
     }
 }

@@ -1,6 +1,7 @@
 package com.owlsoda.pageportal.features.settings.storage
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -20,6 +21,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
+import com.owlsoda.pageportal.ui.theme.BookCampPurple
+import com.owlsoda.pageportal.ui.theme.BookCampTextSecondary
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -32,7 +35,12 @@ fun StorageManagementScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Storage Manager") },
+                title = { 
+                    Text(
+                        "Storage Manager",
+                        style = MaterialTheme.typography.titleLarge
+                    ) 
+                },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back")
@@ -51,8 +59,9 @@ fun StorageManagementScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(16.dp),
+                shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer
+                    containerColor = BookCampPurple.copy(alpha = 0.08f)
                 )
             ) {
                 Row(
@@ -65,7 +74,8 @@ fun StorageManagementScreen(
                     Column {
                         Text(
                             text = "Used Storage",
-                            style = MaterialTheme.typography.labelMedium
+                            style = MaterialTheme.typography.labelSmall,
+                            color = BookCampPurple
                         )
                         Text(
                             text = uiState.formattedTotalSize,
@@ -75,15 +85,16 @@ fun StorageManagementScreen(
                     Icon(
                         imageVector = Icons.Default.SdStorage,
                         contentDescription = null,
-                        modifier = Modifier.size(48.dp),
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer
+                        modifier = Modifier.size(40.dp),
+                        tint = BookCampPurple
                     )
                 }
             }
 
             Text(
                 text = "Downloaded Items",
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.titleSmall,
+                color = BookCampPurple,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
             )
 
@@ -124,6 +135,7 @@ fun StorageItemRow(
         headlineContent = {
             Text(
                 text = item.title,
+                style = MaterialTheme.typography.bodyLarge,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -131,6 +143,8 @@ fun StorageItemRow(
         supportingContent = {
             Text(
                 text = "${item.author} • ${item.formattedSize}",
+                style = MaterialTheme.typography.bodySmall,
+                color = BookCampTextSecondary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -159,7 +173,7 @@ fun StorageItemRow(
                 Icon(
                     imageVector = Icons.Default.Delete,
                     contentDescription = "Delete",
-                    tint = MaterialTheme.colorScheme.error
+                    tint = MaterialTheme.colorScheme.error.copy(alpha = 0.6f)
                 )
             }
         }

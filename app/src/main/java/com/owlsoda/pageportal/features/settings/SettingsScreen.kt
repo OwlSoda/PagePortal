@@ -16,12 +16,15 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.compose.ui.platform.LocalContext
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import com.owlsoda.pageportal.ui.theme.BookCampPurple
+import com.owlsoda.pageportal.ui.theme.BookCampTextSecondary
 import com.owlsoda.pageportal.ui.components.ListDetailLayout
 import com.owlsoda.pageportal.ui.components.WindowSizeClass
 import com.owlsoda.pageportal.ui.components.rememberWindowSizeClass
@@ -76,13 +79,14 @@ fun SettingsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { 
+                title = {
                     Text(
-                        if (windowSizeClass == WindowSizeClass.COMPACT && selectedCategory != null) {
+                        text = if (windowSizeClass == WindowSizeClass.COMPACT && selectedCategory != null) {
                             settingsCategories.find { it.id == selectedCategory }?.title ?: "Settings"
                         } else {
                             "Settings"
-                        }
+                        },
+                        style = MaterialTheme.typography.titleLarge
                     )
                 },
                 navigationIcon = {
@@ -138,22 +142,40 @@ fun SettingsCategoriesList(
     ) {
         items(categories) { category ->
             ListItem(
-                headlineContent = { Text(category.title) },
-                supportingContent = { Text(category.description) },
+                headlineContent = { 
+                    Text(
+                        category.title,
+                        style = MaterialTheme.typography.titleMedium
+                    ) 
+                },
+                supportingContent = { 
+                    Text(
+                        category.description,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = BookCampTextSecondary
+                    ) 
+                },
                 leadingContent = {
                     Icon(
                         imageVector = category.icon,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary
+                        tint = BookCampPurple
                     )
                 },
                 trailingContent = {
-                    Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null)
+                    Icon(
+                        Icons.AutoMirrored.Filled.ArrowForward, 
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                        tint = BookCampTextSecondary.copy(alpha = 0.5f)
+                    )
                 },
-                modifier = Modifier.clickable { onCategoryClick(category) },
+                modifier = Modifier
+                    .clickable { onCategoryClick(category) }
+                    .padding(vertical = 4.dp),
                 colors = if (selectedCategory == category.id) {
                     ListItemDefaults.colors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                        containerColor = BookCampPurple.copy(alpha = 0.08f)
                     )
                 } else {
                     ListItemDefaults.colors()
@@ -871,9 +893,9 @@ fun GestureActionDialog(
 fun SettingsSectionHeader(title: String) {
     Text(
         text = title,
-        style = MaterialTheme.typography.labelLarge,
-        color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.padding(vertical = 12.dp)
+        style = MaterialTheme.typography.titleSmall,
+        color = BookCampPurple,
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
     )
 }
 
@@ -886,17 +908,36 @@ fun SettingsItem(
     onClick: () -> Unit
 ) {
     ListItem(
-        headlineContent = { Text(title) },
-        supportingContent = subtitle?.let { { Text(it) } },
+        headlineContent = { 
+            Text(
+                title, 
+                style = MaterialTheme.typography.bodyLarge
+            ) 
+        },
+        supportingContent = subtitle?.let { { 
+            Text(
+                it, 
+                style = MaterialTheme.typography.bodyMedium,
+                color = BookCampTextSecondary
+            ) 
+        } },
         leadingContent = {
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                tint = BookCampPurple.copy(alpha = 0.7f),
+                modifier = Modifier.size(24.dp)
             )
         },
         trailingContent = if (showChevron) {
-            { Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null) }
+            { 
+                Icon(
+                    Icons.AutoMirrored.Filled.ArrowForward, 
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                    tint = BookCampTextSecondary.copy(alpha = 0.3f)
+                ) 
+            }
         } else null,
         modifier = Modifier.clickable(onClick = onClick)
     )
@@ -911,17 +952,36 @@ fun SwitchSettingsItem(
     onCheckedChange: (Boolean) -> Unit
 ) {
     ListItem(
-        headlineContent = { Text(title) },
-        supportingContent = subtitle?.let { { Text(it) } },
+        headlineContent = { 
+            Text(
+                title, 
+                style = MaterialTheme.typography.bodyLarge
+            ) 
+        },
+        supportingContent = subtitle?.let { { 
+            Text(
+                it, 
+                style = MaterialTheme.typography.bodyMedium,
+                color = BookCampTextSecondary
+            ) 
+        } },
         leadingContent = {
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                tint = BookCampPurple.copy(alpha = 0.7f),
+                modifier = Modifier.size(24.dp)
             )
         },
         trailingContent = {
-            Switch(checked = checked, onCheckedChange = onCheckedChange)
+            Switch(
+                checked = checked, 
+                onCheckedChange = onCheckedChange,
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = Color.White,
+                    checkedTrackColor = BookCampPurple
+                )
+            )
         },
         modifier = Modifier.clickable(onClick = { onCheckedChange(!checked) })
     )

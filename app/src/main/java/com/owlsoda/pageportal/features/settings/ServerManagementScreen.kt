@@ -18,6 +18,8 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.owlsoda.pageportal.core.database.entity.ServerEntity
 import com.owlsoda.pageportal.services.ServiceType
+import com.owlsoda.pageportal.ui.theme.BookCampPurple
+import com.owlsoda.pageportal.ui.theme.BookCampTextSecondary
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -32,7 +34,12 @@ fun ServerManagementScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Servers") },
+                title = { 
+                    Text(
+                        "Servers",
+                        style = MaterialTheme.typography.titleLarge
+                    ) 
+                },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -41,7 +48,11 @@ fun ServerManagementScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = onAddServer) {
+            FloatingActionButton(
+                onClick = onAddServer,
+                containerColor = BookCampPurple,
+                contentColor = Color.White
+            ) {
                 Icon(Icons.Default.Add, contentDescription = "Add Server")
             }
         }
@@ -110,27 +121,40 @@ fun ServerItem(
     }
 
     ListItem(
-        headlineContent = { Text(server.displayName.ifBlank { "Unknown Server" }) },
+        headlineContent = { 
+            Text(
+                server.displayName.ifBlank { "Unknown Server" },
+                style = MaterialTheme.typography.titleMedium
+            ) 
+        },
         supportingContent = { 
             Column {
-                Text(server.serviceType)
-                Text(server.serverUrl, style = MaterialTheme.typography.bodySmall)
+                Text(
+                    server.serviceType,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = BookCampPurple
+                )
+                Text(
+                    server.serverUrl, 
+                    style = MaterialTheme.typography.bodySmall,
+                    color = BookCampTextSecondary
+                )
             }
         },
         trailingContent = {
-            Row {
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onTest) {
                     Icon(
-                        Icons.Default.Info, // Or Build/Settings
+                        Icons.Default.Info,
                         contentDescription = "Run Diagnostics",
-                        tint = MaterialTheme.colorScheme.primary
+                        tint = BookCampPurple.copy(alpha = 0.6f)
                     )
                 }
                 IconButton(onClick = { showDialog = true }) {
                     Icon(
                         Icons.Default.Delete,
                         contentDescription = "Remove",
-                        tint = MaterialTheme.colorScheme.error
+                        tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f)
                     )
                 }
             }

@@ -28,7 +28,8 @@ data class UnifiedBookDisplay(
     val downloadProgress: Float,
     val series: String? = null,
     val seriesIndex: String? = null,
-    val addedAt: Long = 0L
+    val addedAt: Long = 0L,
+    val listeningProgress: Float = 0f
 )
 
 data class ServerTab(
@@ -101,7 +102,8 @@ class LibraryViewModel @Inject constructor(
     private val serviceManager: ServiceManager,
     private val libraryRepository: com.owlsoda.pageportal.data.repository.LibraryRepository,
     private val downloadRepository: com.owlsoda.pageportal.data.repository.DownloadRepository,
-    private val localBookImporter: com.owlsoda.pageportal.data.importer.LocalBookImporter
+    private val localBookImporter: com.owlsoda.pageportal.data.importer.LocalBookImporter,
+    private val progressDao: com.owlsoda.pageportal.core.database.dao.ProgressDao
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(LibraryUiState(isLoading = true))
@@ -258,10 +260,16 @@ class LibraryViewModel @Inject constructor(
 
     private fun observeBooks() {
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.Default) {
-            unifiedBookDao.getAllWithBooks().collect { unifiedList ->
-                allUnifiedBooks = unifiedList.map { item ->
+            combine(
+                unifiedBookDao.getAllWithBooks(),
+                progressDao.getInProgressBooks() // This is a flow of all in-progress progress entities
+            ) { unifiedList, progressList ->
+                val progressMap = progressList.associateBy { it.bookId }
+                
+                unifiedList.map { item ->
                     val books = item.books
                     val serverIds = books.map { it.serverId }.toSet()
+                    val progress = progressMap[item.unifiedBook.id]
                     
                     UnifiedBookDisplay(
                         id = item.unifiedBook.id,
@@ -285,9 +293,12 @@ class LibraryViewModel @Inject constructor(
                         downloadProgress = books.maxOfOrNull { it.downloadProgress } ?: 0f,
                         series = books.firstOrNull()?.series,
                         seriesIndex = books.firstOrNull()?.seriesIndex,
-                        addedAt = books.minOfOrNull { it.addedAt } ?: 0L
+                        addedAt = books.minOfOrNull { it.addedAt } ?: 0L,
+                        listeningProgress = (progress?.percentComplete ?: 0f) / 100f
                     )
                 }
+            }.collect { mappedBooks ->
+                allUnifiedBooks = mappedBooks
                 updateDisplayedBooks()
             }
         }

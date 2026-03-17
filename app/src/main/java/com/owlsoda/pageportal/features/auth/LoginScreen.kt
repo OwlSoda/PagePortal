@@ -3,8 +3,10 @@ package com.owlsoda.pageportal.features.auth
 import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.graphics.Color
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.MenuBook
@@ -29,6 +31,8 @@ import android.net.Uri
 import net.openid.appauth.AuthorizationException
 import net.openid.appauth.AuthorizationResponse
 import net.openid.appauth.AuthorizationService
+import com.owlsoda.pageportal.ui.theme.BookCampPurple
+import com.owlsoda.pageportal.ui.theme.BookCampTextSecondary
 
 @Composable
 fun LoginScreen(
@@ -68,21 +72,21 @@ fun LoginScreen(
         Icon(
             imageVector = Icons.AutoMirrored.Filled.MenuBook,
             contentDescription = "PagePortal Logo",
-            modifier = Modifier.size(72.dp),
-            tint = MaterialTheme.colorScheme.primary
+            modifier = Modifier.size(80.dp),
+            tint = BookCampPurple
         )
         
         Spacer(modifier = Modifier.height(16.dp))
         
         Text(
             text = "PagePortal",
-            style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.Bold)
+            style = MaterialTheme.typography.displayLarge
         )
         
         Text(
             text = "Your unified library",
             style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.secondary
+            color = BookCampTextSecondary
         )
         
         Spacer(modifier = Modifier.height(48.dp))
@@ -156,7 +160,7 @@ fun LoginScreen(
                             }
                             Text(
                                 text = "Connect to $serviceName",
-                                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Medium)
+                                style = MaterialTheme.typography.titleLarge
                             )
                         }
                         
@@ -259,12 +263,17 @@ fun LoginScreen(
                                 .height(56.dp),
                             enabled = !uiState.isLoading && 
                                       uiState.serverUrl.isNotBlank() && 
-                                      uiState.username.isNotBlank() && uiState.password.isNotBlank()
+                                      uiState.username.isNotBlank() && uiState.password.isNotBlank(),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = BookCampPurple,
+                                contentColor = Color.White
+                            ),
+                            shape = RoundedCornerShape(16.dp)
                         ) {
                             if (uiState.isLoading) {
                                 CircularProgressIndicator(
                                     modifier = Modifier.size(24.dp),
-                                    color = MaterialTheme.colorScheme.onPrimary,
+                                    color = Color.White,
                                     strokeWidth = 2.dp
                                 )
                                 Spacer(modifier = Modifier.width(12.dp))
@@ -300,23 +309,27 @@ fun ServiceSelectionCard(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onClick() },
-        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp)
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.elevatedCardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        )
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp)
+                .padding(20.dp)
         ) {
             Text(
                 text = title,
                 style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.primary
+                color = BookCampPurple
             )
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(6.dp))
             Text(
                 text = description,
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = BookCampTextSecondary
             )
         }
     }

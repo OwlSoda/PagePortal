@@ -34,6 +34,7 @@ import java.net.URLDecoder
 import java.net.URLEncoder
 import androidx.compose.ui.res.painterResource
 import com.owlsoda.pageportal.R
+import com.owlsoda.pageportal.ui.theme.BookCampPurple
 
 sealed class Screen(val route: String) {
     object Login : Screen("login?addAccount={addAccount}") {
@@ -119,18 +120,31 @@ fun PagePortalNavHost(
     Scaffold(
         bottomBar = {
             if (showBottomBar) {
-                NavigationBar {
+                NavigationBar(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    tonalElevation = 0.dp
+                ) {
                     // Unified Home
                     NavigationBarItem(
                         icon = { Icon(Icons.Default.Home, null) },
-                        label = { Text("Home") },
+                        label = { 
+                            Text(
+                                "Home", 
+                                style = MaterialTheme.typography.labelSmall
+                            ) 
+                        },
                         selected = currentRoute == Screen.Library.route,
                         onClick = { 
                             navController.navigate(Screen.Library.route) { 
                                 popUpTo(Screen.Library.route) { inclusive = true }
                                 launchSingleTop = true 
                             } 
-                        }
+                        },
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = BookCampPurple,
+                            selectedTextColor = BookCampPurple,
+                            indicatorColor = BookCampPurple.copy(alpha = 0.1f)
+                        )
                     )
                     
 // ... imports
@@ -139,50 +153,90 @@ fun PagePortalNavHost(
                     if (mainState.connectedServiceTypes.contains(com.owlsoda.pageportal.services.ServiceType.STORYTELLER)) {
                         NavigationBarItem(
                             icon = { Icon(painterResource(id = R.drawable.ic_storyteller), contentDescription = null) },
-                            label = { Text("Storyteller") },
+                            label = { 
+                                Text(
+                                    "Storyteller", 
+                                    style = MaterialTheme.typography.labelSmall
+                                ) 
+                            },
                             selected = currentService == "Storyteller",
                             onClick = { 
                                 navController.navigate("service/Storyteller") { 
                                     popUpTo(Screen.Library.route) 
                                     launchSingleTop = true 
                                 } 
-                            }
+                            },
+                            colors = NavigationBarItemDefaults.colors(
+                                selectedIconColor = BookCampPurple,
+                                selectedTextColor = BookCampPurple,
+                                indicatorColor = BookCampPurple.copy(alpha = 0.1f)
+                            )
                         )
                     }
 
                     if (mainState.connectedServiceTypes.contains(com.owlsoda.pageportal.services.ServiceType.AUDIOBOOKSHELF)) {
                         NavigationBarItem(
                             icon = { Icon(painterResource(id = R.drawable.ic_audiobookshelf), contentDescription = null) },
-                            label = { Text("ABS") },
+                            label = { 
+                                Text(
+                                    "ABS", 
+                                    style = MaterialTheme.typography.labelSmall
+                                ) 
+                            },
                             selected = currentService == "Audiobookshelf",
                             onClick = { 
                                 navController.navigate("service/Audiobookshelf") { 
                                     popUpTo(Screen.Library.route) 
                                     launchSingleTop = true 
                                 } 
-                            }
+                            },
+                            colors = NavigationBarItemDefaults.colors(
+                                selectedIconColor = BookCampPurple,
+                                selectedTextColor = BookCampPurple,
+                                indicatorColor = BookCampPurple.copy(alpha = 0.1f)
+                            )
                         )
                     }
 
                     if (mainState.connectedServiceTypes.contains(com.owlsoda.pageportal.services.ServiceType.BOOKLORE)) {
                         NavigationBarItem(
                             icon = { Icon(painterResource(id = R.drawable.ic_booklore), contentDescription = null) },
-                            label = { Text("Booklore") },
+                            label = { 
+                                Text(
+                                    "Booklore", 
+                                    style = MaterialTheme.typography.labelSmall
+                                ) 
+                            },
                             selected = currentService == "Booklore",
                             onClick = { 
                                 navController.navigate("service/Booklore") { 
                                     popUpTo(Screen.Library.route) 
                                     launchSingleTop = true 
                                 } 
-                            }
+                            },
+                            colors = NavigationBarItemDefaults.colors(
+                                selectedIconColor = BookCampPurple,
+                                selectedTextColor = BookCampPurple,
+                                indicatorColor = BookCampPurple.copy(alpha = 0.1f)
+                            )
                         )
                     }
                     
                      NavigationBarItem(
                         icon = { Icon(Icons.Default.Settings, null) },
-                        label = { Text("Settings") },
+                        label = { 
+                            Text(
+                                "Settings", 
+                                style = MaterialTheme.typography.labelSmall
+                            ) 
+                        },
                         selected = currentRoute == Screen.Settings.route,
-                        onClick = { navController.navigate(Screen.Settings.route) { launchSingleTop = true } }
+                        onClick = { navController.navigate(Screen.Settings.route) { launchSingleTop = true } },
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = BookCampPurple,
+                            selectedTextColor = BookCampPurple,
+                            indicatorColor = BookCampPurple.copy(alpha = 0.1f)
+                        )
                     )
                 }
             }

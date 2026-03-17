@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import com.owlsoda.pageportal.core.database.entity.BookEntity
+import com.owlsoda.pageportal.ui.theme.BookCampPurple
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -135,16 +136,20 @@ fun BookDetailScreen(
                         val coverUrl = state.book?.audiobookCoverUrl ?: state.book?.coverUrl
                         val aspectRatio = if (state.book?.audiobookCoverUrl != null) 1f else 2f / 3f
                         
-                        AsyncImage(
-                            model = coverUrl,
-                            contentDescription = state.book?.title,
+                        Surface(
+                            shape = MaterialTheme.shapes.medium,
+                            shadowElevation = 32.dp,
                             modifier = Modifier
-                                .width(if (aspectRatio == 1f) 240.dp else 200.dp)
+                                .width(if (aspectRatio == 1f) 260.dp else 220.dp)
                                 .aspectRatio(aspectRatio)
-                                .clip(RoundedCornerShape(12.dp))
-                                .shadow(24.dp, RoundedCornerShape(12.dp)),
-                            contentScale = ContentScale.Crop
-                        )
+                        ) {
+                            AsyncImage(
+                                model = coverUrl,
+                                contentDescription = state.book?.title,
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Crop
+                            )
+                        }
 
                         Spacer(modifier = Modifier.height(24.dp))
 
@@ -159,7 +164,7 @@ fun BookDetailScreen(
                         Text(
                             text = book.authors,
                             style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = BookCampPurple, // Highlight author in BookCamp purple
                             textAlign = TextAlign.Center,
                             modifier = Modifier
                                 .clickable { onAuthorClick(book.authors) }
@@ -207,8 +212,8 @@ fun BookDetailScreen(
                                     icon = Icons.Default.Headphones,
                                     onClick = { onPlayAudiobook(book.id.toString()) },
                                     modifier = Modifier.weight(1f),
-                                    containerColor = MaterialTheme.colorScheme.primary,
-                                    contentColor = MaterialTheme.colorScheme.onPrimary
+                                    containerColor = BookCampPurple,
+                                    contentColor = Color.White
                                 )
                             }
 

@@ -13,6 +13,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavController
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.owlsoda.pageportal.ui.theme.BookCampPurple
 
 @Composable
 fun BrowseScreen(
@@ -44,8 +45,18 @@ fun BrowseScreen(
                     NavigationBarItem(
                         selected = selectedTab == index,
                         onClick = { selectedTab = index },
-                        label = { Text(title) },
-                        icon = { Icon(icons[index], contentDescription = title) }
+                        label = { 
+                            Text(
+                                title,
+                                style = MaterialTheme.typography.labelSmall
+                            ) 
+                        },
+                        icon = { Icon(icons[index], contentDescription = title) },
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = BookCampPurple,
+                            selectedTextColor = BookCampPurple,
+                            indicatorColor = BookCampPurple.copy(alpha = 0.1f)
+                        )
                     )
                 }
             }

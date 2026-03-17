@@ -17,6 +17,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import com.owlsoda.pageportal.ui.theme.BookCampPurple
+import com.owlsoda.pageportal.ui.theme.BookCampTextSecondary
 
 /**
  * MiniPlayerBar - A compact persistent player bar shown at the bottom of screens
@@ -75,10 +77,10 @@ fun MiniPlayerBar(
                 .padding(8.dp)
                 .height(72.dp)
                 .clickable(onClick = onBarClick),
-            shape = RoundedCornerShape(12.dp),
-            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.95f),
-            tonalElevation = 4.dp,
-            shadowElevation = 8.dp
+            shape = RoundedCornerShape(16.dp),
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 2.dp,
+            shadowElevation = 12.dp
         ) {
             Column {
                 // Progress indicator
@@ -86,9 +88,9 @@ fun MiniPlayerBar(
                     progress = { progress.coerceIn(0f, 1f) },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(3.dp),
-                    color = MaterialTheme.colorScheme.primary,
-                    trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+                        .height(2.dp),
+                    color = BookCampPurple,
+                    trackColor = BookCampPurple.copy(alpha = 0.1f)
                 )
                 
                 Row(
@@ -113,8 +115,7 @@ fun MiniPlayerBar(
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = bookTitle,
-                            style = MaterialTheme.typography.bodyLarge,
-                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.titleSmall,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -122,9 +123,9 @@ fun MiniPlayerBar(
                             text = chapterTitle ?: bookAuthor,
                             style = MaterialTheme.typography.bodySmall,
                             color = if (chapterTitle != null) 
-                                MaterialTheme.colorScheme.primary 
+                                BookCampPurple 
                             else 
-                                MaterialTheme.colorScheme.onSurfaceVariant,
+                                BookCampTextSecondary,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -135,7 +136,7 @@ fun MiniPlayerBar(
                         Icon(
                             imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                             contentDescription = if (isPlaying) "Pause" else "Play",
-                            tint = MaterialTheme.colorScheme.primary
+                            tint = BookCampPurple
                         )
                     }
                     

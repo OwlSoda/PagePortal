@@ -37,6 +37,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.owlsoda.pageportal.ui.theme.BookCampPlayerBackground
+import com.owlsoda.pageportal.ui.theme.BookCampPlayerText
+import com.owlsoda.pageportal.ui.theme.BookCampPurple
 import coil.compose.AsyncImage
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
@@ -81,31 +84,11 @@ fun AudiobookPlayerScreen(
                 }
             }
     ) {
-        // 1. Immersive Background Layer
-        // ... (unchanged)
-        if (state.coverUrl.isNotEmpty()) {
-            AsyncImage(
-                model = state.coverUrl,
-                contentDescription = null,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .blur(radius = 60.dp)
-                    .scale(1.2f),
-                contentScale = ContentScale.Crop
-            )
-            
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.6f))
-            )
-        } else {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.surface)
-            )
-        }
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(BookCampPlayerBackground)
+        )
 
         // 2. Content Layer
         Column(
@@ -169,20 +152,19 @@ fun AudiobookPlayerScreen(
             } else {
                 Spacer(modifier = Modifier.height(24.dp))
                 
-                // Hero Cover Art
-                Card(
-                    elevation = CardDefaults.cardElevation(defaultElevation = 12.dp),
-                    shape = RoundedCornerShape(24.dp),
+                Surface(
+                    shape = MaterialTheme.shapes.large,
+                    shadowElevation = 24.dp,
                     modifier = Modifier
                         .size(320.dp)
-                        .aspectRatio(1f)
+                        .padding(horizontal = 16.dp)
                         .pointerInput(Unit) {
                             detectHorizontalDragGestures { change, dragAmount ->
                                 change.consume()
                                 if (dragAmount > 50) {
-                                    viewModel.rewind() // Right slide (drag right) -> Seek Back
+                                    viewModel.rewind()
                                 } else if (dragAmount < -50) {
-                                    viewModel.forward() // Left slide (drag left) -> Seek Forward
+                                    viewModel.forward()
                                 }
                             }
                         }
@@ -197,27 +179,25 @@ fun AudiobookPlayerScreen(
                 
                 Spacer(modifier = Modifier.weight(1f))
                 
-                // Metadata
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.padding(horizontal = 32.dp)
+                    modifier = Modifier.padding(horizontal = 40.dp)
                 ) {
                     Text(
                         text = state.title,
-                        style = MaterialTheme.typography.headlineMedium.copy(
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = 0.5.sp
+                        style = MaterialTheme.typography.displaySmall.copy(
+                            color = BookCampPlayerText,
+                            textAlign = TextAlign.Center
                         ),
-                        textAlign = TextAlign.Center,
                         maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                        color = Color.White
+                        overflow = TextOverflow.Ellipsis
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
                     Text(
                         text = state.author,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = Color.White.copy(alpha = 0.7f),
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            color = BookCampPlayerText.copy(alpha = 0.6f)
+                        ),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -272,60 +252,60 @@ fun AudiobookPlayerScreen(
                     TextButton(onClick = { showSpeedPicker = true }) {
                         Text(
                             "${state.playbackSpeed}x",
-                            color = Color.White,
-                            fontWeight = FontWeight.Bold
+                            style = MaterialTheme.typography.labelLarge,
+                            color = BookCampPlayerText
                         )
                     }
                     
                     // Rewind
                     IconButton(
                         onClick = { viewModel.rewind() },
-                        modifier = Modifier.size(56.dp)
+                        modifier = Modifier.size(64.dp)
                     ) {
                         Icon(
                             Icons.Default.Replay10,
                             "Rewind 10s",
-                            tint = Color.White,
-                            modifier = Modifier.size(32.dp)
+                            tint = BookCampPlayerText,
+                            modifier = Modifier.size(36.dp)
                         )
                     }
                     
                     // Play/Pause (Animated)
-                    FilledIconButton(
+                    Surface(
                         onClick = { viewModel.togglePlayPause() },
+                        shape = androidx.compose.foundation.shape.CircleShape,
+                        color = Color.White,
                         modifier = Modifier
-                            .size(72.dp)
-                            .scale(if (state.isPlaying) 1.05f else 1f), // Subtle press effect logic could go here
-                        colors = IconButtonDefaults.filledIconButtonColors(
-                            containerColor = Color.White,
-                            contentColor = Color.Black
-                        )
+                            .size(80.dp)
                     ) {
-                        AnimatedContent(
-                            targetState = state.isPlaying,
-                            transitionSpec = {
-                                scaleIn() + fadeIn() togetherWith scaleOut() + fadeOut()
-                            },
-                            label = "PlayPause"
-                        ) { isPlaying ->
-                            Icon(
-                                if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                                contentDescription = if (isPlaying) "Pause" else "Play",
-                                modifier = Modifier.size(36.dp)
-                            )
+                        Box(contentAlignment = Alignment.Center) {
+                            AnimatedContent(
+                                targetState = state.isPlaying,
+                                transitionSpec = {
+                                    scaleIn() + fadeIn() togetherWith scaleOut() + fadeOut()
+                                },
+                                label = "PlayPause"
+                            ) { isPlaying ->
+                                Icon(
+                                    if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                    contentDescription = if (isPlaying) "Pause" else "Play",
+                                    modifier = Modifier.size(40.dp),
+                                    tint = Color.Black
+                                )
+                            }
                         }
                     }
                     
                     // Forward
                     IconButton(
                         onClick = { viewModel.forward() },
-                        modifier = Modifier.size(56.dp)
+                        modifier = Modifier.size(64.dp)
                     ) {
                         Icon(
                             Icons.Default.Forward30,
                             "Forward 30s",
-                            tint = Color.White,
-                            modifier = Modifier.size(32.dp)
+                            tint = BookCampPlayerText,
+                            modifier = Modifier.size(36.dp)
                         )
                     }
                     
@@ -334,7 +314,7 @@ fun AudiobookPlayerScreen(
                         Icon(
                             Icons.Default.Bedtime,
                             "Sleep Timer",
-                            tint = if (state.sleepTimerRemaining > 0) MaterialTheme.colorScheme.primaryContainer else Color.White
+                            tint = if (state.sleepTimerRemaining > 0) BookCampPurple else BookCampPlayerText
                         )
                     }
                 }

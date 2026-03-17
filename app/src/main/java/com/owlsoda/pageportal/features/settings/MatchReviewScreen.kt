@@ -14,12 +14,15 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
+import com.owlsoda.pageportal.ui.theme.BookCampPurple
+import com.owlsoda.pageportal.ui.theme.BookCampTextSecondary
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -32,7 +35,12 @@ fun MatchReviewScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Review Matches") },
+                title = { 
+                    Text(
+                        "Review Matches",
+                        style = MaterialTheme.typography.titleLarge
+                    ) 
+                },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
@@ -78,9 +86,12 @@ fun MatchCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(16.dp)
-            .height(500.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+            .padding(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        )
     ) {
         Column(
             modifier = Modifier.fillMaxSize(),
@@ -105,9 +116,20 @@ fun MatchCard(
                     )
                     Spacer(modifier = Modifier.width(16.dp))
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("New Book", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
-                        Text(candidate.book.title, style = MaterialTheme.typography.titleMedium)
-                        Text(candidate.book.authors, style = MaterialTheme.typography.bodyMedium)
+                        Text(
+                            "New Book", 
+                            style = MaterialTheme.typography.labelSmall, 
+                            color = BookCampPurple
+                        )
+                        Text(
+                            candidate.book.title, 
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                        Text(
+                            candidate.book.authors, 
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = BookCampTextSecondary
+                        )
                     }
                 }
             }
@@ -133,13 +155,25 @@ fun MatchCard(
                     )
                     Spacer(modifier = Modifier.width(16.dp))
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("Possible Match", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.secondary)
-                        Text(candidate.potentialMatch.title, style = MaterialTheme.typography.titleMedium)
-                        Text(candidate.potentialMatch.author, style = MaterialTheme.typography.bodyMedium)
+                        Text(
+                            "Possible Match", 
+                            style = MaterialTheme.typography.labelSmall, 
+                            color = BookCampTextSecondary
+                        )
+                        Text(
+                            candidate.potentialMatch.title, 
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                        Text(
+                            candidate.potentialMatch.author, 
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = BookCampTextSecondary
+                        )
                         
                         Text(
                             "Similarity: ${(candidate.score * 100).toInt()}%", 
                             style = MaterialTheme.typography.labelSmall,
+                            color = BookCampPurple,
                             modifier = Modifier.padding(top = 8.dp)
                         )
                     }
@@ -165,10 +199,10 @@ fun MatchCard(
                 IconButton(
                     onClick = onConfirm,
                     modifier = Modifier
-                        .size(64.dp)
-                        .background(MaterialTheme.colorScheme.primaryContainer, CircleShape)
+                        .size(56.dp)
+                        .background(BookCampPurple, CircleShape)
                 ) {
-                    Icon(Icons.Default.Check, null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                    Icon(Icons.Default.Check, null, tint = Color.White)
                 }
             }
         }

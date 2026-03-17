@@ -16,71 +16,34 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
-private val DarkColorScheme = darkColorScheme(
-    primary = Color(0xFFD0BCFF),
-    onPrimary = Color(0xFF381E72),
-    primaryContainer = Color(0xFF4F378B),
-    onPrimaryContainer = Color(0xFFEADDFF),
-    secondary = Color(0xFFCCC2DC),
-    onSecondary = Color(0xFF332D41),
-    secondaryContainer = Color(0xFF4A4458),
-    onSecondaryContainer = Color(0xFFE8DEF8),
-    tertiary = Color(0xFFEFB8C8),
-    onTertiary = Color(0xFF492532),
-    tertiaryContainer = Color(0xFF633B48),
-    onTertiaryContainer = Color(0xFFFFD8E4),
-    background = Color(0xFF1C1B1F),
-    onBackground = Color(0xFFE6E1E5),
-    surface = Color(0xFF1C1B1F),
-    onSurface = Color(0xFFE6E1E5),
-    error = Color(0xFFF2B8B5),
-    onError = Color(0xFF601410),
-    surfaceVariant = Color(0xFF49454F),
-    onSurfaceVariant = Color(0xFFCAC4D0)
+private val BookCampLightColorScheme = lightColorScheme(
+    primary = BookCampPurple,
+    onPrimary = Color.White,
+    primaryContainer = BookCampPurple.copy(alpha = 0.1f),
+    onPrimaryContainer = BookCampPurple,
+    secondary = BookCampAccent,
+    onSecondary = Color.White,
+    background = BookCampBackground,
+    onBackground = BookCampTextPrimary,
+    surface = BookCampSurface,
+    onSurface = BookCampTextPrimary,
+    surfaceVariant = Color(0xFFF0F0F0),
+    onSurfaceVariant = BookCampTextSecondary,
+    error = BookCampError,
+    onError = Color.White
 )
 
-private val AmoledColorScheme = darkColorScheme(
-    primary = Color(0xFFD0BCFF),
-    onPrimary = Color(0xFF381E72),
-    primaryContainer = Color(0xFF4F378B),
-    onPrimaryContainer = Color(0xFFEADDFF),
-    secondary = Color(0xFFCCC2DC),
-    onSecondary = Color(0xFF332D41),
-    secondaryContainer = Color(0xFF4A4458),
-    onSecondaryContainer = Color(0xFFE8DEF8),
-    tertiary = Color(0xFFEFB8C8),
-    onTertiary = Color(0xFF492532),
-    tertiaryContainer = Color(0xFF633B48),
-    onTertiaryContainer = Color(0xFFFFD8E4),
-    background = Color.Black,
-    onBackground = Color(0xFFE6E1E5),
-    surface = Color.Black,
-    onSurface = Color(0xFFE6E1E5),
-    error = Color(0xFFF2B8B5),
-    onError = Color(0xFF601410),
-    surfaceVariant = Color.Black,
-    onSurfaceVariant = Color(0xFFCAC4D0)
-)
-
-private val LightColorScheme = lightColorScheme(
-    primary = Color(0xFF6750A4),
-    onPrimary = Color(0xFFFFFFFF),
-    primaryContainer = Color(0xFFEADDFF),
-    onPrimaryContainer = Color(0xFF21005D),
-    secondary = Color(0xFF625B71),
-    onSecondary = Color(0xFFFFFFFF),
-    secondaryContainer = Color(0xFFE8DEF8),
-    onSecondaryContainer = Color(0xFF1D192B),
-    tertiary = Color(0xFF7D5260),
-    onTertiary = Color(0xFFFFFFFF),
-    tertiaryContainer = Color(0xFFFFD8E4),
-    onTertiaryContainer = Color(0xFF31111D),
-    background = Color(0xFFFFFBFE),
-    onBackground = Color(0xFF1C1B1F),
-    surface = Color(0xFFFFFBFE),
-    onSurface = Color(0xFF1C1B1F),
-    error = Color(0xFFB3261E),
-    onError = Color(0xFFFFFFFF)
+private val BookCampDarkColorScheme = darkColorScheme(
+    primary = BookCampAccent,
+    onPrimary = Color.White,
+    primaryContainer = Color(0xFF1E1E1E),
+    onPrimaryContainer = Color.White,
+    background = Color(0xFF121212),
+    onBackground = Color.White,
+    surface = Color(0xFF1E1E1E),
+    onSurface = Color.White,
+    surfaceVariant = Color(0xFF2C2C2C),
+    onSurfaceVariant = Color(0xFFB0B0B0)
 )
 
 @Composable
@@ -90,10 +53,10 @@ fun PagePortalTheme(
 ) {
     val darkTheme = isSystemInDarkTheme()
     val colorScheme = when (mode) {
-        "LIGHT" -> LightColorScheme
-        "DARK" -> DarkColorScheme
-        "AMOLED" -> AmoledColorScheme
-        else -> if (darkTheme) DarkColorScheme else LightColorScheme
+        "LIGHT" -> BookCampLightColorScheme
+        "DARK" -> BookCampDarkColorScheme
+        "AMOLED" -> BookCampDarkColorScheme.copy(background = Color.Black, surface = Color.Black)
+        else -> if (darkTheme) BookCampDarkColorScheme else BookCampLightColorScheme
     }
     
     val view = LocalView.current
@@ -108,6 +71,8 @@ fun PagePortalTheme(
 
     MaterialTheme(
         colorScheme = colorScheme,
+        typography = Typography,
+        shapes = Shapes,
         content = content
     )
 }
