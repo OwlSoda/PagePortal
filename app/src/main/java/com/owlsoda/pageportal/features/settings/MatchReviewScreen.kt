@@ -21,8 +21,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
-import com.owlsoda.pageportal.ui.theme.BookCampPurple
-import com.owlsoda.pageportal.ui.theme.BookCampTextSecondary
+import com.owlsoda.pageportal.ui.theme.PagePortalPurple
+import com.owlsoda.pageportal.ui.theme.PagePortalTextSecondary
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -119,7 +119,7 @@ fun MatchCard(
                         Text(
                             "New Book", 
                             style = MaterialTheme.typography.labelSmall, 
-                            color = BookCampPurple
+                            color = PagePortalPurple
                         )
                         Text(
                             candidate.book.title, 
@@ -128,7 +128,7 @@ fun MatchCard(
                         Text(
                             candidate.book.authors, 
                             style = MaterialTheme.typography.bodyMedium,
-                            color = BookCampTextSecondary
+                            color = PagePortalTextSecondary
                         )
                     }
                 }
@@ -158,7 +158,7 @@ fun MatchCard(
                         Text(
                             "Possible Match", 
                             style = MaterialTheme.typography.labelSmall, 
-                            color = BookCampTextSecondary
+                            color = PagePortalTextSecondary
                         )
                         Text(
                             candidate.potentialMatch.title, 
@@ -167,13 +167,13 @@ fun MatchCard(
                         Text(
                             candidate.potentialMatch.author, 
                             style = MaterialTheme.typography.bodyMedium,
-                            color = BookCampTextSecondary
+                            color = PagePortalTextSecondary
                         )
                         
                         Text(
                             "Similarity: ${(candidate.score * 100).toInt()}%", 
                             style = MaterialTheme.typography.labelSmall,
-                            color = BookCampPurple,
+                            color = PagePortalPurple,
                             modifier = Modifier.padding(top = 8.dp)
                         )
                     }
@@ -200,7 +200,7 @@ fun MatchCard(
                     onClick = onConfirm,
                     modifier = Modifier
                         .size(56.dp)
-                        .background(BookCampPurple, CircleShape)
+                        .background(PagePortalPurple, CircleShape)
                 ) {
                     Icon(Icons.Default.Check, null, tint = Color.White)
                 }

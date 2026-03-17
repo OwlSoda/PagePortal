@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -20,15 +22,21 @@ android {
         vectorDrawables {
             useSupportLibrary = true
         }
-        manifestPlaceholders += mapOf("appAuthRedirectScheme" to "pageportal")
+        manifestPlaceholders["appAuthRedirectScheme"] = "com.owlsoda.pageportal"
+    }
+
+    val localProperties = Properties()
+    val localPropertiesFile = rootProject.file("local.properties")
+    if (localPropertiesFile.exists()) {
+        localProperties.load(localPropertiesFile.inputStream())
     }
 
     signingConfigs {
         create("release") {
             storeFile = file("../portal-release.jks")
-            storePassword = "retcon"
-            keyAlias = "portal-alias"
-            keyPassword = "retcon"
+            storePassword = localProperties.getProperty("signing.storePassword") ?: ""
+            keyAlias = localProperties.getProperty("signing.keyAlias") ?: ""
+            keyPassword = localProperties.getProperty("signing.keyPassword") ?: ""
         }
     }
 

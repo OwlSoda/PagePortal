@@ -31,8 +31,8 @@ import android.net.Uri
 import net.openid.appauth.AuthorizationException
 import net.openid.appauth.AuthorizationResponse
 import net.openid.appauth.AuthorizationService
-import com.owlsoda.pageportal.ui.theme.BookCampPurple
-import com.owlsoda.pageportal.ui.theme.BookCampTextSecondary
+import com.owlsoda.pageportal.ui.theme.PagePortalPurple
+import com.owlsoda.pageportal.ui.theme.PagePortalTextSecondary
 
 @Composable
 fun LoginScreen(
@@ -73,7 +73,7 @@ fun LoginScreen(
             imageVector = Icons.AutoMirrored.Filled.MenuBook,
             contentDescription = "PagePortal Logo",
             modifier = Modifier.size(80.dp),
-            tint = BookCampPurple
+            tint = PagePortalPurple
         )
         
         Spacer(modifier = Modifier.height(16.dp))
@@ -86,7 +86,7 @@ fun LoginScreen(
         Text(
             text = "Your unified library",
             style = MaterialTheme.typography.bodyLarge,
-            color = BookCampTextSecondary
+            color = PagePortalTextSecondary
         )
         
         Spacer(modifier = Modifier.height(48.dp))
@@ -120,11 +120,6 @@ fun LoginScreen(
                         description = "Connect to your Audiobookshelf server",
                         onClick = { viewModel.selectService(1) }
                     )
-                    ServiceSelectionCard(
-                        title = "Booklore",
-                        description = "Connect to your Booklore server",
-                        onClick = { viewModel.selectService(2) }
-                    )
                 }
             } else {
                 // STEP 2: Service Form
@@ -155,8 +150,7 @@ fun LoginScreen(
                             Spacer(modifier = Modifier.width(8.dp))
                             val serviceName = when (uiState.selectedService) {
                                 0 -> "Storyteller"
-                                1 -> "Audiobookshelf"
-                                else -> "Booklore"
+                                else -> "Audiobookshelf"
                             }
                             Text(
                                 text = "Connect to $serviceName",
@@ -175,8 +169,7 @@ fun LoginScreen(
                                 Text(
                                     when (uiState.selectedService) {
                                         0 -> "storyteller.example.com"
-                                        1 -> "abs.example.com"
-                                        else -> "booklore.example.com"
+                                        else -> "abs.example.com"
                                     }
                                 )
                             },
@@ -200,7 +193,7 @@ fun LoginScreen(
                             }
                         )
                         
-                        val isBooklore = uiState.selectedService == 2
+                        // No-op for Booklore removal
                         
                         AnimatedVisibility(visible = true) {
                             Column {
@@ -265,7 +258,7 @@ fun LoginScreen(
                                       uiState.serverUrl.isNotBlank() && 
                                       uiState.username.isNotBlank() && uiState.password.isNotBlank(),
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = BookCampPurple,
+                                containerColor = PagePortalPurple,
                                 contentColor = Color.White
                             ),
                             shape = RoundedCornerShape(16.dp)
@@ -323,13 +316,13 @@ fun ServiceSelectionCard(
             Text(
                 text = title,
                 style = MaterialTheme.typography.titleLarge,
-                color = BookCampPurple
+                color = PagePortalPurple
             )
             Spacer(modifier = Modifier.height(6.dp))
             Text(
                 text = description,
                 style = MaterialTheme.typography.bodyMedium,
-                color = BookCampTextSecondary
+                color = PagePortalTextSecondary
             )
         }
     }

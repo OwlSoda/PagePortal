@@ -205,14 +205,19 @@ fun ReaderScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.surfaceVariant) // "Stage" background
+            .background(Color(android.graphics.Color.parseColor(uiState.theme.backgroundColor))) // Match Stage to Theme
     ) {
         // --- 1. Book Content Layer ---
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .statusBarsPadding() // Keep away from notches even in immersive mode? Maybe.
-                .padding(if (showControls) 16.dp else 0.dp) // Add padding when shrunk
+                .statusBarsPadding()
+                .graphicsLayer {
+                    scaleX = contentScale
+                    scaleY = contentScale
+                    clip = true
+                    shape = RoundedCornerShape(contentRadius)
+                }
                 .background(Color(android.graphics.Color.parseColor(uiState.theme.backgroundColor)))
         ) {
             // Error display only
@@ -360,8 +365,13 @@ fun ReaderScreen(
                          Icon(Icons.Default.Settings, "Settings")
                      }
                  },
-                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
-                 modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding()
+                 colors = TopAppBarDefaults.topAppBarColors(
+                     containerColor = Color(android.graphics.Color.parseColor(uiState.theme.backgroundColor)).copy(alpha = 0.9f)
+                 ),
+                 modifier = Modifier
+                     .align(Alignment.TopCenter)
+                     .statusBarsPadding()
+                     .zIndex(10f)
              )
              
              // Bottom Control Strip
@@ -370,7 +380,8 @@ fun ReaderScreen(
                      .align(Alignment.BottomCenter)
                      .fillMaxWidth()
                      .navigationBarsPadding()
-                     .padding(bottom = 24.dp),
+                     .padding(bottom = 24.dp)
+                     .zIndex(10f),
                  horizontalAlignment = Alignment.CenterHorizontally
              ) {
                   // Playback Controls (if available) - Centered and prominent

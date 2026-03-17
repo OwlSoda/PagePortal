@@ -17,8 +17,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
-import com.owlsoda.pageportal.ui.theme.BookCampPurple
-import com.owlsoda.pageportal.ui.theme.BookCampTextSecondary
+import com.owlsoda.pageportal.ui.theme.PagePortalPurple
+import com.owlsoda.pageportal.ui.theme.PagePortalTextSecondary
 
 /**
  * MiniPlayerBar - A compact persistent player bar shown at the bottom of screens
@@ -89,8 +89,8 @@ fun MiniPlayerBar(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(2.dp),
-                    color = BookCampPurple,
-                    trackColor = BookCampPurple.copy(alpha = 0.1f)
+                    color = PagePortalPurple,
+                    trackColor = PagePortalPurple.copy(alpha = 0.1f)
                 )
                 
                 Row(
@@ -123,9 +123,9 @@ fun MiniPlayerBar(
                             text = chapterTitle ?: bookAuthor,
                             style = MaterialTheme.typography.bodySmall,
                             color = if (chapterTitle != null) 
-                                BookCampPurple 
+                                PagePortalPurple 
                             else 
-                                BookCampTextSecondary,
+                                PagePortalTextSecondary,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -136,7 +136,7 @@ fun MiniPlayerBar(
                         Icon(
                             imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                             contentDescription = if (isPlaying) "Pause" else "Play",
-                            tint = BookCampPurple
+                            tint = PagePortalPurple
                         )
                     }
                     

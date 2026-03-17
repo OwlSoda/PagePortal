@@ -52,9 +52,9 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.owlsoda.pageportal.services.ServiceType
 import androidx.compose.foundation.background
 import androidx.compose.material3.LocalContentColor
-import com.owlsoda.pageportal.ui.theme.BookCampPlayerBackground
-import com.owlsoda.pageportal.ui.theme.BookCampPlayerText
-import com.owlsoda.pageportal.ui.theme.BookCampPurple
+import com.owlsoda.pageportal.ui.theme.PagePortalPlayerBackground
+import com.owlsoda.pageportal.ui.theme.PagePortalPlayerText
+import com.owlsoda.pageportal.ui.theme.PagePortalPurple
 import coil.compose.AsyncImage
 import com.owlsoda.pageportal.features.auth.LoginScreen
 import com.owlsoda.pageportal.ui.components.EmptyState
@@ -441,7 +441,6 @@ fun BooksTabContent(
                         val icon = when {
                             tab.id == -1L -> "📚"
                             tab.serviceType == ServiceType.AUDIOBOOKSHELF -> "🎧"
-                            tab.serviceType == ServiceType.BOOKLORE -> "📖"
                             tab.serviceType == ServiceType.STORYTELLER -> "🗣️"
                             else -> "🔗"
                         }
@@ -820,7 +819,7 @@ fun BookCard(
             
             if (book.isDownloading || book.listeningProgress > 0) {
                 val progressValue = if (book.isDownloading) book.downloadProgress else book.listeningProgress
-                val progressColor = if (book.isDownloading) MaterialTheme.colorScheme.primary else BookCampPurple
+                val progressColor = if (book.isDownloading) MaterialTheme.colorScheme.primary else PagePortalPurple
                 
                 LinearProgressIndicator(
                     progress = { progressValue },

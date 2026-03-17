@@ -27,8 +27,8 @@ import android.os.Environment
 import androidx.core.content.FileProvider
 import com.owlsoda.pageportal.BuildConfig
 import com.owlsoda.pageportal.network.GitHubUpdateService
-import com.owlsoda.pageportal.ui.theme.BookCampPurple
-import com.owlsoda.pageportal.ui.theme.BookCampTextSecondary
+import com.owlsoda.pageportal.ui.theme.PagePortalPurple
+import com.owlsoda.pageportal.ui.theme.PagePortalTextSecondary
 import com.owlsoda.pageportal.ui.components.ListDetailLayout
 import com.owlsoda.pageportal.ui.components.WindowSizeClass
 import com.owlsoda.pageportal.ui.components.rememberWindowSizeClass
@@ -156,14 +156,14 @@ fun SettingsCategoriesList(
                     Text(
                         category.description,
                         style = MaterialTheme.typography.bodyMedium,
-                        color = BookCampTextSecondary
+                        color = PagePortalTextSecondary
                     ) 
                 },
                 leadingContent = {
                     Icon(
                         imageVector = category.icon,
                         contentDescription = null,
-                        tint = BookCampPurple
+                        tint = PagePortalPurple
                     )
                 },
                 trailingContent = {
@@ -171,7 +171,7 @@ fun SettingsCategoriesList(
                         Icons.AutoMirrored.Filled.ArrowForward, 
                         contentDescription = null,
                         modifier = Modifier.size(16.dp),
-                        tint = BookCampTextSecondary.copy(alpha = 0.5f)
+                        tint = PagePortalTextSecondary.copy(alpha = 0.5f)
                     )
                 },
                 modifier = Modifier
@@ -179,7 +179,7 @@ fun SettingsCategoriesList(
                     .padding(vertical = 4.dp),
                 colors = if (selectedCategory == category.id) {
                     ListItemDefaults.colors(
-                        containerColor = BookCampPurple.copy(alpha = 0.08f)
+                        containerColor = PagePortalPurple.copy(alpha = 0.08f)
                     )
                 } else {
                     ListItemDefaults.colors()
@@ -712,14 +712,14 @@ fun AboutSettings(state: SettingsState, viewModel: SettingsViewModel) {
                     title = "Update Available: ${s.release.tagName}",
                     subtitle = "Click to download and install",
                     onClick = { viewModel.downloadAndInstallUpdate(s.release) },
-                    tint = BookCampPurple
+                    tint = PagePortalPurple
                 )
             }
             is UpdateState.Downloading -> {
                 ListItem(
                     headlineContent = { Text("Downloading update...") },
                     supportingContent = { LinearProgressIndicator(modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) },
-                    leadingContent = { Icon(Icons.Default.Download, contentDescription = null, tint = BookCampPurple) }
+                    leadingContent = { Icon(Icons.Default.Download, contentDescription = null, tint = PagePortalPurple) }
                 )
             }
             is UpdateState.Error -> {
@@ -945,7 +945,7 @@ fun SettingsSectionHeader(title: String) {
     Text(
         text = title,
         style = MaterialTheme.typography.titleSmall,
-        color = BookCampPurple,
+        color = PagePortalPurple,
         modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
     )
 }
@@ -956,7 +956,7 @@ fun SettingsItem(
     title: String,
     subtitle: String? = null,
     showChevron: Boolean = true,
-    tint: Color = BookCampPurple.copy(alpha = 0.7f),
+    tint: Color = PagePortalPurple.copy(alpha = 0.7f),
     onClick: () -> Unit
 ) {
     ListItem(
@@ -970,7 +970,7 @@ fun SettingsItem(
             Text(
                 it, 
                 style = MaterialTheme.typography.bodyMedium,
-                color = BookCampTextSecondary
+                color = PagePortalTextSecondary
             ) 
         } },
         leadingContent = {
@@ -987,7 +987,7 @@ fun SettingsItem(
                     Icons.AutoMirrored.Filled.ArrowForward, 
                     contentDescription = null,
                     modifier = Modifier.size(16.dp),
-                    tint = BookCampTextSecondary.copy(alpha = 0.3f)
+                    tint = PagePortalTextSecondary.copy(alpha = 0.3f)
                 ) 
             }
         } else null,
@@ -1014,14 +1014,14 @@ fun SwitchSettingsItem(
             Text(
                 it, 
                 style = MaterialTheme.typography.bodyMedium,
-                color = BookCampTextSecondary
+                color = PagePortalTextSecondary
             ) 
         } },
         leadingContent = {
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                tint = BookCampPurple.copy(alpha = 0.7f),
+                tint = PagePortalPurple.copy(alpha = 0.7f),
                 modifier = Modifier.size(24.dp)
             )
         },
@@ -1031,7 +1031,7 @@ fun SwitchSettingsItem(
                 onCheckedChange = onCheckedChange,
                 colors = SwitchDefaults.colors(
                     checkedThumbColor = Color.White,
-                    checkedTrackColor = BookCampPurple
+                    checkedTrackColor = PagePortalPurple
                 )
             )
         },

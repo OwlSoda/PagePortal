@@ -16,25 +16,25 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
-private val BookCampLightColorScheme = lightColorScheme(
-    primary = BookCampPurple,
+private val PagePortalLightColorScheme = lightColorScheme(
+    primary = PagePortalPurple,
     onPrimary = Color.White,
-    primaryContainer = BookCampPurple.copy(alpha = 0.1f),
-    onPrimaryContainer = BookCampPurple,
-    secondary = BookCampAccent,
+    primaryContainer = PagePortalPurple.copy(alpha = 0.1f),
+    onPrimaryContainer = PagePortalPurple,
+    secondary = PagePortalAccent,
     onSecondary = Color.White,
-    background = BookCampBackground,
-    onBackground = BookCampTextPrimary,
-    surface = BookCampSurface,
-    onSurface = BookCampTextPrimary,
+    background = PagePortalBackground,
+    onBackground = PagePortalTextPrimary,
+    surface = PagePortalSurface,
+    onSurface = PagePortalTextPrimary,
     surfaceVariant = Color(0xFFF0F0F0),
-    onSurfaceVariant = BookCampTextSecondary,
-    error = BookCampError,
+    onSurfaceVariant = PagePortalTextSecondary,
+    error = PagePortalError,
     onError = Color.White
 )
 
-private val BookCampDarkColorScheme = darkColorScheme(
-    primary = BookCampAccent,
+private val PagePortalDarkColorScheme = darkColorScheme(
+    primary = PagePortalAccent,
     onPrimary = Color.White,
     primaryContainer = Color(0xFF1E1E1E),
     onPrimaryContainer = Color.White,
@@ -53,10 +53,10 @@ fun PagePortalTheme(
 ) {
     val darkTheme = isSystemInDarkTheme()
     val colorScheme = when (mode) {
-        "LIGHT" -> BookCampLightColorScheme
-        "DARK" -> BookCampDarkColorScheme
-        "AMOLED" -> BookCampDarkColorScheme.copy(background = Color.Black, surface = Color.Black)
-        else -> if (darkTheme) BookCampDarkColorScheme else BookCampLightColorScheme
+        "LIGHT" -> PagePortalLightColorScheme
+        "DARK" -> PagePortalDarkColorScheme
+        "AMOLED" -> PagePortalDarkColorScheme.copy(background = Color.Black, surface = Color.Black)
+        else -> if (darkTheme) PagePortalDarkColorScheme else PagePortalLightColorScheme
     }
     
     val view = LocalView.current

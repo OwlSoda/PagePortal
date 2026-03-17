@@ -21,8 +21,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
-import com.owlsoda.pageportal.ui.theme.BookCampPurple
-import com.owlsoda.pageportal.ui.theme.BookCampTextSecondary
+import com.owlsoda.pageportal.ui.theme.PagePortalPurple
+import com.owlsoda.pageportal.ui.theme.PagePortalTextSecondary
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -61,7 +61,7 @@ fun StorageManagementScreen(
                     .padding(16.dp),
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(
-                    containerColor = BookCampPurple.copy(alpha = 0.08f)
+                    containerColor = PagePortalPurple.copy(alpha = 0.08f)
                 )
             ) {
                 Row(
@@ -75,7 +75,7 @@ fun StorageManagementScreen(
                         Text(
                             text = "Used Storage",
                             style = MaterialTheme.typography.labelSmall,
-                            color = BookCampPurple
+                            color = PagePortalPurple
                         )
                         Text(
                             text = uiState.formattedTotalSize,
@@ -86,7 +86,7 @@ fun StorageManagementScreen(
                         imageVector = Icons.Default.SdStorage,
                         contentDescription = null,
                         modifier = Modifier.size(40.dp),
-                        tint = BookCampPurple
+                        tint = PagePortalPurple
                     )
                 }
             }
@@ -94,7 +94,7 @@ fun StorageManagementScreen(
             Text(
                 text = "Downloaded Items",
                 style = MaterialTheme.typography.titleSmall,
-                color = BookCampPurple,
+                color = PagePortalPurple,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
             )
 
@@ -144,7 +144,7 @@ fun StorageItemRow(
             Text(
                 text = "${item.author} • ${item.formattedSize}",
                 style = MaterialTheme.typography.bodySmall,
-                color = BookCampTextSecondary,
+                color = PagePortalTextSecondary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )

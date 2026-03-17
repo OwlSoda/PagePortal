@@ -18,8 +18,8 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.owlsoda.pageportal.core.database.entity.ServerEntity
 import com.owlsoda.pageportal.services.ServiceType
-import com.owlsoda.pageportal.ui.theme.BookCampPurple
-import com.owlsoda.pageportal.ui.theme.BookCampTextSecondary
+import com.owlsoda.pageportal.ui.theme.PagePortalPurple
+import com.owlsoda.pageportal.ui.theme.PagePortalTextSecondary
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -50,7 +50,7 @@ fun ServerManagementScreen(
         floatingActionButton = {
             FloatingActionButton(
                 onClick = onAddServer,
-                containerColor = BookCampPurple,
+                containerColor = PagePortalPurple,
                 contentColor = Color.White
             ) {
                 Icon(Icons.Default.Add, contentDescription = "Add Server")
@@ -132,12 +132,12 @@ fun ServerItem(
                 Text(
                     server.serviceType,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = BookCampPurple
+                    color = PagePortalPurple
                 )
                 Text(
                     server.serverUrl, 
                     style = MaterialTheme.typography.bodySmall,
-                    color = BookCampTextSecondary
+                    color = PagePortalTextSecondary
                 )
             }
         },
@@ -147,7 +147,7 @@ fun ServerItem(
                     Icon(
                         Icons.Default.Info,
                         contentDescription = "Run Diagnostics",
-                        tint = BookCampPurple.copy(alpha = 0.6f)
+                        tint = PagePortalPurple.copy(alpha = 0.6f)
                     )
                 }
                 IconButton(onClick = { showDialog = true }) {

@@ -34,7 +34,7 @@ import java.net.URLDecoder
 import java.net.URLEncoder
 import androidx.compose.ui.res.painterResource
 import com.owlsoda.pageportal.R
-import com.owlsoda.pageportal.ui.theme.BookCampPurple
+import com.owlsoda.pageportal.ui.theme.PagePortalPurple
 
 sealed class Screen(val route: String) {
     object Login : Screen("login?addAccount={addAccount}") {
@@ -141,9 +141,9 @@ fun PagePortalNavHost(
                             } 
                         },
                         colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = BookCampPurple,
-                            selectedTextColor = BookCampPurple,
-                            indicatorColor = BookCampPurple.copy(alpha = 0.1f)
+                            selectedIconColor = PagePortalPurple,
+                            selectedTextColor = PagePortalPurple,
+                            indicatorColor = PagePortalPurple.copy(alpha = 0.1f)
                         )
                     )
                     
@@ -167,9 +167,9 @@ fun PagePortalNavHost(
                                 } 
                             },
                             colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = BookCampPurple,
-                                selectedTextColor = BookCampPurple,
-                                indicatorColor = BookCampPurple.copy(alpha = 0.1f)
+                                selectedIconColor = PagePortalPurple,
+                                selectedTextColor = PagePortalPurple,
+                                indicatorColor = PagePortalPurple.copy(alpha = 0.1f)
                             )
                         )
                     }
@@ -191,36 +191,13 @@ fun PagePortalNavHost(
                                 } 
                             },
                             colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = BookCampPurple,
-                                selectedTextColor = BookCampPurple,
-                                indicatorColor = BookCampPurple.copy(alpha = 0.1f)
+                                selectedIconColor = PagePortalPurple,
+                                selectedTextColor = PagePortalPurple,
+                                indicatorColor = PagePortalPurple.copy(alpha = 0.1f)
                             )
                         )
                     }
 
-                    if (mainState.connectedServiceTypes.contains(com.owlsoda.pageportal.services.ServiceType.BOOKLORE)) {
-                        NavigationBarItem(
-                            icon = { Icon(painterResource(id = R.drawable.ic_booklore), contentDescription = null) },
-                            label = { 
-                                Text(
-                                    "Booklore", 
-                                    style = MaterialTheme.typography.labelSmall
-                                ) 
-                            },
-                            selected = currentService == "Booklore",
-                            onClick = { 
-                                navController.navigate("service/Booklore") { 
-                                    popUpTo(Screen.Library.route) 
-                                    launchSingleTop = true 
-                                } 
-                            },
-                            colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = BookCampPurple,
-                                selectedTextColor = BookCampPurple,
-                                indicatorColor = BookCampPurple.copy(alpha = 0.1f)
-                            )
-                        )
-                    }
                     
                      NavigationBarItem(
                         icon = { Icon(Icons.Default.Settings, null) },
@@ -233,9 +210,9 @@ fun PagePortalNavHost(
                         selected = currentRoute == Screen.Settings.route,
                         onClick = { navController.navigate(Screen.Settings.route) { launchSingleTop = true } },
                         colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = BookCampPurple,
-                            selectedTextColor = BookCampPurple,
-                            indicatorColor = BookCampPurple.copy(alpha = 0.1f)
+                            selectedIconColor = PagePortalPurple,
+                            selectedTextColor = PagePortalPurple,
+                            indicatorColor = PagePortalPurple.copy(alpha = 0.1f)
                         )
                     )
                 }

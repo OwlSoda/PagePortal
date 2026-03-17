@@ -2,14 +2,14 @@ package com.owlsoda.pageportal.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-val BookCampPurple = Color(0xFF5D3FD3)
-val BookCampBackground = Color(0xFFFAFAFA)
-val BookCampSurface = Color(0xFFFFFFFF)
-val BookCampTextPrimary = Color(0xFF1A1A1A)
-val BookCampTextSecondary = Color(0xFF757575)
+val PagePortalPurple = Color(0xFF5D3FD3)
+val PagePortalBackground = Color(0xFFFAFAFA)
+val PagePortalSurface = Color(0xFFFFFFFF)
+val PagePortalTextPrimary = Color(0xFF1A1A1A)
+val PagePortalTextSecondary = Color(0xFF757575)
 
-val BookCampPlayerBackground = Color(0xFF000000)
-val BookCampPlayerText = Color(0xFFFFFFFF)
+val PagePortalPlayerBackground = Color(0xFF000000)
+val PagePortalPlayerText = Color(0xFFFFFFFF)
 
-val BookCampAccent = Color(0xFF7B61FF)
-val BookCampError = Color(0xFFD32F2F)
+val PagePortalAccent = Color(0xFF7B61FF)
+val PagePortalError = Color(0xFFD32F2F)

@@ -33,7 +33,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import com.owlsoda.pageportal.core.database.entity.BookEntity
-import com.owlsoda.pageportal.ui.theme.BookCampPurple
+import com.owlsoda.pageportal.ui.theme.PagePortalPurple
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -163,7 +163,7 @@ fun BookDetailScreen(
                         Text(
                             text = book.authors,
                             style = MaterialTheme.typography.titleMedium,
-                            color = BookCampPurple, // Highlight author in BookCamp purple
+                            color = PagePortalPurple, // Highlight author
                             textAlign = TextAlign.Center,
                             modifier = Modifier
                                 .clickable { onAuthorClick(book.authors) }
@@ -213,7 +213,7 @@ fun BookDetailScreen(
                                     icon = Icons.Default.Headphones,
                                     onClick = { onPlayAudiobook(book.id.toString()) },
                                     modifier = Modifier.weight(1f, fill = false).widthIn(min = 100.dp),
-                                    containerColor = BookCampPurple,
+                                    containerColor = PagePortalPurple,
                                     contentColor = Color.White
                                 )
                             }

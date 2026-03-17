@@ -1,49 +1,44 @@
 # PagePortal 📚
+**The Premium, Unified Gateway to Your Digital Library**
 
-**Your Unified Gateway to Digital Reading & Listening**
+PagePortal is a high-end Android application built for readers and listeners who value aesthetics as much as their content. PagePortal transforms your self-hosted digital library into a premium, literary experience. 
 
-PagePortal is a modern, material-design Android application that aggregates your digital library from multiple self-hosted services. specificially designed for power users who manage their own content, it provides a seamless, unified interface for ebooks, audiobooks, and comics.
+Aggregating content from multiple backends into a single, beautiful interface, it supports eBooks, Audiobooks, and synchronized ReadAloud experiences.
 
 ---
 
 ## ✨ Key Features
 
-### 🔗 Multi-Service Aggregation
-Connect to multiple backend services simultaneously:
-- **Storyteller**: Best-in-class audiobook streaming.
-- **Audiobookshelf**: Comprehensive audiobook and podcast management.
-- **Booklore**: Lightweight ebook library management.
+### 🏛️ The Premium Aesthetic
+- **Premium UI**: A literary-focused design featuring high-end typography, glassmorphism, and smooth, dynamic transitions.
+- **Adaptive Themes**: Optimized for any environment with **Light**, **Sepia**, **Dark**, and **true AMOLED** modes.
+- **Immersive Focus**: Distraction-free reading and listening modes that put your content front and center.
 
-### 🎧 Advanced Audio Player
-- **ReadAloud Support**:  Synchronized text-to-speech with real-time text highlighting.
-- **Smart Resume**: Auto-rewind on resume to regain context.
-- **Sleep Timer**:  Drift off without losing your place.
-- **Equalizer**:  Fine-tune audio for specific narrators.
-- **Playback Speed**:  Adjust speed without pitch distortion (0.5x - 3.0x).
+### 🔗 Unified Multi-Service Support
+Connect and stream from your favorite self-hosted services simultaneously:
+- **Audiobookshelf**: Full support for your audiobook and podcast collections.
+- **Storyteller**: Best-in-class multi-format streaming with synchronized text.
+- **Local Import**: Securely import and manage local EPUB and PDF files.
 
-### 📖 Premium Reader Experience
-- **Customizable**:  Adjust fonts, margins, line height, and themes (Light, Dark, AMOLED, Sepia).
-- **Format Support**:  EPUB, PDF, CBZ/CBR (Comics).
-- **Immersive Mode**:  Focus entirely on the text with distraction-free reading.
+### 🎧 ReadAloud & Advanced Playback
+- **SMIL Synchronization**: Experience true "Read-Along" with real-time text highlighting synchronized with professional narration.
+- **Smart Resume**: Intelligent auto-rewind on resume to help you regain context immediately.
+- **Precision Controls**: Fine-tune your experience with playback speed (0.5x - 3.0x), sleep timers, and a dedicated equalizer.
+- **Android Auto**: Take your library on the road with full Media3 automotive support.
 
-### 🔄 Seamless Sync
-- **Progress Tracking**:  Keep your reading/listening position synchronized across devices.
-- **Offline Mode**:  Download content usage while disconnected; syncs back when online.
+### 📖 The Master Reader
+- **Infinite Customization**: Total control over fonts, margins, line spacing, and text alignment (Left, Justify, Center).
+- **Format Excellence**: Pixel-perfect rendering for **EPUB**, **PDF**, and **Comics (CBZ/CBR)**.
+- **Smart Progress**: Seamless synchronization of your reading/listening position across all your servers.
 
 ---
 
 ## 🛠️ Technology Stack
-
-PagePortal is built with modern Android development standards:
-
-- **Kotlin**: 100% Kotlin codebase.
-- **Jetpack Compose**:  Modern, declarative UI toolkit.
-- **Coroutines & Flow**:  Asynchronous programming and reactive data streams.
-- **Hilt**:  Dependency injection.
-- **Room**:  Local database persistence.
-- **Retrofit/OkHttp**:  Robust networking.
-- **ExoPlayer (Media3)**:  Industry-standard media playback engine.
-- **Coil**:  Image loading and caching.
+PagePortal is engineered with the latest Android standards for performance and reliability:
+- **100% Kotlin** with **Jetpack Compose** for a modern, reactive UI.
+- **Media3 (ExoPlayer)** for industry-standard, robust audio playback.
+- **Hilt** & **Room** for scalable architecture and lightning-fast local persistence.
+- **Coroutines & Flow** for smooth, asynchronous data streams.
 
 ---
 
@@ -51,33 +46,26 @@ PagePortal is built with modern Android development standards:
 
 ### Prerequisites
 - Android 8.0 (Oreo) or higher.
-- A running instance of Storyteller, Audiobookshelf, or Booklore.
+- A running instance of **Audiobookshelf** or **Storyteller**.
 
-### Installation
-1.  Download the latest APK from the [Releases](tags) page.
-2.  Install on your Android device.
-3.  Launch PagePortal.
-4.  Navigate to **Settings > Services**.
-5.  Add your server URL and credentials.
+### Installation & Updates
+1. **Download**: Grab the latest release directly from the [Releases](https://github.com/OwlSoda/PagePortal/releases) page.
+2. **Install**: Sideload the APK onto your Android device.
+3. **Stay Current**: PagePortal includes a built-in **In-App Updater**—it will automatically check GitHub for new versions so you always have the latest features and security fixes.
 
 ### Building from Source
-
 ```bash
 # Clone the repository
 git clone https://github.com/OwlSoda/PagePortal.git
 
-# Open in Android Studio or build via command line
-./gradlew assembleDebug
+# Build via Gradle
+./gradlew assembleRelease
 ```
-
-The APK will be located in `app/build/outputs/apk/debug/`.
 
 ---
 
 ## 🤝 Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
+Contributions that align with the premium PagePortal aesthetic are welcome! Please feel free to submit a Pull Request or open an issue.
 
 ## 📄 License
-
-[License Information]
+This project is licensed under the [MIT License](LICENSE) (or your preferred license).

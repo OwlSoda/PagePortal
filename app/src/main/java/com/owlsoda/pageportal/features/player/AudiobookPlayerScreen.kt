@@ -37,9 +37,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.owlsoda.pageportal.ui.theme.BookCampPlayerBackground
-import com.owlsoda.pageportal.ui.theme.BookCampPlayerText
-import com.owlsoda.pageportal.ui.theme.BookCampPurple
+import com.owlsoda.pageportal.ui.theme.PagePortalPlayerBackground
+import com.owlsoda.pageportal.ui.theme.PagePortalPlayerText
+import com.owlsoda.pageportal.ui.theme.PagePortalPurple
 import coil.compose.AsyncImage
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
@@ -87,7 +87,7 @@ fun AudiobookPlayerScreen(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(BookCampPlayerBackground)
+                .background(PagePortalPlayerBackground)
         )
 
         // 2. Content Layer
@@ -186,7 +186,7 @@ fun AudiobookPlayerScreen(
                     Text(
                         text = state.title,
                         style = MaterialTheme.typography.displaySmall.copy(
-                            color = BookCampPlayerText,
+                            color = PagePortalPlayerText,
                             textAlign = TextAlign.Center
                         ),
                         maxLines = 2,
@@ -196,7 +196,7 @@ fun AudiobookPlayerScreen(
                     Text(
                         text = state.author,
                         style = MaterialTheme.typography.titleMedium.copy(
-                            color = BookCampPlayerText.copy(alpha = 0.6f)
+                            color = PagePortalPlayerText.copy(alpha = 0.6f)
                         ),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
@@ -253,7 +253,7 @@ fun AudiobookPlayerScreen(
                         Text(
                             "${state.playbackSpeed}x",
                             style = MaterialTheme.typography.labelLarge,
-                            color = BookCampPlayerText
+                            color = PagePortalPlayerText
                         )
                     }
                     
@@ -265,7 +265,7 @@ fun AudiobookPlayerScreen(
                         Icon(
                             Icons.Default.Replay10,
                             "Rewind 10s",
-                            tint = BookCampPlayerText,
+                            tint = PagePortalPlayerText,
                             modifier = Modifier.size(36.dp)
                         )
                     }
@@ -304,7 +304,7 @@ fun AudiobookPlayerScreen(
                         Icon(
                             Icons.Default.Forward30,
                             "Forward 30s",
-                            tint = BookCampPlayerText,
+                            tint = PagePortalPlayerText,
                             modifier = Modifier.size(36.dp)
                         )
                     }
@@ -314,7 +314,7 @@ fun AudiobookPlayerScreen(
                         Icon(
                             Icons.Default.Bedtime,
                             "Sleep Timer",
-                            tint = if (state.sleepTimerRemaining > 0) BookCampPurple else BookCampPlayerText
+                            tint = if (state.sleepTimerRemaining > 0) PagePortalPurple else PagePortalPlayerText
                         )
                     }
                 }
