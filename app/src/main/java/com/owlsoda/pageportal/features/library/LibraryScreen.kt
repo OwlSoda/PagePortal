@@ -11,6 +11,8 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.Headphones
@@ -33,6 +35,7 @@ import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material3.*
+import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.material3.pulltorefresh.pullToRefresh
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
@@ -83,6 +86,7 @@ fun LibraryScreen(
     val scope = rememberCoroutineScope()
     val gridState = rememberLazyGridState()
     
+    val pagerState = rememberPagerState(pageCount = { 4 })
     var showOverflowMenu by remember { mutableStateOf(false) }
     
     val importLauncher = rememberLauncherForActivityResult(
@@ -113,24 +117,9 @@ fun LibraryScreen(
                     // Search (Primary) - Only if not already in main content area
                     // Link: View Mode toggle
                     IconButton(onClick = { 
-                        val nextMode = when (uiState.viewMode) {
-                            ViewMode.Home -> ViewMode.Grid
-                            ViewMode.Grid -> ViewMode.List
-                            ViewMode.List -> ViewMode.Authors
-                            ViewMode.Authors -> ViewMode.Series
-                            ViewMode.Series -> ViewMode.Home
-                        }
-                        viewModel.setViewMode(nextMode)
+                        // Redundant now but keeping for compatibility if needed elsewhere
                     }) {
-                        Icon(
-                            when (uiState.viewMode) {
-                                ViewMode.Home -> Icons.Default.Home
-                                ViewMode.Grid -> Icons.Default.GridView
-                                ViewMode.List -> Icons.AutoMirrored.Filled.ViewList
-                                else -> Icons.Default.GridView
-                            },
-                            contentDescription = "View: ${uiState.viewMode.name}"
-                        )
+                        // Empty or remove
                     }
 
                     // Settings (Primary)
@@ -266,60 +255,54 @@ fun LibraryScreen(
                         label = { Text("📥 Downloaded") }
                     )
                 }
-            }
-            
-            // Service tabs
-            ScrollableTabRow(
-                selectedTabIndex = uiState.selectedTabIndex,
-                modifier = Modifier.fillMaxWidth(),
-                edgePadding = 16.dp
-            ) {
-                uiState.serverTabs.forEachIndexed { index, tab ->
-                    Tab(
-                        selected = uiState.selectedTabIndex == index,
-                        onClick = { viewModel.selectTab(index) },
-                        text = { 
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                val icon = when {
-                                    tab.id == -1L -> "📚"
-                                    tab.serviceType == ServiceType.AUDIOBOOKSHELF -> "🎧"
-                                    tab.serviceType == ServiceType.BOOKLORE -> "📖"
-                                    tab.serviceType == ServiceType.STORYTELLER -> "🗣️"
-                                    else -> "🔗"
-                                }
-                                if (tab.id != -1L) {
-                                    val color = if (tab.isConnected) {
-                                        androidx.compose.ui.graphics.Color.Green
-                                    } else {
-                                        MaterialTheme.colorScheme.error
-                                    }
-                                    
-                                    Box(
-                                        modifier = Modifier
-                                            .size(8.dp)
-                                            .clip(androidx.compose.foundation.shape.CircleShape)
-                                            .background(color)
-                                    )
-                                }
+            } // End of Filter Chips Row
 
-                                Text(text = "$icon ${tab.name}")
-                                
-                                if (tab.bookCount > 0) {
-                                    Text(
-                                        text = "(${tab.bookCount})",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                            }
+            // Main Navigation Tabs
+            ScrollableTabRow(
+                selectedTabIndex = pagerState.currentPage,
+                modifier = Modifier.fillMaxWidth(),
+                edgePadding = 20.dp,
+                containerColor = Color.Transparent,
+                divider = {},
+                indicator = { tabPositions ->
+                    TabRowDefaults.SecondaryIndicator(
+                        Modifier.tabIndicatorOffset(tabPositions[pagerState.currentPage]),
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            ) {
+                listOf("Home", "Authors", "Series", "Books").forEachIndexed { index, title ->
+                    Tab(
+                        selected = pagerState.currentPage == index,
+                        onClick = { 
+                            scope.launch { pagerState.animateScrollToPage(index) }
+                        },
+                        text = { 
+                            Text(
+                                title,
+                                style = MaterialTheme.typography.titleSmall,
+                                color = if (pagerState.currentPage == index) 
+                                    MaterialTheme.colorScheme.primary 
+                                else 
+                                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                            )
                         }
                     )
                 }
             }
-            
+
+            // Sync ViewMode with Pager
+            LaunchedEffect(pagerState.currentPage) {
+                val mode = when(pagerState.currentPage) {
+                    0 -> ViewMode.Home
+                    1 -> ViewMode.Authors
+                    2 -> ViewMode.Series
+                    else -> ViewMode.Grid
+                }
+                if (uiState.viewMode != mode) {
+                    viewModel.setViewMode(mode)
+                }
+            }
             
             // Content
             val pullRefreshState = rememberPullToRefreshState()
@@ -328,6 +311,7 @@ fun LibraryScreen(
                     pullRefreshState.animateToHidden()
                 }
             }
+            
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -337,207 +321,19 @@ fun LibraryScreen(
                         onRefresh = { viewModel.refresh() }
                     )
             ) {
-                 when {
-                        // Error State
-                        uiState.error != null && !uiState.isLoading -> {
-                            Box(
-                                modifier = Modifier.fillMaxSize(),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = uiState.error!!,
-                                    color = MaterialTheme.colorScheme.error,
-                                    textAlign = TextAlign.Center,
-                                    modifier = Modifier.padding(16.dp)
-                                )
-                            }
-                        }
-                        
-                        // Empty States
-                        uiState.books.isEmpty() && !uiState.isLoading -> {
-                            val info = when {
-                                uiState.servers.isEmpty() -> {
-                                    EmptyStateInfo("🔌", "No Services Connected", "Go to Settings to add Storyteller or other services.", "Open Settings", onSettingsClick)
-                                }
-                                
-                                uiState.isOfflineFilterActive -> {
-                                    EmptyStateInfo("☁️", "No Downloaded Books", "Download books while online to read them here.", null, null)
-                                }
-                                
-                                else -> {
-                                    EmptyStateInfo("📚", "No Books Found", "Pull down to refresh or check your server connection.", null, null)
-                                }
-                            }
-                            
-                            EmptyState(
-                                icon = info.icon,
-                                title = info.title,
-                                message = info.message,
-                                buttonText = info.buttonText,
-                                onButtonClick = info.onAction
-                            )
-                            Spacer(modifier = Modifier.height(16.dp))
-                            OutlinedButton(onClick = { viewModel.refresh() }) {
-                                Icon(
-                                    imageVector = Icons.Default.Refresh,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("Refresh Library")
-                            }
-                        }
-                        
-                        // Content Logic
-                        else -> {
-                            Column(modifier = Modifier.fillMaxSize()) {
-                                // Header for Author/Series view with Download All
-                                if (uiState.selectedFilter != null && (uiState.viewMode == ViewMode.Authors || uiState.viewMode == ViewMode.Series)) {
-                                    Surface(
-                                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                                        modifier = Modifier.fillMaxWidth()
-                                    ) {
-                                        Row(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .padding(16.dp),
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Column(modifier = Modifier.weight(1f)) {
-                                                Text(
-                                                    text = uiState.selectedFilter!!,
-                                                    style = MaterialTheme.typography.titleMedium
-                                                )
-                                                Text(
-                                                    text = "${uiState.books.size} books",
-                                                    style = MaterialTheme.typography.bodySmall,
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                                )
-                                            }
-                                            
-                                            Button(
-                                                onClick = {
-                                                    if (uiState.viewMode == ViewMode.Series) {
-                                                        viewModel.downloadSeries(uiState.selectedFilter!!)
-                                                    } else {
-                                                        viewModel.downloadAuthor(uiState.selectedFilter!!)
-                                                    }
-                                                }
-                                            ) {
-                                                Icon(Icons.Default.CloudQueue, contentDescription = null, modifier = Modifier.size(18.dp))
-                                                Spacer(modifier = Modifier.width(8.dp))
-                                                Text("Download All")
-                                            }
-                                            
-                                            IconButton(onClick = { viewModel.clearFilter() }) {
-                                                Icon(Icons.Default.Close, "Clear Selection")
-                                            }
-                                        }
-                                    }
-                                }
-                                
-                                // Main Content based on Mode
-                                if (uiState.viewMode == ViewMode.Series && uiState.selectedFilter == null) {
-                                    // Series List
-                                    LazyColumn(
-                                        modifier = Modifier.fillMaxSize(),
-                                        contentPadding = PaddingValues(16.dp)
-                                    ) {
-                                        items(uiState.uniqueSeries.size) { index ->
-                                            val series = uiState.uniqueSeries[index]
-                                            ListItem(
-                                                headlineContent = { Text(series) },
-                                                leadingContent = { Icon(Icons.Default.Folder, contentDescription = null) },
-                                                modifier = Modifier.clickable { viewModel.selectFilter(series) }
-                                            )
-                                            HorizontalDivider()
-                                        }
-                                    }
-                                } else if (uiState.viewMode == ViewMode.Authors && uiState.selectedFilter == null) {
-                                    // Authors List
-                                    LazyColumn(
-                                        modifier = Modifier.fillMaxSize(),
-                                        contentPadding = PaddingValues(16.dp)
-                                    ) {
-                                        items(uiState.uniqueAuthors.size) { index ->
-                                            val author = uiState.uniqueAuthors[index]
-                                            ListItem(
-                                                headlineContent = { Text(author) },
-                                                leadingContent = { Icon(Icons.Default.Person, contentDescription = null) },
-                                                modifier = Modifier.clickable { viewModel.selectFilter(author) }
-                                            )
-                                            HorizontalDivider()
-                                        }
-                                    }
-                                } else if (uiState.viewMode != ViewMode.Home) {
-                                    // Grid View (Standard or Keyed Filter)
-                                    Box(modifier = Modifier.fillMaxSize()) {
-                                        LazyVerticalGrid(
-                                            state = gridState,
-                                            columns = GridCells.Fixed(2), // Force 2-column for BookCamp feel
-                                            contentPadding = PaddingValues(20.dp),
-                                            horizontalArrangement = Arrangement.spacedBy(20.dp),
-                                            verticalArrangement = Arrangement.spacedBy(24.dp),
-                                            modifier = Modifier.fillMaxSize()
-                                        ) {
-                                            items(
-                                                items = uiState.books,
-                                                key = { it.id }
-                                            ) { book ->
-                                                BookCard(
-                                                    book = book,
-                                                    modifier = Modifier.animateItem(),
-                                                    onClick = { onBookClick("u_${book.id}") }
-                                                )
-                                            }
-                                        }
-
-                                        // Fast Scroller Overlay
-                                        if (uiState.viewMode == ViewMode.Grid && uiState.sortOption == SortOption.TitleAsc && uiState.books.size > 5) {
-                                            FastScroller(
-                                                onLetterClick = { letter ->
-                                                    val index = uiState.books.indexOfFirst { 
-                                                        val title = it.title.trim().lowercase()
-                                                        val normalized = when {
-                                                            title.startsWith("the ") -> title.removePrefix("the ")
-                                                            title.startsWith("a ") -> title.removePrefix("a ")
-                                                            title.startsWith("an ") -> title.removePrefix("an ")
-                                                            else -> title
-                                                        }
-                                                        if (letter == '#') {
-                                                            normalized.isNotEmpty() && normalized[0].isDigit()
-                                                        } else {
-                                                            normalized.isNotEmpty() && normalized[0].uppercaseChar() == letter
-                                                        }
-                                                    }
-                                                    if (index != -1) {
-                                                        scope.launch {
-                                                            gridState.animateScrollToItem(index)
-                                                        }
-                                                    }
-                                                },
-                                                modifier = Modifier
-                                                    .align(Alignment.CenterEnd)
-                                                    .padding(end = 4.dp)
-                                                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.5f), MaterialTheme.shapes.medium)
-                                            )
-                                        }
-                                    }
-                                } else {
-                                    // Home Dashboard
-                                    HomeView(
-                                        selectedTabId = uiState.serverTabs.getOrNull(uiState.selectedTabIndex)?.id ?: -1L,
-                                        recentBooks = uiState.recentBooks,
-                                        homeAuthors = uiState.homeAuthors,
-                                        serviceMap = uiState.booksByService,
-                                        onBookClick = onBookClick,
-                                        onSettingsClick = onSettingsClick
-                                    )
-                                }
-                            }
-                        }
+                HorizontalPager(
+                    state = pagerState,
+                    modifier = Modifier.fillMaxSize(),
+                    beyondViewportPageCount = 1
+                ) { pageIndex ->
+                    when (pageIndex) {
+                        0 -> HomeTabContent(uiState, onBookClick, onSettingsClick)
+                        1 -> AuthorsTabContent(uiState, viewModel)
+                        2 -> SeriesTabContent(uiState, viewModel)
+                        3 -> BooksTabContent(uiState, gridState, viewModel, onBookClick)
                     }
+                }
+                
                 PullToRefreshDefaults.Indicator(
                     state = pullRefreshState,
                     isRefreshing = uiState.isLoading,
@@ -549,13 +345,184 @@ fun LibraryScreen(
 }
 
 @Composable
+fun HomeTabContent(
+    uiState: LibraryUiState,
+    onBookClick: (String) -> Unit,
+    onSettingsClick: () -> Unit
+) {
+    if (uiState.books.isEmpty() && !uiState.isLoading) {
+        EmptyLibraryState(uiState, onSettingsClick)
+    } else {
+        HomeView(
+            selectedTabId = uiState.serverTabs.getOrNull(uiState.selectedTabIndex)?.id ?: -1L,
+            recentBooks = uiState.recentBooks,
+            homeAuthors = uiState.homeAuthors,
+            serviceMap = uiState.booksByService,
+            onBookClick = onBookClick
+        )
+    }
+}
+
+@Composable
+fun AuthorsTabContent(
+    uiState: LibraryUiState,
+    viewModel: LibraryViewModel
+) {
+    if (uiState.uniqueAuthors.isEmpty() && !uiState.isLoading) {
+        EmptyState(icon = "👤", title = "No Authors", message = "Authors will appear here once you have books.")
+    } else {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(16.dp)
+        ) {
+            items(uiState.uniqueAuthors) { author ->
+                ListItem(
+                    headlineContent = { Text(author) },
+                    leadingContent = { Icon(Icons.Default.Person, contentDescription = null) },
+                    modifier = Modifier.clickable { 
+                        viewModel.selectFilter(author)
+                        viewModel.setViewMode(ViewMode.Grid)
+                    }
+                )
+                HorizontalDivider()
+            }
+        }
+    }
+}
+
+@Composable
+fun SeriesTabContent(
+    uiState: LibraryUiState,
+    viewModel: LibraryViewModel
+) {
+    if (uiState.uniqueSeries.isEmpty() && !uiState.isLoading) {
+        EmptyState(icon = "📚", title = "No Series", message = "Series information will appear here once you have books.")
+    } else {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(16.dp)
+        ) {
+            items(uiState.uniqueSeries) { series ->
+                ListItem(
+                    headlineContent = { Text(series) },
+                    leadingContent = { Icon(Icons.Default.Folder, contentDescription = null) },
+                    modifier = Modifier.clickable { 
+                        viewModel.selectFilter(series)
+                        viewModel.setViewMode(ViewMode.Grid)
+                    }
+                )
+                HorizontalDivider()
+            }
+        }
+    }
+}
+
+@Composable
+fun BooksTabContent(
+    uiState: LibraryUiState,
+    gridState: androidx.compose.foundation.lazy.grid.LazyGridState,
+    viewModel: LibraryViewModel,
+    onBookClick: (String) -> Unit
+) {
+    Column(modifier = Modifier.fillMaxSize()) {
+        // Service Filter Row
+        ScrollableTabRow(
+            selectedTabIndex = uiState.selectedTabIndex,
+            modifier = Modifier.fillMaxWidth(),
+            edgePadding = 16.dp,
+            containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(1.dp),
+            divider = {}
+        ) {
+            uiState.serverTabs.forEachIndexed { index, tab ->
+                Tab(
+                    selected = uiState.selectedTabIndex == index,
+                    onClick = { viewModel.selectTab(index) },
+                    text = { 
+                        val icon = when {
+                            tab.id == -1L -> "📚"
+                            tab.serviceType == ServiceType.AUDIOBOOKSHELF -> "🎧"
+                            tab.serviceType == ServiceType.BOOKLORE -> "📖"
+                            tab.serviceType == ServiceType.STORYTELLER -> "🗣️"
+                            else -> "🔗"
+                        }
+                        Text(text = "$icon ${tab.name}", style = MaterialTheme.typography.labelMedium)
+                    }
+                )
+            }
+        }
+
+        // Active filter badge if any
+        if (uiState.selectedFilter != null) {
+            Surface(
+                color = MaterialTheme.colorScheme.primaryContainer,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier.padding(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Filtered by: ${uiState.selectedFilter}",
+                        style = MaterialTheme.typography.labelLarge,
+                        modifier = Modifier.weight(1f).padding(start = 8.dp)
+                    )
+                    IconButton(onClick = { viewModel.clearFilter() }) {
+                        Icon(Icons.Default.Close, "Clear")
+                    }
+                }
+            }
+        }
+
+        Box(modifier = Modifier.fillMaxSize()) {
+            LazyVerticalGrid(
+                state = gridState,
+                columns = GridCells.Fixed(2),
+                contentPadding = PaddingValues(20.dp),
+                horizontalArrangement = Arrangement.spacedBy(20.dp),
+                verticalArrangement = Arrangement.spacedBy(24.dp),
+                modifier = Modifier.fillMaxSize()
+            ) {
+                items(uiState.books, key = { it.id }) { book ->
+                    BookCard(
+                        book = book,
+                        onClick = { onBookClick("u_${book.id}") }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun EmptyLibraryState(uiState: LibraryUiState, onSettingsClick: () -> Unit) {
+    val info = when {
+        uiState.servers.isEmpty() -> {
+            EmptyStateInfo("🔌", "No Services Connected", "Go to Settings to add Storyteller or other services.", "Open Settings", onSettingsClick)
+        }
+        uiState.isOfflineFilterActive -> {
+            EmptyStateInfo("☁️", "No Downloaded Books", "Download books while online to read them here.", null, null)
+        }
+        else -> {
+            EmptyStateInfo("📚", "No Books Found", "Pull down to refresh or check your server connection.", null, null)
+        }
+    }
+    
+    EmptyState(
+        icon = info.icon,
+        title = info.title,
+        message = info.message,
+        buttonText = info.buttonText,
+        onButtonClick = info.onAction
+    )
+}
+
+@Composable
 fun HomeView(
     selectedTabId: Long,
     recentBooks: List<UnifiedBookDisplay>,
     homeAuthors: List<AuthorDisplay>,
     serviceMap: Map<String, List<UnifiedBookDisplay>>,
-    onBookClick: (String) -> Unit,
-    onSettingsClick: () -> Unit
+    onBookClick: (String) -> Unit
 ) {
     val isAllTab = selectedTabId == -1L
     

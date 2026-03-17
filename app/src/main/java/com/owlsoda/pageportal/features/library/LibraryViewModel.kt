@@ -218,7 +218,8 @@ class LibraryViewModel @Inject constructor(
     
     // View mode
     fun setViewMode(mode: ViewMode) {
-        _uiState.update { it.copy(viewMode = mode, selectedFilter = null) }
+        val keepFilter = mode == ViewMode.Grid || mode == ViewMode.List
+        _uiState.update { it.copy(viewMode = mode, selectedFilter = if (keepFilter) it.selectedFilter else null) }
         updateDisplayedBooks()
     }
     
