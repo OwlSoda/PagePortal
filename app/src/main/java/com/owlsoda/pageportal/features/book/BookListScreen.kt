@@ -23,6 +23,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import com.owlsoda.pageportal.core.database.entity.BookEntity
 import com.owlsoda.pageportal.ui.components.EmptyState
+import androidx.compose.material.icons.automirrored.filled.LibraryBooks
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -60,7 +61,7 @@ fun BookListScreen(
                 CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
             } else if (uiState.books.isEmpty()) {
                 EmptyState(
-                    icon = "📚",
+                    icon = Icons.AutoMirrored.Filled.LibraryBooks,
                     title = "No Books Found",
                     message = "There are no books in this category."
                 )
