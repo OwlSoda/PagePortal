@@ -9,6 +9,7 @@ import com.owlsoda.pageportal.services.ServiceBook
 import com.owlsoda.pageportal.services.ServiceManager
 import javax.inject.Inject
 import javax.inject.Singleton
+import com.owlsoda.pageportal.data.repository.SyncRepository
 
 @Singleton
 class LibraryRepository @Inject constructor(
@@ -16,7 +17,8 @@ class LibraryRepository @Inject constructor(
     private val bookDao: BookDao,
     private val collectionDao: com.owlsoda.pageportal.core.database.dao.CollectionDao,
     private val matchingEngine: MatchingEngine,
-    private val progressDao: com.owlsoda.pageportal.core.database.dao.ProgressDao
+    private val progressDao: com.owlsoda.pageportal.core.database.dao.ProgressDao,
+    private val syncRepository: SyncRepository
 ) {
     
     suspend fun syncLibrary(): Result<Unit> {
@@ -135,41 +137,33 @@ class LibraryRepository @Inject constructor(
     }
 
     suspend fun syncProgress(bookId: Long): Result<Unit> {
-        return try {
-            val progress = progressDao.getProgressByBookId(bookId) ?: return Result.success(Unit)
-            val book = bookDao.getBookById(bookId) ?: return Result.failure(Exception("Book not found"))
-            val service = serviceManager.getService(book.serverId) ?: return Result.failure(Exception("Service not found"))
-            
-            // Map Entity to Service Model
-            val readingProgress = com.owlsoda.pageportal.services.ReadingProgress(
-                bookId = book.serviceBookId,
-                currentPosition = progress.currentPosition, // ms
-                currentChapter = progress.currentChapter,
-                percentComplete = progress.percentComplete,
-                lastUpdated = progress.lastUpdated
-            )
-            
-            service.updateProgress(book.serviceBookId, readingProgress)
-            progressDao.markSynced(bookId)
-            
-            Result.success(Unit)
-        } catch (e: Exception) {
-            e.printStackTrace()
-            Result.failure(e)
-        }
+        return syncRepository.syncProgress(bookId)
     }
+    
     suspend fun syncPendingProgress(): Result<Int> {
+        return syncRepository.syncAll()
+    }
+
+    suspend fun triggerReadAloud(bookId: Long): Result<Unit> {
         return try {
-            val pending = progressDao.getUnsyncedProgress()
-            if (pending.isEmpty()) return Result.success(0)
-            
-            var successCount = 0
-            for (progress in pending) {
-                // Try to sync each one
-                val result = syncProgress(progress.bookId)
-                if (result.isSuccess) successCount++
+            val book = bookDao.getBookById(bookId) ?: return Result.failure(Exception("Book not found"))
+            val service = serviceManager.getService(book.serverId)
+            if (service !is com.owlsoda.pageportal.services.storyteller.StorytellerService) {
+                return Result.failure(Exception("Action only supported for Storyteller servers"))
             }
-            Result.success(successCount)
+
+            val result = service.triggerReadAloudProcessing(book.serviceBookId)
+            if (result.isSuccess) {
+                // Update local status to reflect it's being processed
+                val updatedBook = book.copy(
+                    processingStatus = "processing",
+                    updatedAt = System.currentTimeMillis()
+                )
+                bookDao.updateBook(updatedBook)
+                Result.success(Unit)
+            } else {
+                Result.failure(result.exceptionOrNull() ?: Exception("Unknown error triggering sync"))
+            }
         } catch (e: Exception) {
             Result.failure(e)
         }

@@ -26,7 +26,7 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -62,6 +62,8 @@ fun ReaderScreen(
     viewModel: ReaderViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val isSyncingMap by viewModel.isSyncing.collectAsState()
+    val isSyncing = isSyncingMap[bookId.toLongOrNull() ?: 0L] == true
     val context = LocalContext.current
     val view = androidx.compose.ui.platform.LocalView.current
     
@@ -355,6 +357,20 @@ fun ReaderScreen(
                      }
                  },
                  actions = {
+                     if (isSyncing) {
+                         CircularProgressIndicator(
+                             modifier = Modifier.size(24.dp).padding(4.dp),
+                             strokeWidth = 2.dp
+                         )
+                     } else {
+                         Icon(
+                             Icons.Default.CloudDone,
+                             "Synced",
+                             tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                             modifier = Modifier.size(20.dp)
+                         )
+                     }
+                     Spacer(Modifier.width(8.dp))
                      IconButton(onClick = { showTocSheet = true }) {
                          Icon(Icons.AutoMirrored.Filled.List, "Table of Contents")
                      }

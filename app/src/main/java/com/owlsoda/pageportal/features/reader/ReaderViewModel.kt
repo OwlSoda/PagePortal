@@ -34,6 +34,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.isActive
 import java.net.URLDecoder
+import com.owlsoda.pageportal.data.repository.LibraryRepository
+import com.owlsoda.pageportal.core.database.entity.ProgressEntity
 
 data class SearchResult(
     val chapterIndex: Int,
@@ -101,14 +103,15 @@ enum class ReaderTheme(val backgroundColor: String, val textColor: String) {
 class ReaderViewModel @Inject constructor(
     private val bookDao: BookDao,
     private val progressDao: ProgressDao,
-    private val serverDao: ServerDao,
     private val highlightDao: HighlightDao,
     private val bookmarkDao: com.owlsoda.pageportal.core.database.dao.BookmarkDao,
+    private val serverDao: ServerDao,
     private val preferencesRepository: PreferencesRepository,
-    private val libraryRepository: com.owlsoda.pageportal.data.repository.LibraryRepository,
+    private val libraryRepository: LibraryRepository,
     private val syncRepository: SyncRepository
 ) : ViewModel() {
 
+    val isSyncing = syncRepository.isSyncing
     private val _uiState = MutableStateFlow(ReaderUiState())
     val uiState: StateFlow<ReaderUiState> = _uiState.asStateFlow()
     
@@ -216,8 +219,13 @@ class ReaderViewModel @Inject constructor(
                          pdfFile = pdfFile,
                          isLoading = false
                     )
-                     // Load saved progress
-                     val progress = progressDao.getProgressByBookId(id)
+                     val book = bookDao.getBookById(id) ?: return@launch
+                
+                // Bidirectional sync
+                _uiState.update { it.copy(isLoading = true) }
+                syncRepository.syncProgress(id)
+                
+                val progress = progressDao.getProgressByBookId(id)
                      if (progress != null) {
                          _uiState.update { it.copy(currentChapterIndex = progress.currentChapter) }
                      }
@@ -227,7 +235,7 @@ class ReaderViewModel @Inject constructor(
             
             if (file == null || !file.exists()) {
                  // Try legacy/fallback location if any
-                 val server = serverDao.getServerById(bookEntity.serverId.toLong())
+                 val server = bookEntity.serverId?.let { serverDao.getServerById(it) }
                  if (server != null) {
                      val serviceTypeName = server.serviceType.lowercase()
                      val fileName = "${bookEntity.title}.bin"
@@ -982,6 +990,7 @@ class ReaderViewModel @Inject constructor(
     }
 
     private var syncJob: kotlinx.coroutines.Job? = null
+    private var progressUpdateJob: Job? = null
 
     fun setPlaybackSpeed(speed: Float) {
         viewModelScope.launch {
