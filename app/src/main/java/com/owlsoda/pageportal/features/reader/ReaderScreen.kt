@@ -1028,11 +1028,27 @@ fun ReaderSettingsSheet(
             )
         }
         if (!isAuto) {
-            Slider(
-                value = brightness,
-                onValueChange = { onBrightnessChanged(it) },
-                valueRange = 0.0f..1.0f
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(
+                    onClick = { onBrightnessChanged(kotlin.math.max(0.0f, kotlin.math.round((brightness - 0.1f) * 10f) / 10f)) },
+                    enabled = brightness > 0.0f
+                ) {
+                    Icon(Icons.Default.Remove, "Decrease brightness")
+                }
+                Slider(
+                    value = brightness,
+                    onValueChange = { onBrightnessChanged(it) },
+                    valueRange = 0.0f..1.0f,
+                    steps = 9,
+                    modifier = Modifier.weight(1f)
+                )
+                IconButton(
+                    onClick = { onBrightnessChanged(kotlin.math.min(1.0f, kotlin.math.round((brightness + 0.1f) * 10f) / 10f)) },
+                    enabled = brightness < 1.0f
+                ) {
+                    Icon(Icons.Default.Add, "Increase brightness")
+                }
+            }
         }
         
         HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
@@ -1090,26 +1106,73 @@ fun ReaderSettingsSheet(
         }
 
         Text("Line Height: ${String.format("%.1f", lineHeight)}", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 8.dp))
-        Slider(
-            value = lineHeight,
-            onValueChange = { onLineHeightChanged(it) },
-            valueRange = 1.0f..2.5f
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            IconButton(
+                onClick = { onLineHeightChanged(kotlin.math.max(1.0f, kotlin.math.round((lineHeight - 0.1f) * 10f) / 10f)) },
+                enabled = lineHeight > 1.0f
+            ) {
+                Icon(Icons.Default.Remove, "Decrease line height")
+            }
+            Slider(
+                value = lineHeight,
+                onValueChange = { onLineHeightChanged(it) },
+                valueRange = 1.0f..2.5f,
+                steps = 14,
+                modifier = Modifier.weight(1f)
+            )
+            IconButton(
+                onClick = { onLineHeightChanged(kotlin.math.min(2.5f, kotlin.math.round((lineHeight + 0.1f) * 10f) / 10f)) },
+                enabled = lineHeight < 2.5f
+            ) {
+                Icon(Icons.Default.Add, "Increase line height")
+            }
+        }
         
         Text("Paragraph Spacing: ${String.format("%.1f", paragraphSpacing)}", style = MaterialTheme.typography.bodyMedium)
-        Slider(
-            value = paragraphSpacing,
-            onValueChange = { onParagraphSpacingChanged(it) },
-            valueRange = 0.0f..2.0f
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            IconButton(
+                onClick = { onParagraphSpacingChanged(kotlin.math.max(0.0f, kotlin.math.round((paragraphSpacing - 0.1f) * 10f) / 10f)) },
+                enabled = paragraphSpacing > 0.0f
+            ) {
+                Icon(Icons.Default.Remove, "Decrease paragraph spacing")
+            }
+            Slider(
+                value = paragraphSpacing,
+                onValueChange = { onParagraphSpacingChanged(it) },
+                valueRange = 0.0f..2.0f,
+                steps = 19,
+                modifier = Modifier.weight(1f)
+            )
+            IconButton(
+                onClick = { onParagraphSpacingChanged(kotlin.math.min(2.0f, kotlin.math.round((paragraphSpacing + 0.1f) * 10f) / 10f)) },
+                enabled = paragraphSpacing < 2.0f
+            ) {
+                Icon(Icons.Default.Add, "Increase paragraph spacing")
+            }
+        }
         
         Text("Margin: $margin", style = MaterialTheme.typography.bodyMedium)
-        Slider(
-            value = margin.toFloat(),
-            onValueChange = { onMarginChanged(it.toInt()) },
-            valueRange = 0f..10f,
-            steps = 9
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            IconButton(
+                onClick = { onMarginChanged(margin - 1) },
+                enabled = margin > 0
+            ) {
+                Icon(Icons.Default.Remove, "Decrease margin")
+            }
+            Slider(
+                value = margin.toFloat(),
+                onValueChange = { onMarginChanged(it.toInt()) },
+                valueRange = 0f..10f,
+                steps = 9,
+                modifier = Modifier.weight(1f)
+            )
+            IconButton(
+                onClick = { onMarginChanged(margin + 1) },
+                enabled = margin < 10
+            ) {
+                Icon(Icons.Default.Add, "Increase margin")
+            }
+        }
         
         Spacer(modifier = Modifier.height(24.dp))
         
