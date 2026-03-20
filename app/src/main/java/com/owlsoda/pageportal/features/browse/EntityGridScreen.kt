@@ -49,6 +49,7 @@ fun EntityGridScreen(
                         when(uiState.selectedType) {
                             EntityType.Authors -> "Authors"
                             EntityType.Series -> "Series"
+                            EntityType.Tags -> "Tags"
                             EntityType.Collections -> "Collections"
                         }
                     ) 
@@ -72,7 +73,8 @@ fun EntityGridScreen(
                 val (icon, title, message) = when(uiState.selectedType) {
                     EntityType.Authors -> Triple(Icons.Filled.Person, "No Authors Found", "Connect a service or refresh to find authors.")
                     EntityType.Series -> Triple(Icons.AutoMirrored.Filled.LibraryBooks, "No Series Found", "Connect a service or refresh to find series.")
-                    EntityType.Collections -> Triple(Icons.Filled.CollectionsBookmark, "No Collections Found", "Create collections or sync with your server.")
+                    EntityType.Tags -> Triple(Icons.Default.LocalOffer, "No Tags Found", "Tags will appear here once your books are synchronized.")
+                    EntityType.Collections -> Triple(Icons.Default.CollectionsBookmark, "No Collections Found", "Create collections or sync with your server.")
                 }
                 
                 EmptyState(
@@ -95,6 +97,7 @@ fun EntityGridScreen(
                                 val typeStr = when(uiState.selectedType) {
                                     EntityType.Authors -> "AUTHOR"
                                     EntityType.Series -> "SERIES"
+                                    EntityType.Tags -> "TAG"
                                     EntityType.Collections -> "COLLECTION"
                                 }
                                 onEntityClick(typeStr, item.id)

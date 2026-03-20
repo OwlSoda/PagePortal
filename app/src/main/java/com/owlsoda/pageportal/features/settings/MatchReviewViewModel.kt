@@ -76,11 +76,12 @@ class MatchReviewViewModel @Inject constructor(
             var bestScore = 0.0f
             
             for (uBook in unified) {
+                val unifiedAuthors = parseAuthors(uBook.authors, com.google.gson.Gson())
                 val score = TitleMatcher.calculateMatchScore(
                     book.title,
-                    listOf(book.authors), // Author JSON parsing is expensive if done inside loop repeatedly
+                    listOf(book.authors),
                     uBook.title,
-                    listOf(uBook.author)
+                    unifiedAuthors
                 )
                 
                 if (score > bestScore) {

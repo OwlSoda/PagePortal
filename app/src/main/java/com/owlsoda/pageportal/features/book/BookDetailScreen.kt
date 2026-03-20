@@ -45,6 +45,8 @@ fun BookDetailScreen(
 
     onPlayReadAloud: (String) -> Unit,
     onAuthorClick: (String) -> Unit,
+    onSeriesClick: (String) -> Unit,
+    onTagClick: (String) -> Unit,
     onOpenWebReader: (String) -> Unit,
     viewModel: BookDetailViewModel = hiltViewModel()
 ) {
@@ -197,7 +199,7 @@ fun BookDetailScreen(
                             } ?: ""
                             
                             Surface(
-                                onClick = { /* TODO: onSeriesClick(book.series) */ },
+                                onClick = { onSeriesClick(book.series) },
                                 color = Color.Transparent,
                                 shape = RoundedCornerShape(8.dp)
                             ) {
@@ -492,7 +494,7 @@ fun BookDetailScreen(
                                 verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 tagList.forEach { tag ->
-                                    TagChip(tag = tag, onClick = { /* TODO: onTagClick(tag) */ })
+                                    TagChip(tag = tag, onClick = { onTagClick(tag) })
                                 }
                             }
                         }

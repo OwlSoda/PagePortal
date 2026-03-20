@@ -16,6 +16,7 @@ import org.json.JSONArray
 sealed class EntityType(val title: String) {
     object Authors : EntityType("Authors")
     object Series : EntityType("Series")
+    object Tags : EntityType("Tags")
     object Collections : EntityType("Collections")
 }
 
@@ -63,6 +64,7 @@ class EntityViewModel @Inject constructor(
                 val items = when (type) {
                     EntityType.Authors -> processAuthors(books)
                     EntityType.Series -> processSeries(books)
+                    EntityType.Tags -> processTags(books)
                     EntityType.Collections -> processCollections(books, collections)
                 }
                 
@@ -119,6 +121,34 @@ class EntityViewModel @Inject constructor(
         }
         
          return seriesMap.map { (name, books) ->
+            EntityItem(
+                id = name,
+                name = name,
+                count = books.size,
+                coverUrl = books.firstOrNull()?.coverUrl
+            )
+        }
+    }
+
+    private fun processTags(books: List<BookEntity>): List<EntityItem> {
+        val tagMap = mutableMapOf<String, MutableList<BookEntity>>()
+        
+        books.forEach { book ->
+            try {
+                // Parse tags JSON array string
+                val jsonArray = org.json.JSONArray(book.tags)
+                for (i in 0 until jsonArray.length()) {
+                    val tagName = jsonArray.getString(i)
+                    if (tagName.isNotBlank()) {
+                        tagMap.getOrPut(tagName) { mutableListOf() }.add(book)
+                    }
+                }
+            } catch (e: Exception) {
+                // No tags or invalid JSON
+            }
+        }
+        
+        return tagMap.map { (name, books) ->
             EntityItem(
                 id = name,
                 name = name,

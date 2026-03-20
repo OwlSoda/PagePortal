@@ -78,14 +78,17 @@ class BookDetailViewModel @Inject constructor(
                     val base = linkedBooks.first()
                     val displayBook = base.copy(
                         title = unified.unifiedBook.title,
-                        authors = unified.unifiedBook.author,
+                        authors = unified.unifiedBook.authors,
+                        series = unified.unifiedBook.series ?: base.series,
+                        seriesIndex = unified.unifiedBook.seriesIndex ?: base.seriesIndex,
                         coverUrl = unified.unifiedBook.coverUrl ?: base.coverUrl,
                         audiobookCoverUrl = unified.unifiedBook.audiobookCoverUrl ?: base.audiobookCoverUrl,
                         description = unified.unifiedBook.description ?: base.description,
                         tags = unified.unifiedBook.tags ?: base.tags,
                         hasEbook = linkedBooks.any { it.hasEbook },
                         hasAudiobook = linkedBooks.any { it.hasAudiobook },
-                        hasReadAloud = linkedBooks.any { it.hasReadAloud }
+                        hasReadAloud = linkedBooks.any { it.hasReadAloud },
+                        duration = linkedBooks.maxOfOrNull { it.duration } ?: base.duration
                     )
                     
                     val progress = progressDao.getProgressByBookId(base.id)

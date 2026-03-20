@@ -36,19 +36,13 @@ class MatchingEngine @Inject constructor(
             
             // Search in existing (and newly created in this session)
             for (unified in existingUnifiedBooks) {
-                val unifiedAuthors = listOf(unified.author) // UnifiedEntity has single string author for display??
-                // Wait, UnifiedBookEntity should probably have list of authors or normalized string?
-                // Current entity: val author: String.
-                // We'll treat it as valid author string.
-                
-                // We compare against the UnifiedBook's metadata. 
-                // Ideally UnifiedBook aggregates authors.
+                val unifiedAuthors = parseAuthors(unified.authors, gson)
                 
                 val score = TitleMatcher.calculateMatchScore(
                     book.title,
                     bookAuthors,
                     unified.title,
-                    listOf(unified.author)
+                    unifiedAuthors
                 )
                 
                 if (score > bestScore) {
@@ -63,8 +57,10 @@ class MatchingEngine @Inject constructor(
             } else {
                 // Create new UnifiedBook
                 val newUnified = UnifiedBookEntity(
-                    title = book.title, // Use this book's title as canonical for now
-                    author = bookAuthors.firstOrNull() ?: "Unknown",
+                    title = book.title,
+                    authors = book.authors,
+                    series = book.series,
+                    seriesIndex = book.seriesIndex,
                     coverUrl = book.coverUrl,
                     audiobookCoverUrl = book.audiobookCoverUrl,
                     description = book.description,

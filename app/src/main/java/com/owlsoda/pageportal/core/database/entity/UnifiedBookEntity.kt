@@ -8,7 +8,9 @@ data class UnifiedBookEntity(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
     val title: String,
-    val author: String,
+    val authors: String, // JSON array
+    val series: String? = null,
+    val seriesIndex: String? = null,
     val coverUrl: String? = null,
     val audiobookCoverUrl: String? = null,
     val description: String? = null,

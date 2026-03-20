@@ -164,8 +164,15 @@ fun MatchCard(
                             candidate.potentialMatch.title, 
                             style = MaterialTheme.typography.titleMedium
                         )
+                        val unifiedAuthors = remember(candidate.potentialMatch.authors) {
+                            try {
+                                com.google.gson.Gson().fromJson(candidate.potentialMatch.authors, Array<String>::class.java).firstOrNull() ?: "Unknown"
+                            } catch (e: Exception) {
+                                candidate.potentialMatch.authors
+                            }
+                        }
                         Text(
-                            candidate.potentialMatch.author, 
+                            unifiedAuthors, 
                             style = MaterialTheme.typography.bodyMedium,
                             color = PagePortalTextSecondary
                         )

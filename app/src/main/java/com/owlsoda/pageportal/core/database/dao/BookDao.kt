@@ -31,6 +31,12 @@ interface BookDao {
 
     @Query("SELECT * FROM books WHERE series = :series AND serverId IN (:serverIds) ORDER BY seriesIndex ASC, title ASC")
     fun getBooksBySeriesAndServerIds(series: String, serverIds: List<Long>): Flow<List<BookEntity>>
+
+    @Query("SELECT * FROM books WHERE tags LIKE '%' || :tag || '%' ORDER BY title ASC")
+    fun getBooksByTag(tag: String): Flow<List<BookEntity>>
+
+    @Query("SELECT * FROM books WHERE tags LIKE '%' || :tag || '%' AND serverId IN (:serverIds) ORDER BY title ASC")
+    fun getBooksByTagAndServerIds(tag: String, serverIds: List<Long>): Flow<List<BookEntity>>
     
     @Query("SELECT * FROM books WHERE id = :id")
     suspend fun getBookById(id: Long): BookEntity?

@@ -366,6 +366,12 @@ fun PagePortalNavHost(
                         onAuthorClick = { author ->
                             navController.navigate(Screen.FilteredBooks.createRoute("AUTHOR", author))
                         },
+                        onSeriesClick = { series ->
+                            navController.navigate(Screen.FilteredBooks.createRoute("SERIES", series))
+                        },
+                        onTagClick = { tag ->
+                            navController.navigate(Screen.FilteredBooks.createRoute("TAG", tag))
+                        },
                         onOpenWebReader = { url ->
                             navController.navigate(Screen.WebReader.createRoute(url))
                         }

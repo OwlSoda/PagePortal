@@ -83,6 +83,7 @@ private data class EmptyStateInfo(
 @Composable
 fun LibraryScreen(
     onBookClick: (String) -> Unit,
+    onAuthorClick: (String) -> Unit,
     onSettingsClick: () -> Unit,
     onBrowseClick: () -> Unit,
     viewModel: LibraryViewModel = hiltViewModel()
@@ -344,7 +345,7 @@ fun LibraryScreen(
                     beyondViewportPageCount = 1
                 ) { pageIndex ->
                     when (pageIndex) {
-                        0 -> HomeTabContent(uiState, onBookClick, onSettingsClick)
+                        0 -> HomeTabContent(uiState, onBookClick, onAuthorClick, onSettingsClick)
                         1 -> AuthorsTabContent(uiState, viewModel)
                         2 -> SeriesTabContent(uiState, viewModel)
                         3 -> BooksTabContent(uiState, gridState, viewModel, onBookClick)
@@ -362,9 +363,8 @@ fun LibraryScreen(
 }
 
 @Composable
-fun HomeTabContent(
-    uiState: LibraryUiState,
     onBookClick: (String) -> Unit,
+    onAuthorClick: (String) -> Unit,
     onSettingsClick: () -> Unit
 ) {
     if (uiState.books.isEmpty() && !uiState.isLoading) {
@@ -375,7 +375,16 @@ fun HomeTabContent(
             recentBooks = uiState.recentBooks,
             homeAuthors = uiState.homeAuthors,
             serviceMap = uiState.booksByService,
-            onBookClick = onBookClick
+            onBookClick = onBookClick,
+            onAuthorClick = onAuthorClick,
+            onSeeAllClick = { tab ->
+                val index = uiState.serverTabs.indexOf(tab)
+                if (index != -1) {
+                    viewModel.selectTab(index)
+                    // If we need to scroll the pager:
+                    scope.launch { pagerState.animateScrollToPage(3) } // Books tab
+                }
+            }
         )
     }
 }
@@ -546,8 +555,10 @@ fun HomeView(
     selectedTabId: Long,
     recentBooks: List<UnifiedBookDisplay>,
     homeAuthors: List<AuthorDisplay>,
-    serviceMap: Map<String, List<UnifiedBookDisplay>>,
-    onBookClick: (String) -> Unit
+    serviceMap: Map<ServerTab, List<UnifiedBookDisplay>>,
+    onBookClick: (String) -> Unit,
+    onAuthorClick: (String) -> Unit,
+    onSeeAllClick: (ServerTab) -> Unit
 ) {
     val isAllTab = selectedTabId == -1L
     
@@ -561,6 +572,7 @@ fun HomeView(
                 ContinueReadingSection(
                     books = recentBooks, 
                     onBookClick = onBookClick,
+                    onAuthorClick = onAuthorClick,
                     isCompact = !isAllTab
                 )
             }
@@ -571,6 +583,7 @@ fun HomeView(
             item {
                 HomeAuthorsSection(
                     authors = homeAuthors,
+                    onAuthorClick = onAuthorClick,
                     isGrid = !isAllTab
                 )
             }
@@ -578,12 +591,13 @@ fun HomeView(
         
         // Service Rows (Only for "All" tab)
         if (isAllTab) {
-            serviceMap.forEach { (serviceName, books) ->
+            serviceMap.forEach { (tab, books) ->
                 item {
                     ServiceCarousel(
-                        title = serviceName,
+                        title = tab.name,
                         books = books,
-                        onBookClick = onBookClick
+                        onBookClick = onBookClick,
+                        onSeeAllClick = { onSeeAllClick(tab) }
                     )
                 }
             }
@@ -600,6 +614,7 @@ fun HomeView(
 fun ContinueReadingSection(
     books: List<UnifiedBookDisplay>,
     onBookClick: (String) -> Unit,
+    onAuthorClick: (String) -> Unit,
     isCompact: Boolean = false
 ) {
     val listState = rememberLazyListState()
@@ -641,6 +656,7 @@ fun ContinueReadingSection(
 @Composable
 fun HomeAuthorsSection(
     authors: List<AuthorDisplay>,
+    onAuthorClick: (String) -> Unit,
     isGrid: Boolean = false
 ) {
     Column(modifier = Modifier.padding(vertical = 12.dp)) {
@@ -672,6 +688,7 @@ fun HomeAuthorsSection(
                 authors.forEach { author ->
                     HomeAuthorItem(
                         author = author,
+                        onClick = { onAuthorClick(author.name) },
                         modifier = Modifier.width(90.dp)
                     )
                 }
@@ -688,6 +705,7 @@ fun HomeAuthorsSection(
                 items(authors) { author ->
                     HomeAuthorItem(
                         author = author,
+                        onClick = { onAuthorClick(author.name) },
                         modifier = Modifier.width(100.dp)
                     )
                 }
@@ -699,10 +717,11 @@ fun HomeAuthorsSection(
 @Composable
 fun HomeAuthorItem(
     author: AuthorDisplay,
+    onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(
-        modifier = modifier.clickable { /* TODO: Nav to author search */ },
+        modifier = modifier.clickable(onClick = onClick),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         AsyncImage(
@@ -737,7 +756,8 @@ fun HomeAuthorItem(
 fun ServiceCarousel(
     title: String,
     books: List<UnifiedBookDisplay>,
-    onBookClick: (String) -> Unit
+    onBookClick: (String) -> Unit,
+    onSeeAllClick: () -> Unit
 ) {
     val listState = rememberLazyListState()
     
@@ -754,7 +774,7 @@ fun ServiceCarousel(
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis
             )
-            TextButton(onClick = { /* TODO: Filter by service */ }) {
+            TextButton(onClick = onSeeAllClick) {
                 Text("See All")
             }
         }
@@ -833,8 +853,16 @@ fun BookCard(
             )
             
             if (book.authors.isNotEmpty()) {
+                val displayAuthors = remember(book.authors) {
+                    try {
+                        val arr = com.google.gson.Gson().fromJson(book.authors, Array<String>::class.java)
+                        arr.joinToString(", ")
+                    } catch (e: Exception) {
+                        book.authors
+                    }
+                }
                 Text(
-                    text = book.authors,
+                    text = displayAuthors,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,

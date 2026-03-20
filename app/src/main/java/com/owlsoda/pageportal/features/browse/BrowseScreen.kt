@@ -5,8 +5,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.LocalOffer
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -22,14 +23,15 @@ fun BrowseScreen(
     viewModel: EntityViewModel = hiltViewModel()
 ) {
     var selectedTab by remember { mutableIntStateOf(0) }
-    val tabs = listOf("Authors", "Series", "Collections")
+    val tabs = listOf("Authors", "Series", "Tags", "Collections")
     
     // Update ViewModel when tab changes
     LaunchedEffect(selectedTab) {
         when (selectedTab) {
             0 -> viewModel.setType(EntityType.Authors)
             1 -> viewModel.setType(EntityType.Series)
-            2 -> viewModel.setType(EntityType.Collections)
+            2 -> viewModel.setType(EntityType.Tags)
+            3 -> viewModel.setType(EntityType.Collections)
         }
     }
 
@@ -39,6 +41,7 @@ fun BrowseScreen(
                 val icons = listOf(
                     Icons.Default.Person,
                     Icons.Default.Folder,
+                    Icons.Default.LocalOffer, // Best icon for tags
                     Icons.Default.Star
                 )
                 tabs.forEachIndexed { index, title ->

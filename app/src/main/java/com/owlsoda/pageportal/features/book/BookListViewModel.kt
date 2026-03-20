@@ -67,6 +67,17 @@ class BookListViewModel @Inject constructor(
                          bookDao.getBooksBySeries(filterValue)
                     }
                 }
+                "TAG" -> {
+                    _uiState.update { it.copy(title = "Tag: $filterValue") }
+                    if (serviceType != null) {
+                        val normalizedType = serviceType.uppercase()
+                        val servers = serverDao.getServersByServiceType(normalizedType)
+                        val serverIds = servers.map { it.id }
+                        bookDao.getBooksByTagAndServerIds(filterValue, serverIds)
+                    } else {
+                        bookDao.getBooksByTag(filterValue)
+                    }
+                }
                 "COLLECTION" -> {
                      val collectionId = filterValue.toLongOrNull() ?: 0L
                      val collection = collectionDao.getCollectionById(collectionId)

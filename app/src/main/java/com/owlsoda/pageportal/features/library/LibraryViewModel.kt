@@ -70,7 +70,7 @@ data class LibraryUiState(
     // Grouped content for Home Screen
     val recentBooks: List<UnifiedBookDisplay> = emptyList(),
     val homeAuthors: List<AuthorDisplay> = emptyList(),
-    val booksByService: Map<String, List<UnifiedBookDisplay>> = emptyMap(),
+    val booksByService: Map<ServerTab, List<UnifiedBookDisplay>> = emptyMap(),
     
     val servers: List<ServerEntity> = emptyList(),
     val serverTabs: List<ServerTab> = emptyList(),
@@ -282,14 +282,15 @@ class LibraryViewModel @Inject constructor(
                     UnifiedBookDisplay(
                         id = item.unifiedBook.id,
                         title = item.unifiedBook.title,
-                        authors = item.unifiedBook.author,
+                        authors = item.unifiedBook.authors,
                         coverUrl = item.unifiedBook.coverUrl,
                         audiobookCoverUrl = item.unifiedBook.audiobookCoverUrl,
-                        hasEbook = books.any { it.hasEbook },
-                        hasAudiobook = books.any { it.hasAudiobook },
-                        hasReadAloud = books.any { it.hasReadAloud },
+                        hasEbook = linkedBooks.any { it.hasEbook },
+                        hasAudiobook = linkedBooks.any { it.hasAudiobook },
+                        hasReadAloud = linkedBooks.any { it.hasReadAloud },
+                        duration = linkedBooks.maxOfOrNull { it.duration } ?: item.unifiedBook.duration, // Added duration
                         serverIds = serverIds,
-                        isDownloaded = books.any { 
+                        isDownloaded = linkedBooks.any { 
                             it.downloadStatus == "COMPLETED" ||
                             it.isAudiobookDownloaded ||
                             it.isEbookDownloaded ||
@@ -377,12 +378,32 @@ class LibraryViewModel @Inject constructor(
             }
             
             // Build unique authors/series BEFORE applying author/series filter
-            val uniqueAuthors = filtered.map { it.authors }.distinct().sorted()
+            val uniqueAuthors = filtered.flatMap { book ->
+                try {
+                    val arr = org.json.JSONArray(book.authors)
+                    val list = mutableListOf<String>()
+                    for (i in 0 until arr.length()) list.add(arr.getString(i))
+                    list
+                } catch (e: Exception) {
+                    if (book.authors.isNotBlank()) listOf(book.authors) else emptyList()
+                }
+            }.distinct().sorted()
             val uniqueSeries = filtered.mapNotNull { it.series }.distinct().sorted()
             
             // Apply view-specific filtering
             if (state.viewMode == ViewMode.Authors && state.selectedFilter != null) {
-                filtered = filtered.filter { it.authors == state.selectedFilter }
+                filtered = filtered.filter { book ->
+                    try {
+                        val arr = org.json.JSONArray(book.authors)
+                        var found = false
+                        for (i in 0 until arr.length()) {
+                            if (arr.getString(i) == state.selectedFilter) found = true
+                        }
+                        found
+                    } catch (e: Exception) {
+                        book.authors == state.selectedFilter
+                    }
+                }
             } else if (state.viewMode == ViewMode.Series && state.selectedFilter != null) {
                 filtered = filtered.filter { it.series == state.selectedFilter }
             }
@@ -395,8 +416,22 @@ class LibraryViewModel @Inject constructor(
             val recent = homeSource.filter { it.listeningProgress > 0 }.take(10)
             
             // Group by Author for Home
-            val homeAuthors = homeSource
-                .groupBy { it.authors }
+            val displayAuthorsMap = mutableMapOf<String, MutableList<UnifiedBookDisplay>>()
+            homeSource.forEach { book ->
+                try {
+                    val arr = org.json.JSONArray(book.authors)
+                    for (i in 0 until arr.length()) {
+                        val name = arr.getString(i)
+                        displayAuthorsMap.getOrPut(name) { mutableListOf() }.add(book)
+                    }
+                } catch (e: Exception) {
+                    if (book.authors.isNotBlank()) {
+                         displayAuthorsMap.getOrPut(book.authors) { mutableListOf() }.add(book)
+                    }
+                }
+            }
+
+            val homeAuthors = displayAuthorsMap
                 .map { (name, books) ->
                     AuthorDisplay(
                         name = name,
@@ -413,7 +448,7 @@ class LibraryViewModel @Inject constructor(
                     .filter { it.id != -1L }
                     .associate { tab ->
                         val tabBooks = allUnifiedBooks.filter { book -> book.serverIds.contains(tab.id) }
-                        tab.name to tabBooks
+                        tab to tabBooks
                     }
                     .filter { it.value.isNotEmpty() }
             } else {
