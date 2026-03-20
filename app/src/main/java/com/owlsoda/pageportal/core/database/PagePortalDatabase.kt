@@ -30,7 +30,7 @@ import com.owlsoda.pageportal.core.database.entity.UnifiedBookEntity
         CollectionEntity::class,
         BookmarkEntity::class
     ],
-    version = 7,  // Added audiobookCoverUrl to BookEntity and UnifiedBookEntity
+    version = 8,  // Added tags to BookEntity
     exportSchema = false
 )
 @TypeConverters(Converters::class)

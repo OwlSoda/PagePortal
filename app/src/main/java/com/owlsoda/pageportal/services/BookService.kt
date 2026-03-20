@@ -105,6 +105,7 @@ data class ServiceBook(
     val duration: Long? = null,  // audiobook duration in seconds
     val publishedYear: Int? = null,
     val description: String? = null,
+    val tags: List<String> = emptyList(),
     val collections: List<CollectionRef> = emptyList()
 )
 

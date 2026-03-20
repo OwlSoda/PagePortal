@@ -20,6 +20,7 @@ fun BookResponse.toServiceBookSafe(baseUrl: String?, authToken: String?): Servic
             hasReadAloud = readaloud != null && (readaloud.status == "completed" || readaloud.status == "ready" || !readaloud.filepath.isNullOrBlank()),
             description = description,
             publishedYear = publicationDate?.take(4)?.toIntOrNull(),
+            tags = tags?.map { it.name } ?: emptyList(),
             collections = collections?.map { CollectionRef(it.uuid, it.name) } ?: emptyList()
         )
     } catch (e: Exception) {

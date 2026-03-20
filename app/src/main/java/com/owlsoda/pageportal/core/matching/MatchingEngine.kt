@@ -68,6 +68,7 @@ class MatchingEngine @Inject constructor(
                     coverUrl = book.coverUrl,
                     audiobookCoverUrl = book.audiobookCoverUrl,
                     description = book.description,
+                    tags = book.tags,
                     lastUpdated = System.currentTimeMillis()
                 )
                 

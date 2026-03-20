@@ -52,6 +52,7 @@ data class BookEntity(
     val hasReadAloud: Boolean = false,
     val duration: Long? = null,  // Audiobook duration in seconds
     val publishedYear: Int? = null,
+    val tags: String = "[]", // JSON array of tag names
     val isbn: String? = null,
     val asin: String? = null,
     val addedAt: Long = System.currentTimeMillis(),

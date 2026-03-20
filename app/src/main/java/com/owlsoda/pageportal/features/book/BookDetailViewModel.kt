@@ -82,6 +82,7 @@ class BookDetailViewModel @Inject constructor(
                         coverUrl = unified.unifiedBook.coverUrl ?: base.coverUrl,
                         audiobookCoverUrl = unified.unifiedBook.audiobookCoverUrl ?: base.audiobookCoverUrl,
                         description = unified.unifiedBook.description ?: base.description,
+                        tags = unified.unifiedBook.tags ?: base.tags,
                         hasEbook = linkedBooks.any { it.hasEbook },
                         hasAudiobook = linkedBooks.any { it.hasAudiobook },
                         hasReadAloud = linkedBooks.any { it.hasReadAloud }

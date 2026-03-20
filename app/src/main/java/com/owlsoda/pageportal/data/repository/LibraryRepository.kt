@@ -60,6 +60,7 @@ class LibraryRepository @Inject constructor(
                             hasReadAloud = searchBook.hasReadAloud,
                             duration = searchBook.duration,
                             publishedYear = searchBook.publishedYear,
+                            tags = gson.toJson(searchBook.tags),
                             isbn = searchBook.isbn,
                             asin = searchBook.asin,
                             updatedAt = System.currentTimeMillis(),

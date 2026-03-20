@@ -159,28 +159,55 @@ fun BookDetailScreen(
                             modifier = Modifier.padding(horizontal = 16.dp),
                             lineHeight = 32.sp
                         )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = book.authors,
-                            style = MaterialTheme.typography.titleMedium,
-                            color = PagePortalPurple, // Highlight author
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier
-                                .clickable { onAuthorClick(book.authors) }
-                                .padding(4.dp)
-                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        
+                        // Authors (Multiple supported)
+                        val authorList = remember(book.authors) {
+                            try {
+                                com.google.gson.Gson().fromJson(book.authors, Array<String>::class.java)?.toList() ?: listOf(book.authors)
+                            } catch (e: Exception) {
+                                listOf(book.authors)
+                            }
+                        }
+                        
+                        @OptIn(ExperimentalLayoutApi::class)
+                        FlowRow(
+                            horizontalArrangement = Arrangement.Center,
+                            modifier = Modifier.padding(horizontal = 16.dp)
+                        ) {
+                            authorList.forEach { author ->
+                                Text(
+                                    text = author,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = PagePortalPurple,
+                                    modifier = Modifier
+                                        .clickable { onAuthorClick(author) }
+                                        .padding(horizontal = 4.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
                         
                         if (!book.series.isNullOrBlank()) {
-                            val seriesLabel = book.seriesIndex?.toFloatOrNull()?.let {
-                                val s = if (it % 1 == 0f) it.toInt().toString() else it.toString()
-                                " #$s"
+                            val seriesLabel = book.seriesIndex?.let { index ->
+                                val floatIndex = index.toFloatOrNull()
+                                if (floatIndex != null) {
+                                    val s = if (floatIndex % 1 == 0f) floatIndex.toInt().toString() else floatIndex.toString()
+                                    " #$s"
+                                } else " #$index"
                             } ?: ""
-                            Text(
-                                text = "${book.series}$seriesLabel",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.padding(top = 4.dp)
-                            )
+                            
+                            Surface(
+                                onClick = { /* TODO: onSeriesClick(book.series) */ },
+                                color = Color.Transparent,
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Text(
+                                    text = "${book.series}$seriesLabel",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                )
+                            }
                         }
 
                         // Progress Line
@@ -435,6 +462,42 @@ fun BookDetailScreen(
                         }
                     }
                     
+                    // Tags Section
+                    val tagList = remember(book.tags) {
+                        try {
+                            com.google.gson.Gson().fromJson(book.tags, Array<String>::class.java)?.toList() ?: emptyList()
+                        } catch (e: Exception) {
+                            emptyList()
+                        }
+                    }
+                    
+                    if (tagList.isNotEmpty()) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 24.dp, vertical = 8.dp)
+                        ) {
+                            Text(
+                                "Tags",
+                                style = MaterialTheme.typography.titleSmall.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                                )
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            @OptIn(ExperimentalLayoutApi::class)
+                            FlowRow(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                tagList.forEach { tag ->
+                                    TagChip(tag = tag, onClick = { /* TODO: onTagClick(tag) */ })
+                                }
+                            }
+                        }
+                    }
+                    
                     Spacer(modifier = Modifier.height(64.dp))
                 }
             }
@@ -517,6 +580,23 @@ fun MetadataItem(label: String, value: String) {
 @Composable
 fun VerticalDivider(modifier: Modifier, alpha: Float) {
     Box(modifier = modifier.width(1.dp).background(MaterialTheme.colorScheme.onSurface.copy(alpha = alpha)))
+}
+
+@Composable
+fun TagChip(tag: String, onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(8.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
+    ) {
+        Text(
+            text = tag,
+            style = MaterialTheme.typography.labelMedium,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
 }
 
 private fun formatDuration(seconds: Long): String {
