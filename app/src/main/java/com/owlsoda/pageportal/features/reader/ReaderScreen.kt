@@ -8,8 +8,11 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -137,18 +140,12 @@ fun ReaderScreen(
                     val cssOverride = """
                         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
                         <style>
+                            /* Base resets that don't interfere with column layout */
                             * { max-width: 100% !important; box-sizing: border-box !important; }
                             html, body {
                                 margin: 0 !important;
                                 padding: 0 !important;
-                                word-wrap: break-word;
-                                overflow-wrap: break-word;
-                            }
-                            body {
                                 background-color: ${uiState.theme.backgroundColor} !important;
-                                color: ${uiState.theme.textColor} !important;
-                            }
-                            p, div, span, h1, h2, h3, h4, h5, h6 {
                                 color: ${uiState.theme.textColor} !important;
                             }
                             img, video, svg {
@@ -293,12 +290,10 @@ fun ReaderScreen(
                                         }
                                         x > width * 0.7 -> {
                                             if (uiState.isVerticalScroll) {
-                                                // In vertical scroll: right tap goes to next chapter
                                                 viewModel.nextChapter()
                                             } else {
-                                                // In horizontal: right tap scrolls right or next chapter
                                                 webViewRef?.evaluateJavascript(
-                                                    "if ((window.scrollX + window.innerWidth) < document.body.scrollWidth) { window.scrollBy(window.innerWidth, 0); } else { Android.nextChapter(); }", null
+                                                    "if (Math.ceil(window.scrollX + window.innerWidth) < document.body.scrollWidth) { window.scrollBy(window.innerWidth, 0); } else { Android.nextChapter(); }", null
                                                 )
                                             }
                                         }
@@ -315,17 +310,17 @@ fun ReaderScreen(
                                             // In vertical scroll: swipe changes chapter directly
                                             if (diffX < 0) viewModel.nextChapter() else viewModel.previousChapter()
                                         } else {
-                                            if (diffX < 0) {
-                                                // Swipe left -> next page
-                                                webViewRef?.evaluateJavascript(
-                                                    "if ((window.scrollX + window.innerWidth) < document.body.scrollWidth) { window.scrollBy(window.innerWidth, 0); } else { Android.nextChapter(); }", null
-                                                )
-                                            } else {
-                                                // Swipe right -> previous page
-                                                webViewRef?.evaluateJavascript(
-                                                    "if (window.scrollX > 0) { window.scrollBy(-window.innerWidth, 0); } else { Android.prevChapter(); }", null
-                                                )
-                                            }
+                                        if (diffX < 0) {
+                                            // Swipe left -> next page
+                                            webViewRef?.evaluateJavascript(
+                                                "if (Math.ceil(window.scrollX + window.innerWidth) < document.body.scrollWidth) { window.scrollBy(window.innerWidth, 0); } else { Android.nextChapter(); }", null
+                                            )
+                                        } else {
+                                            // Swipe right -> previous page
+                                            webViewRef?.evaluateJavascript(
+                                                "if (window.scrollX > 0) { window.scrollBy(-window.innerWidth, 0); } else { Android.prevChapter(); }", null
+                                            )
+                                        }
                                         }
                                         return true
                                     }
@@ -550,10 +545,11 @@ fun ReaderScreen(
                               viewModel.addHighlight(
                                   uiState.currentChapterIndex,
                                   selectedRange ?: "",
-                                  selectedText!!
+                                  selectedText!!,
+                                  color = uiState.smilHighlightColor
                               )
                               showSelectionMenu = false
-                              webViewRef?.evaluateJavascript("highlightSelection('${selectedRange}', 'yellow');", null)
+                              webViewRef?.evaluateJavascript("highlightSelection('${selectedRange}', '${uiState.smilHighlightColor}');", null)
                           }) {
                               Text("Highlight")
                           }
@@ -605,7 +601,11 @@ fun ReaderScreen(
                           rewindSeconds = uiState.rewindSeconds,
                           forwardSeconds = uiState.forwardSeconds,
                           onRewindSecondsChanged = viewModel::setRewindSeconds,
-                          onForwardSecondsChanged = viewModel::setForwardSeconds
+                          onForwardSecondsChanged = viewModel::setForwardSeconds,
+                          smilHighlightColor = uiState.smilHighlightColor,
+                          smilUnderlineColor = uiState.smilUnderlineColor,
+                          onSmilHighlightColorChanged = viewModel::setSmilHighlightColor,
+                          onSmilUnderlineColorChanged = viewModel::setSmilUnderlineColor
                       )
                   }
               }
@@ -729,27 +729,34 @@ private fun injectStyles(webView: WebView, state: ReaderUiState) {
         // Vertical Scroll Mode
         """
         document.documentElement.style.height = 'auto';
+        document.documentElement.style.width = '100vw';
+        document.documentElement.style.overflowX = 'hidden';
+        document.documentElement.style.overflowY = 'auto';
+        
         document.body.style.height = 'auto';
-        document.body.style.overflowY = 'scroll';
+        document.body.style.width = '100vw';
         document.body.style.overflowX = 'hidden';
+        document.body.style.overflowY = 'visible';
         document.body.style.columnWidth = 'auto';
         document.body.style.columnGap = 'normal';
-        document.documentElement.style.scrollBehavior = 'smooth';
+        document.body.style.display = 'block';
         """
     } else {
-        // Horizontal Pagination Mode (CSS Columns)
+        // Horizontal Pagination Mode (Strict CSS Columns)
         """
         document.documentElement.style.height = '100vh';
+        document.documentElement.style.width = '100vw';
         document.documentElement.style.overflow = 'hidden';
+        
         document.body.style.height = '100vh';
-        document.body.style.overflowY = 'hidden';
-        document.body.style.overflowX = 'hidden';
+        document.body.style.width = '100vw';
+        document.body.style.margin = '0';
+        document.body.style.padding = '0';
+        document.body.style.overflow = 'hidden';
+        document.body.style.display = 'block';
         document.body.style.columnWidth = '100vw';
         document.body.style.columnGap = '0px';
         document.body.style.columnFill = 'auto';
-        document.body.style.boxSizing = 'border-box';
-        document.body.style.margin = '0';
-        document.body.style.padding = '0';
         """
     }
 
@@ -779,29 +786,29 @@ private fun injectStyles(webView: WebView, state: ReaderUiState) {
                 font-size: ${state.fontSize}% !important;
                 color: ${state.theme.textColor} !important;
                 line-height: ${state.lineHeight} !important;
-                margin: 0 $marginVal !important;
-                max-width: 100% !important;
-                padding: 16px !important;
+                margin: 0 !important;
+                padding: 24px $marginVal !important;
                 font-family: '${state.fontFamily}', serif !important;
                 text-align: ${state.textAlignment.lowercase()} !important;
                 box-sizing: border-box !important;
+                -webkit-column-break-inside: avoid;
+                page-break-inside: avoid;
+                break-inside: avoid;
             }
             p, div, span, h1, h2, h3, h4, h5, h6, li, td, th, a, em, strong, b, i, blockquote {
-                font-size: inherit !important;
-                line-height: inherit !important;
                 color: inherit !important;
+                word-wrap: break-word !important;
+                overflow-wrap: break-word !important;
             }
             $paragraphSpacingCss
             $brightnessFilter
             .smil-active { 
-                background: linear-gradient(135deg, #fff176 0%, #ffeb3b 100%) !important;
+                background: ${state.smilHighlightColor} !important;
                 color: #000000 !important; 
-                text-decoration: underline 3px #FF6D00 !important;
+                text-decoration: underline 3px ${state.smilUnderlineColor} !important;
                 text-underline-offset: 3px !important;
                 border-radius: 4px;
-                padding: 2px 6px;
-                box-shadow: 0 2px 8px rgba(255, 235, 59, 0.5);
-                transition: all 0.2s ease-out;
+                padding: 2px 4px;
             }
         `;
     """.trimIndent()
@@ -966,6 +973,7 @@ fun SearchDialog(
     )
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ReaderSettingsSheet(
     fontSize: Int,
@@ -989,7 +997,11 @@ fun ReaderSettingsSheet(
     rewindSeconds: Int,
     forwardSeconds: Int,
     onRewindSecondsChanged: (Int) -> Unit,
-    onForwardSecondsChanged: (Int) -> Unit
+    onForwardSecondsChanged: (Int) -> Unit,
+    smilHighlightColor: String,
+    smilUnderlineColor: String,
+    onSmilHighlightColorChanged: (String) -> Unit,
+    onSmilUnderlineColorChanged: (String) -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -1157,6 +1169,81 @@ fun ReaderSettingsSheet(
                     onClick = { onForwardSecondsChanged(seconds) },
                     label = { Text("${seconds}s") }
                 )
+            }
+        }
+        
+        HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
+
+        // ReadAloud Colors
+        Text("ReadAloud Style", style = MaterialTheme.typography.titleMedium)
+        
+        val presetColors = listOf(
+            "#FFF176", "#FFD54F", "#FFB74D", "#FF8A65", 
+            "#AED581", "#81C784", "#4DB6AC", "#4FC3F7",
+            "#BA68C8", "#F06292", "#E57373", "#FF6D00"
+        )
+
+        Text("Highlight Color", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 8.dp))
+        androidx.compose.foundation.layout.FlowRow(
+            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            presetColors.forEach { color ->
+                val isSelected = smilHighlightColor.equals(color, ignoreCase = true)
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(androidx.compose.foundation.shape.CircleShape)
+                        .background(Color(android.graphics.Color.parseColor(color)))
+                        .clickable { onSmilHighlightColorChanged(color) }
+                        .border(
+                            width = if (isSelected) 2.dp else 0.dp,
+                            color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
+                            shape = androidx.compose.foundation.shape.CircleShape
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (isSelected) {
+                        Icon(
+                            Icons.Default.Check, 
+                            null, 
+                            modifier = Modifier.size(16.dp),
+                            tint = if (color.lowercase() == "#fff176") Color.Black else Color.White
+                        )
+                    }
+                }
+            }
+        }
+
+        Text("Underline Color", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 8.dp))
+        androidx.compose.foundation.layout.FlowRow(
+            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            presetColors.forEach { color ->
+                val isSelected = smilUnderlineColor.equals(color, ignoreCase = true)
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(androidx.compose.foundation.shape.CircleShape)
+                        .background(Color(android.graphics.Color.parseColor(color)))
+                        .clickable { onSmilUnderlineColorChanged(color) }
+                        .border(
+                            width = if (isSelected) 2.dp else 0.dp,
+                            color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
+                            shape = androidx.compose.foundation.shape.CircleShape
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (isSelected) {
+                        Icon(
+                            Icons.Default.Check, 
+                            null, 
+                            modifier = Modifier.size(16.dp),
+                            tint = if (color.lowercase() == "#fff176") Color.Black else Color.White
+                        )
+                    }
+                }
             }
         }
         

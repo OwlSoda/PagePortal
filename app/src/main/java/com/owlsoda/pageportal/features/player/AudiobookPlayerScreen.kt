@@ -51,6 +51,8 @@ fun AudiobookPlayerScreen(
 ) {
     val context = LocalContext.current
     val state by viewModel.state.collectAsState()
+    val isSyncingMap by viewModel.isSyncing.collectAsState()
+    val isSyncing = isSyncingMap[bookId.toLongOrNull() ?: 0L] == true
     
     var showChapters by remember { mutableStateOf(false) }
     var showSleepTimer by remember { mutableStateOf(false) }
@@ -107,6 +109,21 @@ fun AudiobookPlayerScreen(
                     }
                 },
                 actions = {
+                    if (isSyncing) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(24.dp).padding(4.dp),
+                            color = Color.White,
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Icon(
+                            Icons.Default.CloudDone,
+                            "Synced",
+                            tint = Color.White.copy(alpha = 0.5f),
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    Spacer(Modifier.width(8.dp))
                     IconButton(onClick = { showChapters = true }) {
                         Icon(Icons.AutoMirrored.Filled.List, "Chapters", tint = Color.White)
                     }

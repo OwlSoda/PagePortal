@@ -34,11 +34,14 @@ class SyncWorker(
         return try {
             val result = libraryRepository.syncPendingProgress()
             if (result.isSuccess) {
-                 Result.success()
+                android.util.Log.i("SyncWorker", "Sync completed: ${result.getOrNull()} books")
+                Result.success()
             } else {
-                 Result.retry()
+                android.util.Log.e("SyncWorker", "Sync failed", result.exceptionOrNull())
+                Result.retry()
             }
         } catch (e: Exception) {
+            android.util.Log.e("SyncWorker", "Error during sync", e)
             Result.retry()
         }
     }

@@ -283,6 +283,16 @@ class StorytellerService(
         val encodedToken = java.net.URLEncoder.encode(authToken ?: "", "UTF-8")
         return "$base/api/v2/books/$bookId/files?format=readaloud&token=$encodedToken"
     }
+
+    suspend fun triggerReadAloudProcessing(bookId: String): Result<Unit> {
+        return try {
+            getApi().processBook(bookId)
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to trigger ReadAloud processing for $bookId", e)
+            Result.failure(e)
+        }
+    }
     
     fun getWebReaderUrl(bookId: String): String {
         val base = baseUrl?.trimEnd('/') ?: return ""

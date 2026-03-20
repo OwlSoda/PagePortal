@@ -195,6 +195,30 @@ fun BookDetailScreen(
                                 color = MaterialTheme.colorScheme.primary,
                                 trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f)
                             )
+                            
+                            // Last Sync Info
+                            val isSyncingMap by viewModel.isSyncing.collectAsState()
+                            val isSyncing = isSyncingMap[book.id] == true
+                            
+                            Row(
+                                modifier = Modifier.padding(top = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center
+                            ) {
+                                if (isSyncing) {
+                                    CircularProgressIndicator(modifier = Modifier.size(12.dp), strokeWidth = 1.5.dp)
+                                    Spacer(Modifier.width(6.dp))
+                                    Text("Syncing...", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                                } else {
+                                    Icon(Icons.Default.Sync, null, modifier = Modifier.size(12.dp).clickable { viewModel.syncNow() }, tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
+                                    Spacer(Modifier.width(4.dp))
+                                    Text(
+                                        text = state.lastSyncAt?.let { "Synced ${formatLastSync(it)}" } ?: "Not synced",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                    )
+                                }
+                            }
                         }
 
                         Spacer(modifier = Modifier.height(32.dp))
@@ -224,6 +248,7 @@ fun BookDetailScreen(
                                     text = "Read",
                                     icon = Icons.AutoMirrored.Filled.MenuBook,
                                     onClick = { onReadEbook(book.id.toString()) },
+                                    enabled = book.isEbookDownloaded,
                                     modifier = Modifier.weight(1f, fill = false).widthIn(min = 100.dp),
                                     containerColor = MaterialTheme.colorScheme.secondaryContainer,
                                     contentColor = MaterialTheme.colorScheme.onSecondaryContainer
@@ -236,6 +261,7 @@ fun BookDetailScreen(
                                     text = "ReadAloud",
                                     icon = Icons.Default.AutoFixHigh,
                                     onClick = { onPlayReadAloud(book.id.toString()) },
+                                    enabled = book.isReadAloudDownloaded,
                                     modifier = Modifier.weight(1f, fill = false).widthIn(min = 100.dp),
                                     containerColor = MaterialTheme.colorScheme.tertiaryContainer,
                                     contentColor = MaterialTheme.colorScheme.onTertiaryContainer
@@ -331,7 +357,7 @@ fun BookDetailScreen(
                                     }
                                 }
 
-                                // ReadAloud / Sync Download Status
+                                 // ReadAloud / Sync Download Status
                                 if (book.hasReadAloud) {
                                     if (!book.isReadAloudDownloaded) {
                                         OutlinedButton(
@@ -355,6 +381,29 @@ fun BookDetailScreen(
                                             IconButton(onClick = { viewModel.deleteDownload("readaloud") }) {
                                                 Icon(Icons.Default.Delete, "Delete", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(20.dp))
                                             }
+                                        }
+                                    }
+                                } else if (book.hasEbook && book.hasAudiobook) {
+                                    // Option to create ReadAloud
+                                    if (book.processingStatus == "processing" || book.processingStatus == "queued") {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                                            horizontalArrangement = Arrangement.Center
+                                        ) {
+                                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                                            Spacer(modifier = Modifier.width(12.dp))
+                                            Text("Syncing ReadAloud...", style = MaterialTheme.typography.labelMedium)
+                                        }
+                                    } else {
+                                        OutlinedButton(
+                                            onClick = { viewModel.triggerReadAloudCreation() },
+                                            modifier = Modifier.fillMaxWidth(),
+                                            colors = ButtonDefaults.outlinedButtonColors(contentColor = PagePortalPurple)
+                                        ) {
+                                            Icon(Icons.Default.AutoFixHigh, null, modifier = Modifier.size(18.dp))
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text("Create ReadAloud Sync")
                                         }
                                     }
                                 }
@@ -399,11 +448,13 @@ fun MainActionButton(
     icon: ImageVector,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    enabled: Boolean = true,
     containerColor: Color,
     contentColor: Color
 ) {
     Button(
         onClick = onClick,
+        enabled = enabled,
         modifier = modifier.height(56.dp),
         shape = RoundedCornerShape(16.dp),
         colors = ButtonDefaults.buttonColors(
@@ -473,4 +524,15 @@ private fun formatDuration(seconds: Long): String {
     val hours = seconds / 3600
     val minutes = (seconds % 3600) / 60
     return if (hours > 0) "${hours}h ${minutes}m" else "${minutes}m"
+}
+
+private fun formatLastSync(timestamp: Long): String {
+    val now = System.currentTimeMillis()
+    val diff = now - timestamp
+    return when {
+        diff < 60000 -> "just now"
+        diff < 3600000 -> "${diff / 60000}m ago"
+        diff < 86400000 -> "${diff / 3600000}h ago"
+        else -> "${diff / 86400000}d ago"
+    }
 }

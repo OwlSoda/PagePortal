@@ -79,7 +79,9 @@ data class ReaderUiState(
     val currentEqualizerPreset: String = "Spoken Word",  // Active EQ preset
     val debugLog: String = "",
     val rewindSeconds: Int = 10,
-    val forwardSeconds: Int = 30
+    val forwardSeconds: Int = 30,
+    val smilHighlightColor: String = "#FFF176",
+    val smilUnderlineColor: String = "#FF6D00"
 )
 
 enum class ReaderTheme(val backgroundColor: String, val textColor: String) {
@@ -171,8 +173,8 @@ class ReaderViewModel @Inject constructor(
             }
             
             // 1. Check if we have a direct local path (e.g. from Import)
-            if (!bookEntity.localFilePath.isNullOrBlank()) {
-                val file = File(bookEntity.localFilePath!!)
+            bookEntity.localFilePath?.let { path ->
+                val file = File(path)
                 if (file.exists()) {
                     parseAndLoad(file, id)
                     return@launch
@@ -247,12 +249,14 @@ class ReaderViewModel @Inject constructor(
             }
             
             if (file == null || !file.exists()) {
-                 _uiState.value = _uiState.value.copy(isLoading = false, error = "Book file not found. Please download, import, or fix the file path.")
+                 _uiState.update { it.copy(
+                     isLoading = false, 
+                     error = "Book file not found. Please download the book first."
+                 ) }
                  return@launch
             }
             
-            val validFile = file!!
-            parseAndLoad(validFile, id)
+            parseAndLoad(file, id)
             
             // Auto-play if requested and available
             if (preferReadAloud) {
@@ -520,20 +524,23 @@ class ReaderViewModel @Inject constructor(
         }
         
         // Fallback: recursive search for audio file
-        if (audioFile == null && audioCacheDir != null) {
-            appendLog("Falling back to recursive audio search...")
-            val audioFilename = audioPath.substringAfterLast("/")
-            audioFile = audioCacheDir!!.walkTopDown()
-                .filter { it.isFile && it.name.equals(audioFilename, ignoreCase = true) }
-                .firstOrNull()
-            if (audioFile != null) {
-                appendLog("Found via recursive search: ${audioFile.path}")
+        if (audioFile == null) {
+            audioCacheDir?.let { dir ->
+                appendLog("Falling back to recursive audio search in ${dir.path}...")
+                val audioFilename = audioPath.substringAfterLast("/")
+                audioFile = dir.walkTopDown()
+                    .filter { it.isFile && it.name.equals(audioFilename, ignoreCase = true) }
+                    .firstOrNull()
+                if (audioFile != null) {
+                    appendLog("Found via recursive search: ${audioFile?.path}")
+                }
             }
         }
         
-        if (audioFile != null && audioFile.exists()) {
-            appendLog("SUCCESS: Loading audio from ${audioFile.path}")
-            val mediaItem = MediaItem.fromUri(audioFile.path)
+        val finalAudioFile = audioFile
+        if (finalAudioFile != null && finalAudioFile.exists()) {
+            appendLog("SUCCESS: Loading audio from ${finalAudioFile.path}")
+            val mediaItem = MediaItem.fromUri(finalAudioFile.path)
             exoPlayer?.let { player ->
                 player.setMediaItem(mediaItem)
                 player.prepare()
@@ -579,11 +586,11 @@ class ReaderViewModel @Inject constructor(
         // Lazy initialization if player is missing
         if (exoPlayer == null) {
              android.util.Log.d("ReaderViewModel", "exoPlayer is null, attempting lazy initialization...")
-             if (appContext != null) {
-                 initializePlayer(appContext!!)
+             appContext?.let { ctx ->
+                 initializePlayer(ctx)
                  // Try to load audio for current chapter
                  loadAudioForChapter(_uiState.value.currentChapterIndex, autoPlay = true)
-             } else {
+             } ?: run {
                  android.util.Log.e("ReaderViewModel", "Cannot initialize player: context is null")
              }
              return
@@ -625,8 +632,8 @@ class ReaderViewModel @Inject constructor(
                 }
 
                 // Auto-rewind 5 seconds on resume
-                if (lastPausePosition != null) {
-                    val rewindPosition = (lastPausePosition!! - 5000).coerceAtLeast(0)
+                lastPausePosition?.let { pos ->
+                    val rewindPosition = (pos - 5000).coerceAtLeast(0)
                     player.seekTo(rewindPosition)
                     lastPausePosition = null
                     android.util.Log.d("ReaderViewModel", "Rewound to position $rewindPosition")
@@ -691,15 +698,26 @@ class ReaderViewModel @Inject constructor(
                     preferencesRepository.readerVerticalScroll,
                     preferencesRepository.readerTextAlignment,
                     preferencesRepository.readerParagraphSpacing,
-                    preferencesRepository.readerBrightness
-                ) { vertical, align, spacing, bright ->
-                    ReaderPreferencesPart2(vertical, align, spacing, bright)
+                    preferencesRepository.readerBrightness,
+                    preferencesRepository.readerSmilHighlightColor,
+                    preferencesRepository.readerSmilUnderlineColor
+                ) { values: Array<*> ->
+                    ReaderPreferencesPart2(
+                        isVerticalScroll = values[0] as Boolean,
+                        textAlignment = values[1] as String,
+                        paragraphSpacing = values[2] as Float,
+                        brightness = values[3] as Float,
+                        smilHighlightColor = values[4] as String,
+                        smilUnderlineColor = values[5] as String
+                    )
                 }.collect { p2 ->
                     _uiState.update { it.copy(
                         isVerticalScroll = p2.isVerticalScroll,
                         textAlignment = p2.textAlignment,
                         paragraphSpacing = p2.paragraphSpacing,
-                        brightness = p2.brightness
+                        brightness = p2.brightness,
+                        smilHighlightColor = p2.smilHighlightColor,
+                        smilUnderlineColor = p2.smilUnderlineColor
                     ) }
                 }
             }
@@ -787,7 +805,9 @@ class ReaderViewModel @Inject constructor(
         val isVerticalScroll: Boolean,
         val textAlignment: String,
         val paragraphSpacing: Float,
-        val brightness: Float
+        val brightness: Float,
+        val smilHighlightColor: String,
+        val smilUnderlineColor: String
     )
 
     private fun loadHighlights(bookId: Long) {
@@ -989,6 +1009,18 @@ class ReaderViewModel @Inject constructor(
         }
     }
 
+    fun setSmilHighlightColor(color: String) {
+        viewModelScope.launch {
+            preferencesRepository.setReaderSmilHighlightColor(color)
+        }
+    }
+
+    fun setSmilUnderlineColor(color: String) {
+        viewModelScope.launch {
+            preferencesRepository.setReaderSmilUnderlineColor(color)
+        }
+    }
+
     private var syncJob: kotlinx.coroutines.Job? = null
     private var progressUpdateJob: Job? = null
 
@@ -1147,9 +1179,10 @@ class ReaderViewModel @Inject constructor(
         val percent = (currentChapter.toFloat() / totalChapters) * 100f
         
         // If playing audio, refinement:
-        if (_uiState.value.isPlayingAudio && exoPlayer != null) {
-            val duration = exoPlayer!!.duration
-            val position = exoPlayer!!.currentPosition
+        val player = exoPlayer
+        if (_uiState.value.isPlayingAudio && player != null) {
+            val duration = player.duration
+            val position = player.currentPosition
             if (duration > 0) {
                  val chapterProgress = position.toFloat() / duration
                  // Adjust percent: currentChapter + chapterProgress

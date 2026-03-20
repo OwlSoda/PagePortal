@@ -128,6 +128,13 @@ fun LibraryScreen(
                         // Empty or remove
                     }
 
+                    // Import (Primary)
+                    IconButton(onClick = { 
+                        importLauncher.launch(arrayOf("application/epub+zip", "audio/*", "video/mp4"))
+                    }) {
+                        Icon(Icons.Default.Add, contentDescription = "Import Content")
+                    }
+
                     // Settings (Primary)
                     IconButton(onClick = onSettingsClick) {
                         Icon(Icons.Default.Settings, contentDescription = "Settings")
@@ -452,6 +459,7 @@ fun BooksTabContent(
                             tab.id == -1L -> Icons.AutoMirrored.Filled.LibraryBooks
                             tab.serviceType == ServiceType.AUDIOBOOKSHELF -> Icons.Filled.Headphones
                             tab.serviceType == ServiceType.STORYTELLER -> Icons.Filled.RecordVoiceOver
+                            tab.serviceType == ServiceType.LOCAL -> Icons.Filled.Folder
                             else -> Icons.Filled.Link
                         }
                         Row(verticalAlignment = Alignment.CenterVertically) {

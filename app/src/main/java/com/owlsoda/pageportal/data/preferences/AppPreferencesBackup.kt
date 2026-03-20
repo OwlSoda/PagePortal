@@ -19,6 +19,8 @@ data class AppPreferencesBackup(
     @SerializedName("reader_text_alignment") val readerTextAlignment: String = "LEFT",
     @SerializedName("reader_paragraph_spacing") val readerParagraphSpacing: Float = 1.0f,
     @SerializedName("reader_brightness") val readerBrightness: Float = -1.0f,
+    @SerializedName("reader_smil_highlight_color") val readerSmilHighlightColor: String = "#FFF176",
+    @SerializedName("reader_smil_underline_color") val readerSmilUnderlineColor: String = "#FF6D00",
     
     // Gestures
     @SerializedName("gesture_tap_left") val gestureTapLeft: String = "PREV",

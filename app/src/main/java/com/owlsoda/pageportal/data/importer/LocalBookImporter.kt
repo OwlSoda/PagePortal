@@ -47,7 +47,7 @@ class LocalBookImporter @Inject constructor(
             val extension = destinationFile.extension.lowercase()
             val bookMetadata = when (extension) {
                 "epub" -> parseEpub(destinationFile)
-                "mp3", "m4b", "aac" -> parseAudiobook(destinationFile)
+                "mp3", "m4b", "aac", "mp4", "m4a" -> parseAudiobook(destinationFile)
                 else -> return@withContext Result.failure(Exception("Unsupported file type: $extension"))
             }
 
@@ -62,13 +62,13 @@ class LocalBookImporter @Inject constructor(
                 
                 // Format flags
                 hasEbook = extension == "epub",
-                hasAudiobook = extension in listOf("mp3", "m4b", "aac"),
+                hasAudiobook = extension in listOf("mp3", "m4b", "aac", "mp4", "m4a"),
                 hasReadAloud = bookMetadata.hasMediaOverlays,
 
                 // Download status (it's local, so it's "downloaded")
                 downloadStatus = "COMPLETED",
                 isEbookDownloaded = extension == "epub",
-                isAudiobookDownloaded = extension in listOf("mp3", "m4b", "aac"),
+                isAudiobookDownloaded = extension in listOf("mp3", "m4b", "aac", "mp4", "m4a"),
                 isReadAloudDownloaded = bookMetadata.hasMediaOverlays,
                 
                 localFilePath = destinationFile.absolutePath,

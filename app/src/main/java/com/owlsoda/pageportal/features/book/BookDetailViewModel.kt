@@ -8,11 +8,13 @@ import com.owlsoda.pageportal.core.database.dao.ServerDao
 import com.owlsoda.pageportal.core.database.dao.UnifiedBookDao
 import com.owlsoda.pageportal.core.database.entity.BookEntity
 import com.owlsoda.pageportal.services.ServiceManager
+import com.owlsoda.pageportal.data.repository.SyncRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -24,7 +26,8 @@ data class BookDetailState(
     val downloadProgress: Float = 0f,
     val isLoading: Boolean = true,
     val error: String? = null,
-    val webReaderUrl: String? = null
+    val webReaderUrl: String? = null,
+    val lastSyncAt: Long? = null
 )
 
 @HiltViewModel
@@ -34,8 +37,12 @@ class BookDetailViewModel @Inject constructor(
     private val progressDao: ProgressDao,
     private val serverDao: ServerDao,
     private val serviceManager: ServiceManager,
-    private val downloadRepository: com.owlsoda.pageportal.data.repository.DownloadRepository
+    private val libraryRepository: com.owlsoda.pageportal.data.repository.LibraryRepository,
+    private val downloadRepository: com.owlsoda.pageportal.data.repository.DownloadRepository,
+    private val syncRepository: SyncRepository
 ) : ViewModel() {
+    
+    val isSyncing = syncRepository.isSyncing
     
     private val _state = MutableStateFlow(BookDetailState())
     val state: StateFlow<BookDetailState> = _state.asStateFlow()
@@ -43,6 +50,9 @@ class BookDetailViewModel @Inject constructor(
     private var currentBookId: String? = null
     // Keep track of all linked books for this unified entry
     private var linkedBooks: List<BookEntity> = emptyList()
+    
+    private var downloadJob: kotlinx.coroutines.Job? = null
+    private var progressJob: kotlinx.coroutines.Job? = null
     
     fun loadBook(bookId: String) {
         if (currentBookId == bookId) return
@@ -79,15 +89,22 @@ class BookDetailViewModel @Inject constructor(
                     
                     val progress = progressDao.getProgressByBookId(base.id)
                     
-                    // Observe first linked book for download status for now (imperfect but works for single source)
                     observeDownloadStatus(base.id)
+                    observeProgress(base.id)
+                    observeBookMetadata(base.id)
                     
                     _state.value = _state.value.copy(
                         book = displayBook,
                         progressPercent = progress?.percentComplete ?: 0f,
                         webReaderUrl = getWebReaderUrl(base),
+                        lastSyncAt = base.lastSyncAt,
                         isLoading = false
                     )
+
+                    // Start automatic sync
+                    viewModelScope.launch {
+                        syncRepository.syncProgress(base.id)
+                    }
                     
                 } else {
                     // Legacy/Direct Book ID
@@ -100,16 +117,25 @@ class BookDetailViewModel @Inject constructor(
                     }
                     
                     linkedBooks = listOf(book)
-                    val progress = progressDao.getProgressByBookId(book.id)
                     
                     observeDownloadStatus(book.id)
+                    observeProgress(book.id)
+                    observeBookMetadata(book.id)
+                    
+                    val progress = progressDao.getProgressByBookId(book.id)
                     
                     _state.value = _state.value.copy(
                         book = book,
                         progressPercent = progress?.percentComplete ?: 0f,
                         webReaderUrl = getWebReaderUrl(book),
+                        lastSyncAt = book.lastSyncAt,
                         isLoading = false
                     )
+
+                    // Start automatic sync
+                    viewModelScope.launch {
+                        syncRepository.syncProgress(book.id)
+                    }
                 }
                 
             } catch (e: Exception) {
@@ -122,7 +148,8 @@ class BookDetailViewModel @Inject constructor(
     }
     
     private fun observeDownloadStatus(bookId: Long) {
-        viewModelScope.launch {
+        downloadJob?.cancel()
+        downloadJob = viewModelScope.launch {
             bookDao.observeBook(bookId).collect { book ->
                 if (book != null) {
                     val status = book.downloadStatus
@@ -135,6 +162,26 @@ class BookDetailViewModel @Inject constructor(
                     if (book.localFilePath != _state.value.book?.localFilePath) {
                          // _state.value = _state.value.copy(book = book) // Careful with overwrite
                     }
+                }
+            }
+        }
+    }
+    private fun observeProgress(bookId: Long) {
+        progressJob?.cancel()
+        progressJob = viewModelScope.launch {
+            progressDao.observeProgressByBookId(bookId).collect { progress ->
+                if (progress != null) {
+                    _state.update { it.copy(progressPercent = progress.percentComplete) }
+                }
+            }
+        }
+    }
+
+    private fun observeBookMetadata(bookId: Long) {
+        viewModelScope.launch {
+            bookDao.observeBook(bookId).collect { book ->
+                if (book != null) {
+                    _state.update { it.copy(lastSyncAt = book.lastSyncAt) }
                 }
             }
         }
@@ -201,6 +248,30 @@ class BookDetailViewModel @Inject constructor(
         }
     }
     
+    fun triggerReadAloudCreation() {
+        val book = _state.value.book ?: return
+        viewModelScope.launch {
+            _state.value = _state.value.copy(isLoading = true)
+            val result = libraryRepository.triggerReadAloud(book.id)
+            if (result.isSuccess) {
+                // Success - status will be updated via DAO observation
+                _state.value = _state.value.copy(isLoading = false)
+            } else {
+                _state.value = _state.value.copy(
+                    isLoading = false,
+                    error = result.exceptionOrNull()?.message ?: "Failed to trigger ReadAloud creation"
+                )
+            }
+        }
+    }
+    
+    fun syncNow() {
+        val book = _state.value.book ?: return
+        viewModelScope.launch {
+            syncRepository.syncProgress(book.id)
+        }
+    }
+
     private suspend fun getWebReaderUrl(book: BookEntity): String? {
         val service = serviceManager.getService(book.serverId)
         return if (service is com.owlsoda.pageportal.services.storyteller.StorytellerService) {

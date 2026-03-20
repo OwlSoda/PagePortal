@@ -43,6 +43,8 @@ class PreferencesRepository @Inject constructor(
         val READER_TEXT_ALIGNMENT = stringPreferencesKey("reader_text_alignment") // "LEFT", "JUSTIFY", "CENTER"
         val READER_PARAGRAPH_SPACING = floatPreferencesKey("reader_paragraph_spacing") // Scale factor
         val READER_BRIGHTNESS = floatPreferencesKey("reader_brightness") // -1.0 = system, 0.0-1.0 = manual
+        val READER_SMIL_HIGHLIGHT_COLOR = stringPreferencesKey("reader_smil_highlight_color")
+        val READER_SMIL_UNDERLINE_COLOR = stringPreferencesKey("reader_smil_underline_color")
         
         // Gesture Settings
         val GESTURE_TAP_LEFT = stringPreferencesKey("gesture_tap_left") // "PREV", "NEXT", "MENU", "NONE"
@@ -197,6 +199,22 @@ class PreferencesRepository @Inject constructor(
         context.dataStore.edit { it[PreferencesKeys.READER_BRIGHTNESS] = brightness }
     }
     
+    val readerSmilHighlightColor: Flow<String> = context.dataStore.data
+        .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
+        .map { it[PreferencesKeys.READER_SMIL_HIGHLIGHT_COLOR] ?: "#FFF176" }
+
+    suspend fun setReaderSmilHighlightColor(color: String) {
+        context.dataStore.edit { it[PreferencesKeys.READER_SMIL_HIGHLIGHT_COLOR] = color }
+    }
+
+    val readerSmilUnderlineColor: Flow<String> = context.dataStore.data
+        .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
+        .map { it[PreferencesKeys.READER_SMIL_UNDERLINE_COLOR] ?: "#FF6D00" }
+
+    suspend fun setReaderSmilUnderlineColor(color: String) {
+        context.dataStore.edit { it[PreferencesKeys.READER_SMIL_UNDERLINE_COLOR] = color }
+    }
+    
     // Gesture Accessors
     val gestureTapLeft: Flow<String> = context.dataStore.data
         .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
@@ -282,6 +300,8 @@ class PreferencesRepository @Inject constructor(
                 readerTextAlignment = prefs[PreferencesKeys.READER_TEXT_ALIGNMENT] ?: "LEFT",
                 readerParagraphSpacing = prefs[PreferencesKeys.READER_PARAGRAPH_SPACING] ?: 1.0f,
                 readerBrightness = prefs[PreferencesKeys.READER_BRIGHTNESS] ?: -1.0f,
+                readerSmilHighlightColor = prefs[PreferencesKeys.READER_SMIL_HIGHLIGHT_COLOR] ?: "#FFF176",
+                readerSmilUnderlineColor = prefs[PreferencesKeys.READER_SMIL_UNDERLINE_COLOR] ?: "#FF6D00",
                 gestureTapLeft = prefs[PreferencesKeys.GESTURE_TAP_LEFT] ?: "PREV",
                 gestureTapCenter = prefs[PreferencesKeys.GESTURE_TAP_CENTER] ?: "MENU",
                 gestureTapRight = prefs[PreferencesKeys.GESTURE_TAP_RIGHT] ?: "NEXT",
@@ -311,6 +331,8 @@ class PreferencesRepository @Inject constructor(
             readerTextAlignment = prefs[PreferencesKeys.READER_TEXT_ALIGNMENT] ?: "LEFT",
             readerParagraphSpacing = prefs[PreferencesKeys.READER_PARAGRAPH_SPACING] ?: 1.0f,
             readerBrightness = prefs[PreferencesKeys.READER_BRIGHTNESS] ?: -1.0f,
+            readerSmilHighlightColor = prefs[PreferencesKeys.READER_SMIL_HIGHLIGHT_COLOR] ?: "#FFF176",
+            readerSmilUnderlineColor = prefs[PreferencesKeys.READER_SMIL_UNDERLINE_COLOR] ?: "#FF6D00",
             gestureTapLeft = prefs[PreferencesKeys.GESTURE_TAP_LEFT] ?: "PREV",
             gestureTapCenter = prefs[PreferencesKeys.GESTURE_TAP_CENTER] ?: "MENU",
             gestureTapRight = prefs[PreferencesKeys.GESTURE_TAP_RIGHT] ?: "NEXT",
@@ -335,6 +357,8 @@ class PreferencesRepository @Inject constructor(
             prefs[PreferencesKeys.READER_TEXT_ALIGNMENT] = backup.readerTextAlignment
             prefs[PreferencesKeys.READER_PARAGRAPH_SPACING] = backup.readerParagraphSpacing
             prefs[PreferencesKeys.READER_BRIGHTNESS] = backup.readerBrightness
+            prefs[PreferencesKeys.READER_SMIL_HIGHLIGHT_COLOR] = backup.readerSmilHighlightColor
+            prefs[PreferencesKeys.READER_SMIL_UNDERLINE_COLOR] = backup.readerSmilUnderlineColor
             prefs[PreferencesKeys.GESTURE_TAP_LEFT] = backup.gestureTapLeft
             prefs[PreferencesKeys.GESTURE_TAP_CENTER] = backup.gestureTapCenter
             prefs[PreferencesKeys.GESTURE_TAP_RIGHT] = backup.gestureTapRight

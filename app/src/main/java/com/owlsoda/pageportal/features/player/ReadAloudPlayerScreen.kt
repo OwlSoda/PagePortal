@@ -29,6 +29,8 @@ fun ReadAloudPlayerScreen(
 ) {
     val context = LocalContext.current
     val state by viewModel.state.collectAsState()
+    val isSyncingMap by viewModel.isSyncing.collectAsState()
+    val isSyncing = isSyncingMap[bookId.toLongOrNull() ?: 0L] == true
     
     var showSleepTimer by remember { mutableStateOf(false) }
     var showSpeedPicker by remember { mutableStateOf(false) }
@@ -58,6 +60,22 @@ fun ReadAloudPlayerScreen(
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
                     }
+                },
+                actions = {
+                    if (isSyncing) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(24.dp).padding(4.dp),
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Icon(
+                            Icons.Default.CloudDone,
+                            "Synced",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    Spacer(Modifier.width(16.dp))
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0f)

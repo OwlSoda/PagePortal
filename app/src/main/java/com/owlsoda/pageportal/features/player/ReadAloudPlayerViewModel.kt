@@ -10,6 +10,8 @@ import com.owlsoda.pageportal.core.database.dao.BookDao
 import com.owlsoda.pageportal.core.database.dao.ProgressDao
 import com.owlsoda.pageportal.core.database.dao.ServerDao
 import com.owlsoda.pageportal.core.database.entity.ProgressEntity
+import com.owlsoda.pageportal.data.repository.LibraryRepository
+import com.owlsoda.pageportal.data.repository.SyncRepository
 import com.owlsoda.pageportal.player.PlaybackService
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.*
@@ -39,11 +41,15 @@ data class ReadAloudPlayerState(
 class ReadAloudPlayerViewModel @Inject constructor(
     private val bookDao: BookDao,
     private val progressDao: ProgressDao,
-    private val serverDao: ServerDao
+    private val serverDao: ServerDao,
+    private val syncRepository: SyncRepository,
+    private val libraryRepository: LibraryRepository
 ) : ViewModel() {
     
     private val _state = MutableStateFlow(ReadAloudPlayerState())
     val state: StateFlow<ReadAloudPlayerState> = _state.asStateFlow()
+    
+    val isSyncing = syncRepository.isSyncing
     
     private var player: Player? = null
     private var progressUpdateJob: Job? = null
@@ -131,14 +137,26 @@ class ReadAloudPlayerViewModel @Inject constructor(
                     return@launch
                 }
                 
-                val progress = progressDao.getProgressByBookId(book.id)
-                val resumePosition = progress?.currentPosition ?: 0L
                 
+                // 1. Check for local progress
+                val localProgress = progressDao.getProgressByBookId(book.id)
+                var currentPos = localProgress?.currentPosition ?: 0L
+                
+                // 2. Perform bidirectional sync
+                _state.value = _state.value.copy(isLoading = true)
+                val syncResult = syncRepository.syncProgress(id)
+                if (syncResult.isSuccess) {
+                    // Update current pos if sync changed it
+                    val updatedProgress = progressDao.getProgressByBookId(id)
+                    currentPos = updatedProgress?.currentPosition ?: 0L
+                }
+
                 _state.value = _state.value.copy(
                     bookId = bookId,
                     title = book.title,
                     author = book.authors,
-                    coverUrl = book.coverUrl ?: ""
+                    coverUrl = book.coverUrl ?: "",
+                    currentPosition = currentPos
                 )
                 
                 // Build path to ReadAloud file using consistent utility
@@ -274,8 +292,8 @@ class ReadAloudPlayerViewModel @Inject constructor(
                     player?.apply {
                         setMediaItem(mediaItem)
                         prepare()
-                        if (resumePosition > 0) {
-                            seekTo(resumePosition)
+                        if (currentPos > 0) {
+                            seekTo(currentPos)
                         }
                         if (autoPlay) {
                             play()
@@ -444,6 +462,10 @@ class ReadAloudPlayerViewModel @Inject constructor(
                 lastUpdated = System.currentTimeMillis()
             )
             progressDao.insertProgress(progress)
+            
+            // Push to server
+            val id = state.bookId.toLongOrNull() ?: return@launch
+            syncRepository.pushProgress(id)
         }
     }
     

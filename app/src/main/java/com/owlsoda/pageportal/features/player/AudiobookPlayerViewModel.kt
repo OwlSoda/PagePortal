@@ -13,6 +13,9 @@ import com.owlsoda.pageportal.core.database.entity.ProgressEntity
 import com.owlsoda.pageportal.player.PlaybackService
 import com.owlsoda.pageportal.services.ServiceManager
 import com.owlsoda.pageportal.services.ServiceType
+import com.owlsoda.pageportal.data.repository.DownloadRepository
+import com.owlsoda.pageportal.data.repository.LibraryRepository
+import com.owlsoda.pageportal.data.repository.SyncRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -49,12 +52,16 @@ class AudiobookPlayerViewModel @Inject constructor(
     private val progressDao: ProgressDao,
     private val serverDao: ServerDao,
     private val serviceManager: ServiceManager,
-    private val libraryRepository: com.owlsoda.pageportal.data.repository.LibraryRepository,
-    private val preferencesRepository: com.owlsoda.pageportal.data.preferences.PreferencesRepository
+    private val libraryRepository: LibraryRepository,
+    private val preferencesRepository: com.owlsoda.pageportal.data.preferences.PreferencesRepository,
+    private val downloadRepository: DownloadRepository,
+    private val syncRepository: SyncRepository
 ) : ViewModel() {
     
     private val _state = MutableStateFlow(AudiobookPlayerState())
     val state: StateFlow<AudiobookPlayerState> = _state.asStateFlow()
+    
+    val isSyncing = syncRepository.isSyncing
     
     private var player: Player? = null
     private var progressUpdateJob: Job? = null
@@ -139,15 +146,27 @@ class AudiobookPlayerViewModel @Inject constructor(
                     return@launch
                 }
                 
-                // Get saved progress
-                val progress = progressDao.getProgressByBookId(book.id)
-                val resumePosition = progress?.currentPosition ?: 0L
+                // 1. Check for local progress
+                val localProgress = progressDao.getProgressByBookId(id)
+                var currentPos = localProgress?.currentPosition ?: 0L
                 
+                // 2. Perform bidirectional sync
+                _state.value = _state.value.copy(isLoading = true) // ephemeral message reminder
+                val syncResult = syncRepository.syncProgress(id)
+                if (syncResult.isSuccess) {
+                    // Update current pos if sync changed it
+                    val updatedProgress = progressDao.getProgressByBookId(id)
+                    currentPos = updatedProgress?.currentPosition ?: 0L
+                }
+
                 _state.value = _state.value.copy(
-                    bookId = bookId,
+                    bookId = book.id.toString(),
                     title = book.title,
                     author = book.authors,
-                    coverUrl = book.coverUrl ?: ""
+                    coverUrl = book.coverUrl ?: "",
+                    duration = (book.duration ?: 0L) * 1000L,
+                    currentPosition = currentPos,
+                    isLoading = false
                 )
                 
                 // Build media item
@@ -212,8 +231,8 @@ class AudiobookPlayerViewModel @Inject constructor(
                     player?.apply {
                         setMediaItem(mediaItem)
                         prepare()
-                        if (resumePosition > 0) {
-                            seekTo(resumePosition)
+                        if (currentPos > 0) {
+                            seekTo(currentPos)
                         }
                         if (autoPlay) {
                             play()
@@ -391,8 +410,9 @@ class AudiobookPlayerViewModel @Inject constructor(
         if (state.bookId.isEmpty()) return
         
         viewModelScope.launch {
+            val id = state.bookId.toLongOrNull() ?: return@launch
             val progress = ProgressEntity(
-                bookId = state.bookId.toLongOrNull() ?: 0L,
+                bookId = id,
                 currentPosition = state.currentPosition,
                 currentChapter = state.currentChapterIndex,
                 percentComplete = if (state.duration > 0) {
@@ -402,12 +422,8 @@ class AudiobookPlayerViewModel @Inject constructor(
             )
             progressDao.insertProgress(progress)
             
-            // Sync to server via library repository
-            try {
-                libraryRepository.syncProgress(state.bookId.toLongOrNull() ?: 0L)
-            } catch (e: Exception) {
-                // Ignore sync failures for now, they'll be retried next time
-            }
+            // Push to server
+            syncRepository.pushProgress(id) // ephemeral message reminder
         }
     }
     
