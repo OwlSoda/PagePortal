@@ -155,7 +155,12 @@ fun ComicReaderScreen(
                 contentAlignment = Alignment.Center
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("⚠️", style = MaterialTheme.typography.displayLarge)
+                    Icon(
+                        imageVector = Icons.Filled.Warning,
+                        contentDescription = "Error",
+                        modifier = Modifier.size(64.dp),
+                        tint = MaterialTheme.colorScheme.error
+                    )
                     Spacer(modifier = Modifier.height(16.dp))
                     Text(
                         state.error!!,
