@@ -45,6 +45,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.graphicsLayer
+import kotlin.math.roundToInt
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.viewinterop.AndroidView
@@ -359,7 +360,7 @@ fun ReaderScreen(
                          )
                      } else {
                          Icon(
-                             Icons.Default.CloudDone,
+                             Icons.Filled.CloudDone,
                              "Synced",
                              tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
                              modifier = Modifier.size(20.dp)
@@ -370,10 +371,10 @@ fun ReaderScreen(
                          Icon(Icons.AutoMirrored.Filled.List, "Table of Contents")
                      }
                      IconButton(onClick = { showSearch = true }) {
-                         Icon(Icons.Default.Search, "Search")
+                         Icon(Icons.Filled.Search, "Search")
                      }
                      IconButton(onClick = { showSettings = true }) {
-                         Icon(Icons.Default.Settings, "Settings")
+                         Icon(Icons.Filled.Settings, "Settings")
                      }
                  },
                  colors = TopAppBarDefaults.topAppBarColors(
@@ -438,7 +439,7 @@ fun ReaderScreen(
                                       .background(MaterialTheme.colorScheme.primary, androidx.compose.foundation.shape.CircleShape)
                               ) {
                                   Icon(
-                                      if (uiState.isPlayingAudio) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                      if (uiState.isPlayingAudio) Icons.Filled.Pause else Icons.Filled.PlayArrow,
                                       "Toggle Audio",
                                       tint = MaterialTheme.colorScheme.onPrimary,
                                       modifier = Modifier.size(32.dp)
@@ -474,7 +475,7 @@ fun ReaderScreen(
                                                   showSpeedMenu = false
                                               },
                                               leadingIcon = if (uiState.playbackSpeed == speed) {
-                                                  { Icon(Icons.Default.Check, null) }
+                                                  { Icon(Icons.Filled.Check, null) }
                                               } else null
                                           )
                                       }
@@ -486,7 +487,7 @@ fun ReaderScreen(
                              Box {
                                  IconButton(onClick = { showSleepMenu = true }) {
                                      Icon(
-                                         imageVector = Icons.Default.Timer ?: Icons.Default.Settings, 
+                                         imageVector = Icons.Filled.Timer ?: Icons.Filled.Settings,
                                          contentDescription = "Sleep Timer",
                                          tint = if (uiState.sleepTimerMinutes > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
                                      )
@@ -504,7 +505,7 @@ fun ReaderScreen(
                                                  showSleepMenu = false
                                              },
                                              leadingIcon = if (uiState.sleepTimerMinutes == mins) {
-                                                 { Icon(Icons.Default.Check, null) }
+                                                 { Icon(Icons.Filled.Check, null) }
                                              } else null
                                          )
                                      }
@@ -933,7 +934,7 @@ fun SearchDialog(
                     trailingIcon = {
                         if (query.isNotEmpty()) {
                             IconButton(onClick = { query = "" }) {
-                                Icon(Icons.Default.Close, "Clear")
+                                Icon(Icons.Filled.Close, "Clear")
                             }
                         }
                     }
@@ -1056,7 +1057,7 @@ fun ReaderSettingsSheet(
                 onClick = { onFontSizeChanged(fontSize - 10) },
                 enabled = fontSize > 50
             ) {
-                Icon(Icons.Default.Remove, "Decrease font size")
+                Icon(Icons.Filled.Remove, "Decrease font size")
             }
             Slider(
                 value = fontSize.toFloat(),
@@ -1069,7 +1070,7 @@ fun ReaderSettingsSheet(
                 onClick = { onFontSizeChanged(fontSize + 10) },
                 enabled = fontSize < 200
             ) {
-                Icon(Icons.Default.Add, "Increase font size")
+                Icon(Icons.Filled.Add, "Increase font size")
             }
         }
         
@@ -1102,26 +1103,71 @@ fun ReaderSettingsSheet(
         }
 
         Text("Line Height: ${String.format("%.1f", lineHeight)}", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 8.dp))
-        Slider(
-            value = lineHeight,
-            onValueChange = { onLineHeightChanged(it) },
-            valueRange = 1.0f..2.5f
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            IconButton(
+                onClick = { onLineHeightChanged(((lineHeight - 0.1f) * 10).roundToInt() / 10f) },
+                enabled = lineHeight > 1.05f
+            ) {
+                Icon(Icons.Filled.Remove, "Decrease line height")
+            }
+            Slider(
+                value = lineHeight,
+                onValueChange = { onLineHeightChanged(((it) * 10).roundToInt() / 10f) },
+                valueRange = 1.0f..2.5f,
+                modifier = Modifier.weight(1f)
+            )
+            IconButton(
+                onClick = { onLineHeightChanged(((lineHeight + 0.1f) * 10).roundToInt() / 10f) },
+                enabled = lineHeight < 2.45f
+            ) {
+                Icon(Icons.Filled.Add, "Increase line height")
+            }
+        }
         
         Text("Paragraph Spacing: ${String.format("%.1f", paragraphSpacing)}", style = MaterialTheme.typography.bodyMedium)
-        Slider(
-            value = paragraphSpacing,
-            onValueChange = { onParagraphSpacingChanged(it) },
-            valueRange = 0.0f..2.0f
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            IconButton(
+                onClick = { onParagraphSpacingChanged(((paragraphSpacing - 0.1f) * 10).roundToInt() / 10f) },
+                enabled = paragraphSpacing > 0.05f
+            ) {
+                Icon(Icons.Filled.Remove, "Decrease paragraph spacing")
+            }
+            Slider(
+                value = paragraphSpacing,
+                onValueChange = { onParagraphSpacingChanged(((it) * 10).roundToInt() / 10f) },
+                valueRange = 0.0f..2.0f,
+                modifier = Modifier.weight(1f)
+            )
+            IconButton(
+                onClick = { onParagraphSpacingChanged(((paragraphSpacing + 0.1f) * 10).roundToInt() / 10f) },
+                enabled = paragraphSpacing < 1.95f
+            ) {
+                Icon(Icons.Filled.Add, "Increase paragraph spacing")
+            }
+        }
         
         Text("Margin: $margin", style = MaterialTheme.typography.bodyMedium)
-        Slider(
-            value = margin.toFloat(),
-            onValueChange = { onMarginChanged(it.toInt()) },
-            valueRange = 0f..10f,
-            steps = 9
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            IconButton(
+                onClick = { onMarginChanged(margin - 1) },
+                enabled = margin > 0
+            ) {
+                Icon(Icons.Filled.Remove, "Decrease margin")
+            }
+            Slider(
+                value = margin.toFloat(),
+                onValueChange = { onMarginChanged(it.toInt()) },
+                valueRange = 0f..10f,
+                steps = 9,
+                modifier = Modifier.weight(1f)
+            )
+            IconButton(
+                onClick = { onMarginChanged(margin + 1) },
+                enabled = margin < 10
+            ) {
+                Icon(Icons.Filled.Add, "Increase margin")
+            }
+        }
         
         Spacer(modifier = Modifier.height(24.dp))
         
@@ -1205,7 +1251,7 @@ fun ReaderSettingsSheet(
                 ) {
                     if (isSelected) {
                         Icon(
-                            Icons.Default.Check, 
+                            Icons.Filled.Check,
                             null, 
                             modifier = Modifier.size(16.dp),
                             tint = if (color.lowercase() == "#fff176") Color.Black else Color.White
@@ -1237,7 +1283,7 @@ fun ReaderSettingsSheet(
                 ) {
                     if (isSelected) {
                         Icon(
-                            Icons.Default.Check, 
+                            Icons.Filled.Check,
                             null, 
                             modifier = Modifier.size(16.dp),
                             tint = if (color.lowercase() == "#fff176") Color.Black else Color.White
