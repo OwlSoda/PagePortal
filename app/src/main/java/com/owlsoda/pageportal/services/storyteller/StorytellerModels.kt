@@ -154,9 +154,10 @@ data class UserResponse(
 data class MetadataRequest(
     val title: String? = null,
     val description: String? = null,
-    @SerializedName("series_name") val seriesName: String? = null,
-    @SerializedName("series_index") val seriesIndex: Float? = null,
-    @SerializedName("creator_names") val creatorNames: List<String>? = null,
-    @SerializedName("tag_names") val tagNames: List<String>? = null
+    val series: String? = null,
+    val seriesIndex: Float? = null,
+    val authors: List<String>? = null,
+    val narrators: List<String>? = null,
+    val tags: List<String>? = null
 )
 

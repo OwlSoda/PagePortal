@@ -251,10 +251,10 @@ class StorytellerService(
             val metadataRequest = MetadataRequest(
                 title = metadata.title,
                 description = metadata.description,
-                seriesName = metadata.series,
+                series = metadata.series,
                 seriesIndex = metadata.seriesIndex,
-                creatorNames = metadata.authors,
-                tagNames = metadata.tags
+                authors = metadata.authors,
+                tags = metadata.tags
             )
             
             var response = api.updateMetadataJson(bookId, metadataRequest)
@@ -324,7 +324,7 @@ class StorytellerService(
     fun getSyncDownloadUrl(bookId: String): String {
         val base = baseUrl?.trimEnd('/') ?: return ""
         val encodedToken = java.net.URLEncoder.encode(authToken ?: "", "UTF-8")
-        return "$base/api/v2/books/$bookId/files?format=readaloud&token=$encodedToken"
+        return "$base/api/v2/books/$bookId/files?format=sync&token=$encodedToken"
     }
 
     suspend fun triggerReadAloudProcessing(bookId: String): Result<Unit> {
