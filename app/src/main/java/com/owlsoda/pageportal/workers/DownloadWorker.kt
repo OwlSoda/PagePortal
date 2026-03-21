@@ -97,20 +97,25 @@ class DownloadWorker(
                 else -> DownloadUtils.DownloadFormat.AUDIO
             }
             
+            val availableFiles = details.files
+            logToFile("Found ${availableFiles.size} candidate files for book $serviceBookId")
+            availableFiles.forEach { logToFile("  - File: ${it.filename}, Mime: ${it.mimeType}") }
+
             downloadUrl = when (format) {
                 DownloadUtils.DownloadFormat.AUDIO -> 
-                    details.files.firstOrNull { it.mimeType.startsWith("audio/") }?.downloadUrl
+                    availableFiles.firstOrNull { it.mimeType.startsWith("audio/") || it.filename.endsWith(".m4b") || it.filename.endsWith(".mp3") }?.downloadUrl
                 DownloadUtils.DownloadFormat.EBOOK -> 
-                    details.files.firstOrNull { it.mimeType == "application/epub+zip" }?.downloadUrl
+                    availableFiles.firstOrNull { it.mimeType == "application/epub+zip" || it.mimeType == "application/epub" || it.filename.endsWith(".epub") }?.downloadUrl
                 DownloadUtils.DownloadFormat.PDF ->
-                    details.files.firstOrNull { it.mimeType == "application/pdf" }?.downloadUrl
+                    availableFiles.firstOrNull { it.mimeType == "application/pdf" }?.downloadUrl
                 DownloadUtils.DownloadFormat.READALOUD -> 
-                    details.files.firstOrNull { it.mimeType == "application/zip" || it.filename.contains("readaloud") }?.downloadUrl
+                    availableFiles.firstOrNull { it.mimeType == "application/zip" || it.filename.contains("readaloud") || it.filename.contains("sync") }?.downloadUrl
+                else -> availableFiles.firstOrNull()?.downloadUrl
             }
-            
+
             if (downloadUrl == null) {
-                val availableMimeTypes = details.files.map { "${it.filename} (${it.mimeType})" }
-                logToFile("ERROR: No URL for $downloadType. Available: $availableMimeTypes")
+                val availableMimeTypes = availableFiles.map { "${it.filename} (${it.mimeType})" }
+                logToFile("ERROR: No suitable URL found for $downloadType among $availableMimeTypes")
                 // Also log to regular Logcat
                 Log.e(TAG, "No download URL for $downloadType. Book: ${book.title}. Available: $availableMimeTypes")
                 return Result.failure()

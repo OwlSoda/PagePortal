@@ -166,18 +166,19 @@ class StorytellerService(
 
         val durationSeconds = extractDuration(response) ?: locDuration?.let { it / 1000 }
         
+        val bookIdFromResponse = response.uuid ?: response.id ?: ""
         val serviceBook = response.toServiceBook() ?: throw Exception("Failed to map book details for $bookId")
         
         return ServiceBookDetails(
             book = serviceBook.copy(duration = durationSeconds),
-            chapters = emptyList(),  // Storyteller doesn't expose chapter list in main API
+            chapters = emptyList(),
             files = buildList {
                 // Ebook
-                response.ebook?.let {
-                    // Always use API endpoint for downloads to avoid 404s on folder paths
-                    val url = getEbookDownloadUrl(bookId)
+                val ebook = response.ebook ?: response.eBookField
+                ebook?.let {
+                    val url = getEbookDownloadUrl(bookIdFromResponse)
                     add(BookFile(
-                        id = it.uuid,
+                        id = it.uuid ?: it.id ?: "ebook",
                         filename = it.filepath?.substringAfterLast('/') ?: "ebook.epub",
                         mimeType = "application/epub+zip",
                         size = 0,
@@ -185,11 +186,11 @@ class StorytellerService(
                     ))
                 }
                 // Audiobook
-                response.audiobook?.let {
-                    // Always use API endpoint for downloads
-                    val url = getAudiobookDownloadUrl(bookId)
+                val audiobook = response.audiobook ?: response.audioBookField
+                audiobook?.let {
+                    val url = getAudiobookDownloadUrl(bookIdFromResponse)
                     add(BookFile(
-                        id = it.uuid,
+                        id = it.uuid ?: it.id ?: "audiobook",
                         filename = it.filepath?.substringAfterLast('/') ?: "audiobook.m4b",
                         mimeType = "audio/mp4",
                         size = 0,
@@ -197,24 +198,21 @@ class StorytellerService(
                     ))
                 }
                 // ReadAloud
-                response.readaloud?.let {
-                    Log.d(TAG, "Book $bookId ReadAloud status: ${it.status}")
-                    val isAvailable = true
-                    if (isAvailable) {
-                        // Always use API endpoint for downloads
-                        val url = getSyncDownloadUrl(bookId)
-                        add(BookFile(
-                            id = it.uuid,
-                            filename = it.filepath?.substringAfterLast('/') ?: "readaloud.zip",
-                            mimeType = "application/zip",
-                            size = 0,
-                            downloadUrl = url
-                        ))
-                    }
+                val readaloud = response.readaloud ?: response.readAloudField
+                readaloud?.let {
+                    Log.d(TAG, "Book $bookIdFromResponse ReadAloud status: ${it.status}")
+                    val url = getSyncDownloadUrl(bookIdFromResponse)
+                    add(BookFile(
+                        id = it.uuid ?: it.id ?: "readaloud",
+                        filename = it.filepath?.substringAfterLast('/') ?: "readaloud.zip",
+                        mimeType = "application/zip",
+                        size = 0,
+                        downloadUrl = url
+                    ))
                 }
             },
             totalDuration = durationSeconds,
-            lastProgress = position?.toReadingProgress(bookId)
+            lastProgress = position?.toReadingProgress(bookIdFromResponse)
         )
     }
     
@@ -356,28 +354,33 @@ class StorytellerService(
     
     // Mapping extensions
     private fun BookResponse.toServiceBook(): ServiceBook? {
+        val bookId = uuid ?: id ?: return null
+        val ebookObj = ebook ?: eBookField
+        val audiobookObj = audiobook ?: audioBookField
+        val readaloudObj = readaloud ?: readAloudField
+
         return try {
             ServiceBook(
                 serviceType = ServiceType.STORYTELLER,
-                serviceId = uuid,
-                title = title,
-                authors = authors?.map { it.name } ?: emptyList(),
-                narrators = narrators?.map { it.name } ?: emptyList(),
+                serviceId = bookId,
+                title = title ?: "Unknown",
+                authors = authors?.mapNotNull { it.name } ?: emptyList(),
+                narrators = narrators?.mapNotNull { it.name } ?: emptyList(),
                 series = series?.firstOrNull()?.name,
                 seriesIndex = series?.firstOrNull()?.seriesIndex?.toFloatOrNull(),
-                coverUrl = getCoverUrl(uuid),
-                audiobookCoverUrl = if (audiobook != null) "${getCoverUrl(uuid)}?format=square" else null,
-                hasEbook = ebook != null,
-                hasAudiobook = audiobook != null,
-                hasReadAloud = readaloud != null && (readaloud.status == "completed" || readaloud.status == "ready" || !readaloud.filepath.isNullOrBlank()),
+                coverUrl = getCoverUrl(bookId),
+                audiobookCoverUrl = if (audiobookObj != null) "${getCoverUrl(bookId)}?format=square" else null,
+                hasEbook = ebookObj != null,
+                hasAudiobook = audiobookObj != null,
+                hasReadAloud = readaloudObj != null && (readaloudObj.status == "completed" || readaloudObj.status == "ready" || !readaloudObj.filepath.isNullOrBlank()),
                 description = description,
                 duration = extractDuration(this),
                 publishedYear = publicationDate?.take(4)?.toIntOrNull(),
-                tags = tags?.map { it.name } ?: emptyList(),
-                collections = collections?.map { CollectionRef(it.uuid, it.name) } ?: emptyList()
+                tags = tags?.mapNotNull { it.name } ?: emptyList(),
+                collections = collections?.map { CollectionRef(it.uuid ?: it.id ?: "", it.name ?: "") } ?: emptyList()
             )
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to map book: $title ($uuid)", e)
+            Log.e(TAG, "Failed to map book: $title ($bookId)", e)
             null
         }
     }
