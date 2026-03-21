@@ -384,6 +384,10 @@ class AudiobookshelfService(
     override suspend fun downloadBook(bookId: String): Flow<DownloadProgress> {
          return flow { } // Downloads are handled by DownloadService, not this method
     }
+
+    override suspend fun updateMetadata(bookId: String, metadata: MetadataUpdate): Result<ServiceBook> {
+        return Result.failure(NotImplementedError("AudiobookshelfService does not support metadata editing yet"))
+    }
     
     private fun normalizeUrl(url: String): String {
         return ServiceManager.normalizeUrl(url)

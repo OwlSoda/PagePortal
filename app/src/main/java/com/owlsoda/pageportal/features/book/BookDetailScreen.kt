@@ -31,8 +31,13 @@ import androidx.compose.ui.unit.TextUnitType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.navigation.NavController
 import coil.compose.AsyncImage
+import com.google.gson.Gson
 import com.owlsoda.pageportal.core.database.entity.BookEntity
+import com.owlsoda.pageportal.core.extensions.parseAuthors
+import com.owlsoda.pageportal.core.extensions.parseTags
+import com.owlsoda.pageportal.ui.components.EmptyState
 import com.owlsoda.pageportal.ui.theme.PagePortalPurple
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -48,6 +53,7 @@ fun BookDetailScreen(
     onSeriesClick: (String) -> Unit,
     onTagClick: (String) -> Unit,
     onOpenWebReader: (String) -> Unit,
+    onEditClick: (Long) -> Unit,
     viewModel: BookDetailViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsState()
@@ -75,6 +81,14 @@ fun BookDetailScreen(
                         expanded = showMenu,
                         onDismissRequest = { showMenu = false }
                     ) {
+                        DropdownMenuItem(
+                            text = { Text("Edit Metadata") },
+                            onClick = {
+                                state.book?.id?.let { onEditClick(it) }
+                                showMenu = false
+                            },
+                            leadingIcon = { Icon(Icons.Default.Edit, null) }
+                        )
                         DropdownMenuItem(
                             text = { Text("Unlink Book") },
                             onClick = {
@@ -165,11 +179,7 @@ fun BookDetailScreen(
                         
                         // Authors (Multiple supported)
                         val authorList = remember(book.authors) {
-                            try {
-                                com.google.gson.Gson().fromJson(book.authors, Array<String>::class.java)?.toList() ?: listOf(book.authors)
-                            } catch (e: Exception) {
-                                listOf(book.authors)
-                            }
+                            book.authors.parseAuthors()
                         }
                         
                         @OptIn(ExperimentalLayoutApi::class)
@@ -466,11 +476,7 @@ fun BookDetailScreen(
                     
                     // Tags Section
                     val tagList = remember(book.tags) {
-                        try {
-                            com.google.gson.Gson().fromJson(book.tags, Array<String>::class.java)?.toList() ?: emptyList()
-                        } catch (e: Exception) {
-                            emptyList()
-                        }
+                        book.tags.parseTags()
                     }
                     
                     if (tagList.isNotEmpty()) {

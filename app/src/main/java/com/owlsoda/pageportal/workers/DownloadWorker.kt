@@ -154,7 +154,7 @@ class DownloadWorker(
                 url = downloadUrl,
                 file = targetFile,
                 headers = headers,
-                numParts = 4, // Parallel parts for speed
+                numParts = 6, // Parallel parts for speed
                 onProgress = { progress ->
                     val percent = (progress * 100).toInt()
                     

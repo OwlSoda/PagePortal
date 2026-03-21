@@ -210,6 +210,10 @@ class BookloreService(
             else -> false
         }
     }
+
+    override suspend fun updateMetadata(bookId: String, metadata: MetadataUpdate): Result<ServiceBook> {
+        return Result.failure(NotImplementedError("BookloreService does not support metadata editing yet"))
+    }
     
     private fun getExtension(format: MediaFormat, mimeType: String? = null): String {
         return when (format) {

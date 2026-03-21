@@ -169,4 +169,37 @@ class LibraryRepository @Inject constructor(
             Result.failure(e)
         }
     }
+
+    suspend fun updateBookMetadata(bookId: Long, metadata: com.owlsoda.pageportal.services.MetadataUpdate): Result<Unit> {
+        return try {
+            val book = bookDao.getBookById(bookId) ?: return Result.failure(Exception("Book not found"))
+            val service = serviceManager.getService(book.serverId) ?: return Result.failure(Exception("Service not found"))
+            
+            val result = service.updateMetadata(book.serviceBookId, metadata)
+            if (result.isSuccess) {
+                val updatedServiceBook = result.getOrThrow()
+                val gson = Gson()
+                val updatedBook = book.copy(
+                    title = updatedServiceBook.title,
+                    authors = gson.toJson(updatedServiceBook.authors),
+                    narrators = gson.toJson(updatedServiceBook.narrators),
+                    description = updatedServiceBook.description,
+                    coverUrl = updatedServiceBook.coverUrl,
+                    audiobookCoverUrl = updatedServiceBook.audiobookCoverUrl,
+                    series = updatedServiceBook.series,
+                    seriesIndex = updatedServiceBook.seriesIndex?.toString(),
+                    tags = gson.toJson(updatedServiceBook.tags),
+                    isbn = updatedServiceBook.isbn,
+                    asin = updatedServiceBook.asin,
+                    updatedAt = System.currentTimeMillis()
+                )
+                bookDao.updateBook(updatedBook)
+                Result.success(Unit)
+            } else {
+                Result.failure(result.exceptionOrNull() ?: Exception("Unknown error updating metadata"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
 }

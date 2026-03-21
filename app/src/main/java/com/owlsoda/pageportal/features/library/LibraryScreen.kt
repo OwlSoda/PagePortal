@@ -56,6 +56,7 @@ import com.owlsoda.pageportal.ui.theme.PagePortalPlayerBackground
 import com.owlsoda.pageportal.ui.theme.PagePortalPlayerText
 import com.owlsoda.pageportal.ui.theme.PagePortalPurple
 import coil.compose.AsyncImage
+import com.owlsoda.pageportal.core.extensions.parseAuthors
 import com.owlsoda.pageportal.features.auth.LoginScreen
 import com.owlsoda.pageportal.ui.components.EmptyState
 import com.owlsoda.pageportal.features.library.components.FastScroller
@@ -345,7 +346,7 @@ fun LibraryScreen(
                     beyondViewportPageCount = 1
                 ) { pageIndex ->
                     when (pageIndex) {
-                        0 -> HomeTabContent(uiState, onBookClick, onAuthorClick, onSettingsClick)
+                        0 -> HomeTabContent(uiState, viewModel, pagerState, scope, onBookClick, onAuthorClick, onSettingsClick)
                         1 -> AuthorsTabContent(uiState, viewModel)
                         2 -> SeriesTabContent(uiState, viewModel)
                         3 -> BooksTabContent(uiState, gridState, viewModel, onBookClick)
@@ -363,6 +364,11 @@ fun LibraryScreen(
 }
 
 @Composable
+fun HomeTabContent(
+    uiState: LibraryUiState,
+    viewModel: LibraryViewModel,
+    pagerState: androidx.compose.foundation.pager.PagerState,
+    scope: kotlinx.coroutines.CoroutineScope,
     onBookClick: (String) -> Unit,
     onAuthorClick: (String) -> Unit,
     onSettingsClick: () -> Unit
@@ -853,16 +859,11 @@ fun BookCard(
             )
             
             if (book.authors.isNotEmpty()) {
-                val displayAuthors = remember(book.authors) {
-                    try {
-                        val arr = com.google.gson.Gson().fromJson(book.authors, Array<String>::class.java)
-                        arr.joinToString(", ")
-                    } catch (e: Exception) {
-                        book.authors
-                    }
+                val authorsList = remember(book.authors) {
+                    book.authors.parseAuthors()
                 }
                 Text(
-                    text = displayAuthors,
+                    text = authorsList.joinToString(", "),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,

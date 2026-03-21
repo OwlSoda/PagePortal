@@ -78,7 +78,7 @@ class LocalBookImporter @Inject constructor(
             // 5. Insert into DB (Unified + Book)
             val unifiedBook = UnifiedBookEntity(
                 title = bookEntity.title,
-                author = bookEntity.authors,
+                authors = bookEntity.authors,
                 coverUrl = bookEntity.coverUrl,
                 lastUpdated = System.currentTimeMillis()
             )

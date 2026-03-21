@@ -88,7 +88,7 @@ class BookDetailViewModel @Inject constructor(
                         hasEbook = linkedBooks.any { it.hasEbook },
                         hasAudiobook = linkedBooks.any { it.hasAudiobook },
                         hasReadAloud = linkedBooks.any { it.hasReadAloud },
-                        duration = linkedBooks.maxOfOrNull { it.duration } ?: base.duration
+                        duration = linkedBooks.mapNotNull { it.duration }.maxOrNull() ?: base.duration
                     )
                     
                     val progress = progressDao.getProgressByBookId(base.id)

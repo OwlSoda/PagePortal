@@ -24,6 +24,9 @@ data class BookResponse(
     val createdAt: String? = null,
     val updatedAt: String? = null,
     val publicationDate: String? = null,
+    val duration: Float? = null,
+    @SerializedName("total_duration") val totalDuration: Float? = null,
+    @SerializedName("totalDurationMs") val totalDurationMs: Long? = null,
     val authors: List<AuthorResponse>? = emptyList(),
     val narrators: List<NarratorResponse>? = emptyList(),
     val series: List<SeriesResponse>? = emptyList(),
@@ -94,6 +97,9 @@ data class TagResponse(
 data class AudiobookResponse(
     val uuid: String,
     val filepath: String?,
+    val duration: Float? = null,
+    @SerializedName("total_duration") val totalDuration: Float? = null,
+    @SerializedName("totalDurationMs") val totalDurationMs: Long? = null,
     val createdAt: String? = null,
     val updatedAt: String? = null
 )
@@ -143,5 +149,14 @@ data class UserResponse(
     val id: String,
     val name: String,
     val email: String? = null
+)
+
+data class MetadataRequest(
+    val title: String? = null,
+    val description: String? = null,
+    @SerializedName("series_name") val seriesName: String? = null,
+    @SerializedName("series_index") val seriesIndex: Float? = null,
+    @SerializedName("creator_names") val creatorNames: List<String>? = null,
+    @SerializedName("tag_names") val tagNames: List<String>? = null
 )
 

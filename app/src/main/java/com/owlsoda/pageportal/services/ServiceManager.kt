@@ -265,7 +265,7 @@ class ServiceManager @Inject constructor(
             ServiceType.STORYTELLER -> com.owlsoda.pageportal.services.storyteller.StorytellerService(okHttpClient)
             ServiceType.AUDIOBOOKSHELF -> com.owlsoda.pageportal.services.audiobookshelf.AudiobookshelfService(serverUrl, okHttpClient)
             ServiceType.BOOKLORE -> com.owlsoda.pageportal.services.booklore.BookloreService(okHttpClient)
-            ServiceType.LOCAL -> com.owlsoda.pageportal.services.local.LocalService()
+            ServiceType.LOCAL -> throw IllegalArgumentException("Local service is handled directly via LocalBookImporter, not the BookService interface.")
         }
     }
 

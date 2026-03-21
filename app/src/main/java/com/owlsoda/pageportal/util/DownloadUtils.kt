@@ -222,32 +222,49 @@ object DownloadUtils {
         headers: Map<String, String>,
         onProgress: suspend (Long) -> Unit
     ) {
-        val request = Request.Builder()
-            .url(url)
-            .addHeader("Range", "bytes=$start-$end")
-            .apply { headers.forEach { (k, v) -> addHeader(k, v) } }
-            .build()
+        var attempts = 0
+        val maxAttempts = 3
+        var lastError: Exception? = null
 
-        client.newCall(request).execute().use { response ->
-            if (!response.isSuccessful && response.code != 206) {
-                throw Exception("Part download failed: ${response.code}")
-            }
+        while (attempts < maxAttempts) {
+            try {
+                val request = Request.Builder()
+                    .url(url)
+                    .addHeader("Range", "bytes=$start-$end")
+                    .apply { headers.forEach { (k, v) -> addHeader(k, v) } }
+                    .build()
 
-            val body = response.body ?: throw Exception("Empty part body")
-            RandomAccessFile(file, "rw").use { raf ->
-                raf.seek(start)
-                val input = body.byteStream()
-                val buffer = ByteArray(256 * 1024)
-                var bytesRead: Int
-                var totalPartRead = 0L
-                
-                while (input.read(buffer).also { bytesRead = it } != -1) {
-                    raf.write(buffer, 0, bytesRead)
-                    totalPartRead += bytesRead
-                    onProgress(totalPartRead)
+                client.newCall(request).execute().use { response ->
+                    if (!response.isSuccessful && response.code != 206) {
+                        throw Exception("Part download failed (HTTP ${response.code})")
+                    }
+
+                    val body = response.body ?: throw Exception("Empty part body")
+                    RandomAccessFile(file, "rw").use { raf ->
+                        raf.seek(start)
+                        val input = body.byteStream()
+                        val buffer = ByteArray(1024 * 1024) // 1MB buffer
+                        var bytesRead: Int
+                        var totalPartRead = 0L
+                        
+                        while (input.read(buffer).also { bytesRead = it } != -1) {
+                            raf.write(buffer, 0, bytesRead)
+                            totalPartRead += bytesRead
+                            onProgress(totalPartRead)
+                        }
+                    }
+                }
+                return // Success
+            } catch (e: Exception) {
+                attempts++
+                lastError = e
+                Log.w(TAG, "Part download attempt $attempts failed for range $start-$end: ${e.message}")
+                if (attempts < maxAttempts) {
+                    kotlinx.coroutines.delay(1000L * attempts)
                 }
             }
         }
+        throw lastError ?: Exception("Unknown error in downloadPart")
     }
 
     private suspend fun downloadFileSingle(
@@ -257,55 +274,71 @@ object DownloadUtils {
         headers: Map<String, String> = emptyMap(),
         onProgress: suspend (Float) -> Unit
     ) {
-        var serverHash: String? = null
-        val existingSize = if (file.exists()) file.length() else 0L
-        file.parentFile?.mkdirs()
-        
-        val request = Request.Builder()
-            .url(url)
-            .apply {
-                if (existingSize > 0) {
-                    addHeader("Range", "bytes=$existingSize-")
-                }
-                headers.forEach { (key, value) -> addHeader(key, value) }
-            }
-            .build()
-            
-        client.newCall(request).execute().use { response ->
-            if (!response.isSuccessful && response.code != 206) {
-                if (response.code == 416) {
-                    onProgress(1f)
-                    return
-                }
-                throw Exception("HTTP Error ${response.code}: ${response.message}")
-            }
+        var attempts = 0
+        val maxAttempts = 3
+        var lastError: Exception? = null
 
-            serverHash = response.header("X-Storyteller-Hash")
-            val body = response.body ?: throw Exception("Empty response body")
-            val contentLength = body.contentLength()
-            val isResuming = response.code == 206
-            val totalSize = if (isResuming) contentLength + existingSize else contentLength
-            
-            FileOutputStream(file, isResuming).use { output ->
-                val input = body.byteStream()
-                val buffer = ByteArray(512 * 1024)
-                var bytesRead: Int
-                var totalBytesRead = if (isResuming) existingSize else 0L
+        while (attempts < maxAttempts) {
+            try {
+                val existingSize = if (file.exists()) file.length() else 0L
+                file.parentFile?.mkdirs()
                 
-                while (input.read(buffer).also { bytesRead = it } != -1) {
-                    output.write(buffer, 0, bytesRead)
-                    totalBytesRead += bytesRead
-                    if (totalSize > 0) {
-                        onProgress(totalBytesRead.toFloat() / totalSize)
+                val request = Request.Builder()
+                    .url(url)
+                    .apply {
+                        if (existingSize > 0) {
+                            addHeader("Range", "bytes=$existingSize-")
+                        }
+                        headers.forEach { (key, value) -> addHeader(key, value) }
+                    }
+                    .build()
+                    
+                client.newCall(request).execute().use { response ->
+                    if (!response.isSuccessful && response.code != 206) {
+                        if (response.code == 416) {
+                            onProgress(1f)
+                            return
+                        }
+                        throw Exception("HTTP Error ${response.code}: ${response.message}")
+                    }
+
+                    val serverHash = response.header("X-Storyteller-Hash")
+                    val body = response.body ?: throw Exception("Empty response body")
+                    val contentLength = body.contentLength()
+                    val isResuming = response.code == 206
+                    val totalSize = if (isResuming) contentLength + existingSize else contentLength
+                    
+                    FileOutputStream(file, isResuming).use { output ->
+                        val input = body.byteStream()
+                        val buffer = ByteArray(2 * 1024 * 1024) // 2MB buffer for single stream
+                        var bytesRead: Int
+                        var totalBytesRead = if (isResuming) existingSize else 0L
+                        
+                        while (input.read(buffer).also { bytesRead = it } != -1) {
+                            output.write(buffer, 0, bytesRead)
+                            totalBytesRead += bytesRead
+                            if (totalSize > 0) {
+                                onProgress(totalBytesRead.toFloat() / totalSize)
+                            }
+                        }
+                        output.flush()
+                    }
+                    
+                    if (serverHash != null && file.exists()) {
+                        verifyHash(file, serverHash)
                     }
                 }
-                output.flush()
+                return // Success
+            } catch (e: Exception) {
+                attempts++
+                lastError = e
+                Log.w(TAG, "Single download attempt $attempts failed: ${e.message}")
+                if (attempts < maxAttempts) {
+                    kotlinx.coroutines.delay(1000L * attempts)
+                }
             }
         }
-
-        if (serverHash != null && file.exists()) {
-            verifyHash(file, serverHash!!)
-        }
+        throw lastError ?: Exception("Unknown error in downloadFileSingle")
     }
 
     /**

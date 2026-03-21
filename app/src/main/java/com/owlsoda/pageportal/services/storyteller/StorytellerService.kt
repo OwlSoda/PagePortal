@@ -6,6 +6,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import okhttp3.Interceptor
 import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.MultipartBody
 import okhttp3.OkHttpClient
 import okhttp3.RequestBody.Companion.toRequestBody
 import retrofit2.Retrofit
@@ -131,7 +132,7 @@ class StorytellerService(
             val response = getApi().listBooks(synced = null)
             android.util.Log.d("StorytellerService", "Received ${response.size} books from Storyteller")
             
-            response.mapNotNull { it.toServiceBookSafe(baseUrl, authToken) }
+            response.mapNotNull { it.toServiceBook() }
         } catch (e: Exception) {
             android.util.Log.e("StorytellerService", "Failed to fetch books from Storyteller. URL: $baseUrl, Token present: ${authToken != null}", e)
             emptyList()
@@ -159,10 +160,16 @@ class StorytellerService(
              return "$cleanBase/$encodedPath"
         }
         
-        val durationSeconds = position?.locator?.locations?.totalDurationMs?.let { it / 1000 }
+        // Debug duration reporting
+        val locDuration = position?.locator?.locations?.totalDurationMs
+        Log.d(TAG, "Duration Info for $bookId: locDurationMs=$locDuration")
 
+        val durationSeconds = extractDuration(response) ?: locDuration?.let { it / 1000 }
+        
+        val serviceBook = response.toServiceBook() ?: throw Exception("Failed to map book details for $bookId")
+        
         return ServiceBookDetails(
-            book = response.toServiceBook().copy(duration = durationSeconds),
+            book = serviceBook.copy(duration = durationSeconds),
             chapters = emptyList(),  // Storyteller doesn't expose chapter list in main API
             files = buildList {
                 // Ebook
@@ -234,6 +241,42 @@ class StorytellerService(
             timestamp = progress.lastUpdated
         )
         getApi().updatePosition(bookId, position)
+    }
+
+    override suspend fun updateMetadata(bookId: String, metadata: MetadataUpdate): Result<ServiceBook> {
+        return try {
+            val api = getApi()
+            
+            // Phase 1: Update metadata via JSON PUT
+            val metadataRequest = MetadataRequest(
+                title = metadata.title,
+                description = metadata.description,
+                seriesName = metadata.series,
+                seriesIndex = metadata.seriesIndex,
+                creatorNames = metadata.authors,
+                tagNames = metadata.tags
+            )
+            
+            var response = api.updateMetadataJson(bookId, metadataRequest)
+            
+            // Phase 2: Update cover if provided
+            metadata.coverImage?.let { imageBytes ->
+                val mimeType = metadata.coverMimeType ?: "image/jpeg"
+                val requestBody = imageBytes.toRequestBody(mimeType.toMediaType())
+                val coverPart = MultipartBody.Part.createFormData("cover", "cover.jpg", requestBody)
+                response = api.updateCover(bookId, coverPart)
+            }
+
+            response.toServiceBook()?.let { Result.success(it) } 
+                ?: Result.failure(Exception("Failed to map updated book metadata"))
+        } catch (e: retrofit2.HttpException) {
+            val errorBody = e.response()?.errorBody()?.string()
+            Log.e(TAG, "Server error (${e.code()}): $errorBody", e)
+            Result.failure(Exception("Server error (${e.code()}): $errorBody", e))
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to update metadata for book $bookId", e)
+            Result.failure(e)
+        }
     }
     
     override suspend fun downloadBook(bookId: String): Flow<DownloadProgress> {
@@ -312,24 +355,49 @@ class StorytellerService(
     }
     
     // Mapping extensions
-    private fun BookResponse.toServiceBook(): ServiceBook {
-        return ServiceBook(
-            serviceType = ServiceType.STORYTELLER,
-            serviceId = uuid,
-            title = title,
-            authors = authors?.map { it.name } ?: emptyList(),
-            narrators = narrators?.map { it.name } ?: emptyList(),
-            series = series?.firstOrNull()?.name,
-            seriesIndex = series?.firstOrNull()?.seriesIndex?.toFloatOrNull(),
-            coverUrl = getCoverUrl(uuid),
-            audiobookCoverUrl = if (audiobook != null) "${getCoverUrl(uuid)}?format=square" else null,
-            hasEbook = ebook != null,
-            hasAudiobook = audiobook != null,
-            hasReadAloud = readaloud != null && (readaloud.status == "completed" || readaloud.status == "ready" || !readaloud.filepath.isNullOrBlank()),
-            description = description,
-            publishedYear = publicationDate?.take(4)?.toIntOrNull(),
-            collections = collections?.map { CollectionRef(it.uuid, it.name) } ?: emptyList()
-        )
+    private fun BookResponse.toServiceBook(): ServiceBook? {
+        return try {
+            ServiceBook(
+                serviceType = ServiceType.STORYTELLER,
+                serviceId = uuid,
+                title = title,
+                authors = authors?.map { it.name } ?: emptyList(),
+                narrators = narrators?.map { it.name } ?: emptyList(),
+                series = series?.firstOrNull()?.name,
+                seriesIndex = series?.firstOrNull()?.seriesIndex?.toFloatOrNull(),
+                coverUrl = getCoverUrl(uuid),
+                audiobookCoverUrl = if (audiobook != null) "${getCoverUrl(uuid)}?format=square" else null,
+                hasEbook = ebook != null,
+                hasAudiobook = audiobook != null,
+                hasReadAloud = readaloud != null && (readaloud.status == "completed" || readaloud.status == "ready" || !readaloud.filepath.isNullOrBlank()),
+                description = description,
+                duration = extractDuration(this),
+                publishedYear = publicationDate?.take(4)?.toIntOrNull(),
+                tags = tags?.map { it.name } ?: emptyList(),
+                collections = collections?.map { CollectionRef(it.uuid, it.name) } ?: emptyList()
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to map book: $title ($uuid)", e)
+            null
+        }
+    }
+    
+    private fun extractDuration(book: BookResponse): Long? {
+        // Priority 1: totalDurationMs (ms -> s)
+        book.totalDurationMs?.let { if (it > 0) return it / 1000 }
+        
+        // Priority 2: total_duration/duration (s)
+        book.totalDuration?.let { if (it > 0) return it.toLong() }
+        book.duration?.let { if (it > 0) return it.toLong() }
+        
+        // Priority 3: audiobook level
+        book.audiobook?.let { ab ->
+            ab.totalDurationMs?.let { if (it > 0) return it / 1000 }
+            ab.totalDuration?.let { if (it > 0) return it.toLong() }
+            ab.duration?.let { if (it > 0) return it.toLong() }
+        }
+        
+        return null
     }
     
     private fun Position.toReadingProgress(bookId: String): ReadingProgress {

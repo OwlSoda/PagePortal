@@ -60,6 +60,11 @@ interface BookService {
      * Check if this service supports a specific feature.
      */
     fun supportsFeature(feature: ServiceFeature): Boolean
+
+    /**
+     * Update metadata for a book.
+     */
+    suspend fun updateMetadata(bookId: String, metadata: MetadataUpdate): Result<ServiceBook>
 }
 
 enum class ServiceType {
@@ -107,6 +112,17 @@ data class ServiceBook(
     val description: String? = null,
     val tags: List<String> = emptyList(),
     val collections: List<CollectionRef> = emptyList()
+)
+
+data class MetadataUpdate(
+    val title: String? = null,
+    val authors: List<String>? = null,
+    val series: String? = null,
+    val seriesIndex: Float? = null,
+    val description: String? = null,
+    val tags: List<String>? = null,
+    val coverImage: ByteArray? = null,
+    val coverMimeType: String? = null
 )
 
 data class CollectionRef(
