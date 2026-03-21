@@ -153,7 +153,10 @@ object DownloadUtils {
         numParts: Int = 1,
         onProgress: suspend (Float) -> Unit
     ) = coroutineScope {
-        if (numParts <= 1) {
+        // Force single stream for small files (< 10MB) or if only 1 part requested
+        val useSingleStream = numParts <= 1
+        
+        if (useSingleStream) {
             downloadFileSingle(client, url, file, headers, onProgress)
             return@coroutineScope
         }
@@ -168,15 +171,20 @@ object DownloadUtils {
             .build()
             
         val (contentLength, acceptsRanges) = withContext(Dispatchers.IO) {
-            client.newCall(headRequest).execute().use { resp ->
-                val length = resp.header("Content-Length")?.toLongOrNull() ?: -1L
-                val ranges = resp.header("Accept-Ranges") == "bytes" || resp.code == 206
-                length to ranges
+            try {
+                client.newCall(headRequest).execute().use { resp ->
+                    val length = resp.header("Content-Length")?.toLongOrNull() ?: -1L
+                    val ranges = resp.header("Accept-Ranges") == "bytes" || resp.code == 206
+                    length to ranges
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "HEAD request failed, falling back to single stream: ${e.message}")
+                -1L to false
             }
         }
 
-        if (contentLength <= 0 || !acceptsRanges) {
-            Log.d(TAG, "Server doesn't support ranges or size unknown. Falling back to single stream.")
+        if (contentLength <= 10 * 1024 * 1024 || !acceptsRanges) {
+            Log.d(TAG, "Server doesn't support ranges or file too small ($contentLength). Using single stream.")
             downloadFileSingle(client, url, file, headers, onProgress)
             return@coroutineScope
         }
@@ -185,12 +193,14 @@ object DownloadUtils {
         
         val partSize = contentLength / numParts
         val progressMap = java.util.concurrent.ConcurrentHashMap<Int, Long>()
-        var lastReportedProgress = 0L
+        var lastTotalReported = 0L
 
         // Initialize file size
         withContext(Dispatchers.IO) {
             RandomAccessFile(file, "rw").use { raf ->
-                raf.setLength(contentLength)
+                if (raf.length() != contentLength) {
+                    raf.setLength(contentLength)
+                }
             }
         }
 
@@ -200,11 +210,15 @@ object DownloadUtils {
                 val end = if (i == numParts - 1) contentLength - 1 else (i + 1) * partSize - 1
                 
                 downloadPart(client, url, file, start, end, headers) { bytesRead ->
-                    progressMap[i] = bytesRead
-                    val totalRead = progressMap.values.sum()
-                    if (totalRead > lastReportedProgress + (contentLength / 100)) {
-                        lastReportedProgress = totalRead
-                        onProgress(totalRead.toFloat() / contentLength)
+                    // Guard against progress jumping back during retries
+                    val currentStored = progressMap[i] ?: 0L
+                    if (bytesRead > currentStored) {
+                        progressMap[i] = bytesRead
+                        val totalRead = progressMap.values.sum()
+                        if (totalRead > lastTotalReported + (contentLength / 200)) { // 0.5% increments
+                            lastTotalReported = totalRead
+                            onProgress(totalRead.toFloat() / contentLength)
+                        }
                     }
                 }
             }
@@ -223,7 +237,7 @@ object DownloadUtils {
         onProgress: suspend (Long) -> Unit
     ) {
         var attempts = 0
-        val maxAttempts = 3
+        val maxAttempts = 5
         var lastError: Exception? = null
 
         while (attempts < maxAttempts) {
@@ -236,6 +250,7 @@ object DownloadUtils {
 
                 client.newCall(request).execute().use { response ->
                     if (!response.isSuccessful && response.code != 206) {
+                        Log.e(TAG, "Part download HTTP error: ${response.code} for range $start-$end")
                         throw Exception("Part download failed (HTTP ${response.code})")
                     }
 
@@ -258,9 +273,10 @@ object DownloadUtils {
             } catch (e: Exception) {
                 attempts++
                 lastError = e
-                Log.w(TAG, "Part download attempt $attempts failed for range $start-$end: ${e.message}")
+                Log.w(TAG, "Part download attempt $attempts/$maxAttempts failed ($start-$end): ${e.message}")
                 if (attempts < maxAttempts) {
-                    kotlinx.coroutines.delay(1000L * attempts)
+                    val delayMs = 2000L * attempts // Progressive delay
+                    kotlinx.coroutines.delay(delayMs)
                 }
             }
         }
