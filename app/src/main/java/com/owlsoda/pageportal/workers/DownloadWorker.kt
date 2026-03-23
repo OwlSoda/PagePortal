@@ -243,20 +243,22 @@ class DownloadWorker(
             }
             
             // --- Step 1: Pre-flight URL validation ---
-            logToFile("Pre-flight check for $downloadType: $downloadUrl")
-            val validationError = validateDownloadUrl(downloadClient, downloadUrl, headers)
-            if (validationError != null) {
-                val isUuidLink = downloadUrl.contains(Regex("[a-f0-9]{8}-"))
-                val detailedError = if (!isUuidLink && validationError.contains("404")) {
-                    "$validationError (Book may lack a UUID — v2 API requires UUID for downloads)"
-                } else {
-                    validationError
+            // Skip pre-flight for Storyteller /files endpoints — these are dynamic file-serving
+            // routes that don't support Range requests and return 404 for partial GETs even
+            // though a full download works fine.
+            val isDynamicFileEndpoint = downloadUrl.contains("/files?format=")
+            if (isDynamicFileEndpoint) {
+                logToFile("Skipping pre-flight for dynamic file endpoint: $downloadType")
+            } else {
+                logToFile("Pre-flight check for $downloadType")
+                val validationError = validateDownloadUrl(downloadClient, downloadUrl, headers)
+                if (validationError != null) {
+                    logToFile("Pre-flight FAILED: $validationError")
+                    bookDao.updateDownloadStatus(dbBookId, DownloadStatus.FAILED.name, 0f, null, error = validationError)
+                    return Result.failure()
                 }
-                logToFile("Pre-flight FAILED: $detailedError")
-                bookDao.updateDownloadStatus(dbBookId, DownloadStatus.FAILED.name, 0f, null, error = detailedError)
-                return Result.failure()
+                logToFile("Pre-flight OK")
             }
-            logToFile("Pre-flight OK")
             
             // Log sanitized URL
             val logUrl = downloadUrl.replace(Regex("token=[^&]+"), "token=REDACTED")
