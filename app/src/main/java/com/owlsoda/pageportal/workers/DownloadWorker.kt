@@ -74,7 +74,12 @@ class DownloadWorker(
                 val code = response.code
                 val contentType = response.header("Content-Type") ?: ""
                 
+                // Detailed header logging for debugging 404/Auth issues
                 logToFile("Pre-flight: HTTP $code, Content-Type: $contentType")
+                val responseHeaders = response.headers.names().joinToString(", ") { name ->
+                    "$name: ${response.header(name)}"
+                }
+                logToFile("Pre-flight Headers: $responseHeaders")
 
                 when {
                     code == 401 || code == 403 -> "Authentication expired — try logging out and back in"
@@ -99,7 +104,8 @@ class DownloadWorker(
         } catch (e: javax.net.ssl.SSLException) {
             "SSL/TLS error — check server certificate"
         } catch (e: Exception) {
-            logToFile("Pre-flight exception: ${e.javaClass.simpleName}: ${e.message}")
+            val stackTrace = e.stackTrace.take(10).joinToString("\n") { "  at $it" }
+            logToFile("Pre-flight exception: ${e.javaClass.simpleName}: ${e.message}\n$stackTrace")
             // Don't fail here — let the actual download attempt provide a better error
             null
         }
@@ -314,9 +320,10 @@ class DownloadWorker(
             Result.success()
             
         } catch (e: NumberFormatException) {
-            logToFile("NUMBER FORMAT ERROR: ${e.message}")
+            val stackTrace = e.stackTrace.take(20).joinToString("\n") { "  at $it" }
+            logToFile("NUMBER FORMAT ERROR: ${e.message}\n$stackTrace")
             Log.e(TAG, "NumberFormatException during download", e)
-            bookDao.updateDownloadStatus(dbBookId, DownloadStatus.FAILED.name, 0f, null, error = "Critical error: malformed data from server")
+            bookDao.updateDownloadStatus(dbBookId, DownloadStatus.FAILED.name, 0f, null, error = "Critical error: malformed data (${e.message})")
             Result.failure()
         } catch (e: Throwable) {
             val urlInfo = if (downloadUrl != null) "URL: ${downloadUrl.replace(Regex("token=[^&]+"), "token=REDACTED")}" else "URL not resolved"
