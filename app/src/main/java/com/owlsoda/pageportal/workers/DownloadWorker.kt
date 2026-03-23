@@ -36,6 +36,7 @@ class DownloadWorker(
         fun serviceManager(): ServiceManager
         fun bookDao(): BookDao
         fun okHttpClient(): OkHttpClient
+        fun libraryRepository(): com.owlsoda.pageportal.data.repository.LibraryRepository
     }
 
     companion object {
@@ -157,6 +158,7 @@ class DownloadWorker(
         val bookDao = entryPoint.bookDao()
         val serviceManager = entryPoint.serviceManager()
         val baseOkHttpClient = entryPoint.okHttpClient()
+        val libraryRepository = entryPoint.libraryRepository()
 
         val dbBookId = inputData.getLong(KEY_DB_BOOK_ID, -1L)
         val serverId = inputData.getLong(KEY_SERVER_ID, -1L)
@@ -173,11 +175,22 @@ class DownloadWorker(
         var downloadUrl: String? = null
 
         return try {
-            val book = bookDao.getBookById(dbBookId)
+            var book = bookDao.getBookById(dbBookId)
             if (book == null) {
                 logToFile("ERROR: Book not found in DB: $dbBookId")
                 return Result.failure()
             }
+            
+            // --- Step 0: Refresh latest metadata from server ---
+            logToFile("Refreshing latest metadata from server...")
+            try {
+                libraryRepository.refreshBookMetadata(dbBookId)
+            } catch (e: Exception) {
+                logToFile("Metadata refresh failed (non-fatal): ${e.message}")
+            }
+
+            // Capture stable local reference for smart-casting
+            val currentBook = bookDao.getBookById(dbBookId) ?: book
             
             val service = serviceManager.getService(serverId)
             if (service == null) {
@@ -186,7 +199,7 @@ class DownloadWorker(
                 return Result.failure()
             }
 
-            logToFile("Fetching details for book: ${book.title}")
+            logToFile("Fetching details for book: ${currentBook.title}")
             val details = service.getBookDetails(serviceBookId)
             
             val format = when (downloadType) {
@@ -215,7 +228,14 @@ class DownloadWorker(
 
             if (downloadUrl == null) {
                 val available = availableFiles.joinToString { "${it.filename} (${it.mimeType})" }
-                val errorMsg = if (availableFiles.isEmpty()) {
+                val errorMsg = if (downloadType == "readaloud") {
+                    when (currentBook.processingStatus) {
+                        "processing" -> "ReadAloud is still aligning on the server (${(currentBook.processingProgress ?: 0f) * 100}%). Please wait."
+                        "queued" -> "ReadAloud is queued for alignment on the server. Please wait."
+                        "failed" -> "ReadAloud alignment failed on the server. Please re-trigger alignment."
+                        else -> "ReadAloud file not found on server — alignment may not have been started."
+                    }
+                } else if (availableFiles.isEmpty()) {
                     "No files available for this book — the server may not have processed it yet"
                 } else {
                     "No $downloadType file found — available: $available"
@@ -264,13 +284,13 @@ class DownloadWorker(
             val logUrl = downloadUrl.replace(Regex("token=[^&]+"), "token=REDACTED")
             logToFile("Resolved URL for $downloadType: $logUrl")
             
-            val targetFile = DownloadUtils.getFilePath(applicationContext.filesDir, book, format)
+            val targetFile = DownloadUtils.getFilePath(applicationContext.filesDir, currentBook, format)
             targetFile.parentFile?.mkdirs()
             
             bookDao.updateDownloadStatus(dbBookId, DownloadStatus.DOWNLOADING.name, 0f, null, error = null)
             
             // Show initial notification
-            setForeground(createForegroundInfo(0, book.title))
+            setForeground(createForegroundInfo(0, currentBook.title))
             
             logToFile("Starting download to: ${targetFile.absolutePath}")
             
@@ -284,7 +304,7 @@ class DownloadWorker(
                     val percent = (progress * 100).toInt()
                     if (percent > lastNotificationProgress + 2) {
                         lastNotificationProgress = percent
-                        setForeground(createForegroundInfo(percent, book.title))
+                        setForeground(createForegroundInfo(percent, currentBook.title))
                         bookDao.updateDownloadStatus(dbBookId, DownloadStatus.DOWNLOADING.name, progress, null)
                     }
                 }
@@ -324,7 +344,7 @@ class DownloadWorker(
                 }
             }
             
-            setForeground(createForegroundInfo(100, book.title))
+            setForeground(createForegroundInfo(100, currentBook.title))
             logToFile("SUCCESS: $filePath")
             Result.success()
             

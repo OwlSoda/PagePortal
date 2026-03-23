@@ -202,4 +202,25 @@ class LibraryRepository @Inject constructor(
             Result.failure(e)
         }
     }
+
+    suspend fun refreshBookMetadata(bookId: Long): Result<BookEntity> {
+        return try {
+            val book = bookDao.getBookById(bookId) ?: return Result.failure(Exception("Book not found"))
+            val service = serviceManager.getService(book.serverId) ?: return Result.failure(Exception("Service not found"))
+            
+            val details = service.getBookDetails(book.serviceBookId)
+            val updatedBook = book.copy(
+                processingStatus = details.readAloudStatus,
+                processingProgress = details.readAloudProgress,
+                hasEbook = details.files.any { it.mimeType.contains("epub") },
+                hasAudiobook = details.files.any { it.mimeType.contains("audio") || it.filename.endsWith(".m4b") },
+                hasReadAloud = details.readAloudStatus != null,
+                updatedAt = System.currentTimeMillis()
+            )
+            bookDao.updateBook(updatedBook)
+            Result.success(updatedBook)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
 }

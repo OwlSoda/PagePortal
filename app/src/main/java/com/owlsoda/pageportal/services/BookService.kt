@@ -135,7 +135,9 @@ data class ServiceBookDetails(
     val chapters: List<Chapter> = emptyList(),
     val files: List<BookFile> = emptyList(),
     val totalDuration: Long? = null,
-    val lastProgress: ReadingProgress? = null
+    val lastProgress: ReadingProgress? = null,
+    val readAloudStatus: String? = null,
+    val readAloudProgress: Float? = null
 )
 
 data class Chapter(

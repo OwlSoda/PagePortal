@@ -169,6 +169,10 @@ class StorytellerService(
         val bookIdFromResponse = response.uuid ?: response.id ?: ""
         val serviceBook = response.toServiceBook() ?: throw Exception("Failed to map book details for $bookId")
         
+        val readaloud = response.readaloud ?: response.readAloudField
+        val raStatus = readaloud?.status
+        val raProgress = readaloud?.stageProgress?.toFloat()
+
         return ServiceBookDetails(
             book = serviceBook.copy(duration = durationSeconds),
             chapters = emptyList(),
@@ -197,22 +201,25 @@ class StorytellerService(
                         downloadUrl = url
                     ))
                 }
-                // ReadAloud
-                val readaloud = response.readaloud ?: response.readAloudField
+                // ReadAloud - ONLY if completed
                 readaloud?.let {
                     Log.d(TAG, "Book $bookIdFromResponse ReadAloud status: ${it.status}")
-                    val url = getSyncDownloadUrl(bookIdFromResponse)
-                    add(BookFile(
-                        id = it.uuid ?: it.id ?: "readaloud",
-                        filename = it.filepath?.substringAfterLast('/') ?: "readaloud.zip",
-                        mimeType = "application/zip",
-                        size = 0,
-                        downloadUrl = url
-                    ))
+                    if (it.status == "completed") {
+                        val url = getSyncDownloadUrl(bookIdFromResponse)
+                        add(BookFile(
+                            id = it.uuid ?: it.id ?: "readaloud",
+                            filename = it.filepath?.substringAfterLast('/') ?: "readaloud.zip",
+                            mimeType = "application/zip",
+                            size = 0,
+                            downloadUrl = url
+                        ))
+                    }
                 }
             },
             totalDuration = durationSeconds,
-            lastProgress = position?.toReadingProgress(bookIdFromResponse)
+            lastProgress = position?.toReadingProgress(bookIdFromResponse),
+            readAloudStatus = raStatus,
+            readAloudProgress = raProgress
         )
     }
     
