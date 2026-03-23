@@ -66,8 +66,8 @@ object DownloadUtils {
      * Format: "01 - Title" if has series index, otherwise just "Title"
      */
     fun getBaseFileName(book: BookEntity): String {
-        val indexPart = book.seriesIndex?.let { 
-            it.toInt().toString().padStart(2, '0') 
+        val indexPart = book.seriesIndex?.toFloatOrNull()?.toInt()?.let { 
+            it.toString().padStart(2, '0') 
         }
         return if (indexPart != null) {
             sanitize("$indexPart - ${book.title}")
