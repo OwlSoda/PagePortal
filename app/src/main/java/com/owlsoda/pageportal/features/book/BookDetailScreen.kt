@@ -330,13 +330,22 @@ fun BookDetailScreen(
                         ) {
                             if (state.isDownloading) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    CircularProgressIndicator(
-                                        progress = { state.downloadProgress },
-                                        modifier = Modifier.size(24.dp),
-                                        strokeWidth = 3.dp
-                                    )
-                                    Spacer(modifier = Modifier.width(12.dp))
-                                    Text("Downloading... ${(state.downloadProgress * 100).toInt()}%", style = MaterialTheme.typography.labelMedium)
+                                    if (state.downloadProgress < 0) {
+                                        CircularProgressIndicator(
+                                            modifier = Modifier.size(24.dp),
+                                            strokeWidth = 3.dp
+                                        )
+                                        Spacer(modifier = Modifier.width(12.dp))
+                                        Text("Downloading...", style = MaterialTheme.typography.labelMedium)
+                                    } else {
+                                        CircularProgressIndicator(
+                                            progress = { state.downloadProgress },
+                                            modifier = Modifier.size(24.dp),
+                                            strokeWidth = 3.dp
+                                        )
+                                        Spacer(modifier = Modifier.width(12.dp))
+                                        Text("Downloading... ${(state.downloadProgress * 100).toInt()}%", style = MaterialTheme.typography.labelMedium)
+                                    }
                                     TextButton(onClick = { viewModel.cancelDownload() }) {
                                         Text("Cancel", color = MaterialTheme.colorScheme.error)
                                     }

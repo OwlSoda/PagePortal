@@ -164,7 +164,7 @@ class StorytellerService(
         val locDuration = position?.locator?.locations?.totalDurationMs
         Log.d(TAG, "Duration Info for $bookId: locDurationMs=$locDuration")
 
-        val durationSeconds = extractDuration(response) ?: locDuration?.let { it / 1000 }
+        val durationSeconds = extractDuration(response) ?: locDuration?.toLong()?.let { it / 1000 }
         
         val bookIdFromResponse = response.uuid ?: response.id ?: ""
         val serviceBook = response.toServiceBook() ?: throw Exception("Failed to map book details for $bookId")
@@ -231,9 +231,9 @@ class StorytellerService(
                 mediaType = "application/xhtml+xml",
                 locations = Locations(
                     progression = progress.percentComplete.toDouble() / 100.0,
-                    position = progress.currentChapter,
+                    position = progress.currentChapter.toDouble(),
                     totalProgression = progress.percentComplete.toDouble() / 100.0,
-                    audioTimestampMs = progress.currentPosition
+                    audioTimestampMs = progress.currentPosition.toDouble()
                 )
             ),
             timestamp = progress.lastUpdated
@@ -384,7 +384,7 @@ class StorytellerService(
     
     private fun extractDuration(book: BookResponse): Long? {
         // Priority 1: totalDurationMs (ms -> s)
-        book.totalDurationMs?.let { if (it > 0) return it / 1000 }
+        book.totalDurationMs?.let { if (it > 0) return it.toLong() / 1000 }
         
         // Priority 2: total_duration/duration (s)
         book.totalDuration?.let { if (it > 0) return it.toLong() }
@@ -392,7 +392,7 @@ class StorytellerService(
         
         // Priority 3: audiobook level
         book.audiobook?.let { ab ->
-            ab.totalDurationMs?.let { if (it > 0) return it / 1000 }
+            ab.totalDurationMs?.let { if (it > 0) return it.toLong() / 1000 }
             ab.totalDuration?.let { if (it > 0) return it.toLong() }
             ab.duration?.let { if (it > 0) return it.toLong() }
         }
@@ -403,8 +403,8 @@ class StorytellerService(
     private fun Position.toReadingProgress(bookId: String): ReadingProgress {
         return ReadingProgress(
             bookId = bookId,
-            currentPosition = locator.locations.audioTimestampMs ?: 0,
-            currentChapter = locator.locations.position ?: 0,
+            currentPosition = locator.locations.audioTimestampMs?.toLong() ?: 0,
+            currentChapter = locator.locations.position?.toInt() ?: 0,
             percentComplete = (((locator.locations.totalProgression ?: locator.locations.progression ?: 0.0) * 100).toFloat()),
             lastUpdated = timestamp
         )

@@ -26,7 +26,7 @@ data class BookResponse(
     val publicationDate: String? = null,
     val duration: Float? = null,
     @SerializedName("total_duration") val totalDuration: Float? = null,
-    @SerializedName("totalDurationMs") val totalDurationMs: Long? = null,
+    @SerializedName("totalDurationMs") val totalDurationMs: Double? = null,
     val authors: List<AuthorResponse>? = emptyList(),
     val narrators: List<NarratorResponse>? = emptyList(),
     val series: List<SeriesResponse>? = emptyList(),
@@ -108,7 +108,7 @@ data class AudiobookResponse(
     val filepath: String? = null,
     val duration: Float? = null,
     @SerializedName("total_duration") val totalDuration: Float? = null,
-    @SerializedName("totalDurationMs") val totalDurationMs: Long? = null,
+    @SerializedName("totalDurationMs") val totalDurationMs: Double? = null,
     val createdAt: String? = null,
     val updatedAt: String? = null
 )
@@ -126,7 +126,7 @@ data class ReadAloudResponse(
     val id: String? = null,
     val status: String? = null,
     val filepath: String? = null,
-    val queuePosition: Int? = null,
+    val queuePosition: Double? = null,
     val currentStage: String? = null,
     val stageProgress: Double? = null,
     val createdAt: String? = null,
@@ -147,13 +147,13 @@ data class Locator(
 
 data class Locations(
     val progression: Double? = 0.0,
-    val position: Int? = null,
+    val position: Double? = null,
     @SerializedName("totalProgression") val totalProgression: Double? = null,
-    val audioTimestampMs: Long? = null,
-    val chapterIndex: Int? = null,
+    val audioTimestampMs: Double? = null,
+    val chapterIndex: Double? = null,
     val elementId: String? = null,
-    val totalChapters: Int? = null,
-    val totalDurationMs: Long? = null
+    val totalChapters: Double? = null,
+    val totalDurationMs: Double? = null
 )
 
 data class UserResponse(

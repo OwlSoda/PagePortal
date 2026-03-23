@@ -243,10 +243,17 @@ class DownloadWorker(
             }
             
             // --- Step 1: Pre-flight URL validation ---
+            logToFile("Pre-flight check for $downloadType: $downloadUrl")
             val validationError = validateDownloadUrl(downloadClient, downloadUrl, headers)
             if (validationError != null) {
-                logToFile("Pre-flight FAILED: $validationError")
-                bookDao.updateDownloadStatus(dbBookId, DownloadStatus.FAILED.name, 0f, null, error = validationError)
+                val isUuidLink = downloadUrl.contains(Regex("[a-f0-9]{8}-"))
+                val detailedError = if (!isUuidLink && validationError.contains("404")) {
+                    "$validationError (Book may lack a UUID — v2 API requires UUID for downloads)"
+                } else {
+                    validationError
+                }
+                logToFile("Pre-flight FAILED: $detailedError")
+                bookDao.updateDownloadStatus(dbBookId, DownloadStatus.FAILED.name, 0f, null, error = detailedError)
                 return Result.failure()
             }
             logToFile("Pre-flight OK")
