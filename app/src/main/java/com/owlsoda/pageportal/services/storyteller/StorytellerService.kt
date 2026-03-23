@@ -215,9 +215,15 @@ class StorytellerService(
                 readaloud?.let {
                     Log.d(TAG, "Book $bookIdFromResponse ReadAloud status: ${it.status}")
                     if (isReadAloudReady(it.status)) {
-                        val url = getSyncDownloadUrl(bookIdFromResponse)
+                        val fileId = it.uuid ?: it.id ?: "readaloud"
+                        val url = if (it.uuid != null || it.id != null) {
+                            "$baseUrl/api/v2/books/$bookIdFromResponse/files/${it.uuid ?: it.id}"
+                        } else {
+                            getSyncDownloadUrl(bookIdFromResponse)
+                        }
+                        
                         add(BookFile(
-                            id = it.uuid ?: it.id ?: "readaloud",
+                            id = fileId,
                             filename = it.filepath?.substringAfterLast('/') ?: "readaloud.zip",
                             mimeType = "application/zip",
                             size = 0,
