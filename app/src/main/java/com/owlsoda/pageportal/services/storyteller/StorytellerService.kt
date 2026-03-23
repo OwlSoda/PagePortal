@@ -190,15 +190,10 @@ class StorytellerService(
                 // Ebook
                 val ebook = response.ebook ?: response.eBookField
                 ebook?.let {
-                    val fileId = it.uuid ?: it.id ?: "ebook"
-                    val url = if (it.uuid != null || it.id != null) {
-                        "${baseUrl?.trimEnd('/')}/api/v2/books/$bookIdFromResponse/files/$fileId"
-                    } else {
-                        getEbookDownloadUrl(bookIdFromResponse)
-                    }
+                    val url = getEbookDownloadUrl(bookIdFromResponse)
                     
                     add(BookFile(
-                        id = fileId,
+                        id = it.uuid ?: it.id ?: "ebook",
                         filename = it.filepath?.substringAfterLast('/') ?: "ebook.epub",
                         mimeType = "application/epub+zip",
                         size = 0,
@@ -208,15 +203,10 @@ class StorytellerService(
                 // Audiobook
                 val audiobook = response.audiobook ?: response.audioBookField
                 audiobook?.let {
-                    val fileId = it.uuid ?: it.id ?: "audiobook"
-                    val url = if (it.uuid != null || it.id != null) {
-                        "${baseUrl?.trimEnd('/')}/api/v2/books/$bookIdFromResponse/files/$fileId"
-                    } else {
-                        getAudiobookDownloadUrl(bookIdFromResponse)
-                    }
+                    val url = getAudiobookDownloadUrl(bookIdFromResponse)
                     
                     add(BookFile(
-                        id = fileId,
+                        id = it.uuid ?: it.id ?: "audiobook",
                         filename = it.filepath?.substringAfterLast('/') ?: "audiobook.m4b",
                         mimeType = "audio/mp4",
                         size = 0,
@@ -227,15 +217,10 @@ class StorytellerService(
                 readaloud?.let {
                     Log.d(TAG, "Book $bookIdFromResponse ReadAloud status: ${it.status}, uuid: ${it.uuid}, id: ${it.id}, filepath: ${it.filepath}")
                     if (isReadAloudReady(it.status)) {
-                        val fileId = it.uuid ?: it.id ?: "readaloud"
-                        val url = if (it.uuid != null || it.id != null) {
-                            "${baseUrl?.trimEnd('/')}/api/v2/books/$bookIdFromResponse/files/$fileId"
-                        } else {
-                            getReadAloudDownloadUrl(bookIdFromResponse)
-                        }
+                        val url = getReadAloudDownloadUrl(bookIdFromResponse)
                         
                         add(BookFile(
-                            id = fileId,
+                            id = it.uuid ?: it.id ?: "readaloud",
                             filename = it.filepath?.substringAfterLast('/') ?: "readaloud.zip",
                             mimeType = "application/zip",
                             size = 0,
