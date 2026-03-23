@@ -262,7 +262,7 @@ class DownloadWorker(
             // Skip pre-flight for Storyteller /files endpoints — these are dynamic file-serving
             // routes that don't support Range requests and return 404 for partial GETs even
             // though a full download works fine.
-            val isDynamicFileEndpoint = downloadUrl.contains("/files?format=")
+            val isDynamicFileEndpoint = downloadUrl.contains("/files") // Bypass pre-flight for all Storyteller file-serving routes
             if (isDynamicFileEndpoint) {
                 logToFile("Skipping pre-flight for dynamic file endpoint: $downloadType")
             } else {
