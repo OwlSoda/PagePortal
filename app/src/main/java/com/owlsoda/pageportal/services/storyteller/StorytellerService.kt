@@ -24,6 +24,10 @@ class StorytellerService(
 
     companion object {
         private const val TAG = "StorytellerService"
+        
+        private fun isReadAloudReady(status: String?): Boolean {
+            return status == "completed" || status == "ready" || status == "ALIGNED"
+        }
     }
 
     private fun log(message: String) {
@@ -207,10 +211,10 @@ class StorytellerService(
                         downloadUrl = url
                     ))
                 }
-                // ReadAloud - ONLY if completed
+                // ReadAloud - ONLY if completed/aligned
                 readaloud?.let {
                     Log.d(TAG, "Book $bookIdFromResponse ReadAloud status: ${it.status}")
-                    if (it.status == "completed") {
+                    if (isReadAloudReady(it.status)) {
                         val url = getSyncDownloadUrl(bookIdFromResponse)
                         add(BookFile(
                             id = it.uuid ?: it.id ?: "readaloud",
@@ -388,7 +392,7 @@ class StorytellerService(
                 audiobookCoverUrl = if (audiobookObj != null) "${getCoverUrl(bookId)}?format=square" else null,
                 hasEbook = ebookObj != null,
                 hasAudiobook = audiobookObj != null,
-                hasReadAloud = readaloudObj != null && (readaloudObj.status == "completed" || readaloudObj.status == "ready" || !readaloudObj.filepath.isNullOrBlank()),
+                hasReadAloud = readaloudObj != null && (isReadAloudReady(readaloudObj.status) || !readaloudObj.filepath.isNullOrBlank()),
                 description = description,
                 duration = extractDuration(this),
                 publishedYear = publicationDate?.take(4)?.toIntOrNull(),
