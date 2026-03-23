@@ -236,7 +236,7 @@ class StorytellerService(
                     audioTimestampMs = progress.currentPosition.toDouble()
                 )
             ),
-            timestamp = progress.lastUpdated
+            timestamp = progress.lastUpdated.toDouble()
         )
         getApi().updatePosition(bookId, position)
     }
@@ -406,7 +406,7 @@ class StorytellerService(
             currentPosition = locator.locations.audioTimestampMs?.toLong() ?: 0,
             currentChapter = locator.locations.position?.toInt() ?: 0,
             percentComplete = (((locator.locations.totalProgression ?: locator.locations.progression ?: 0.0) * 100).toFloat()),
-            lastUpdated = timestamp
+            lastUpdated = timestamp.toLong()
         )
     }
 }

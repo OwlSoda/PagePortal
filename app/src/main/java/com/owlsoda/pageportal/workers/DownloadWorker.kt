@@ -329,10 +329,10 @@ class DownloadWorker(
             Result.success()
             
         } catch (e: NumberFormatException) {
-            val stackTrace = Log.getStackTraceString(e)
-            logToFile("CRITICAL: NumberFormatException for input: ${e.message}\n$stackTrace")
-            Log.e(TAG, "NumberFormatException during download", e)
-            bookDao.updateDownloadStatus(dbBookId, DownloadStatus.FAILED.name, 0f, null, error = "Critical error: malformed data (${e.message})")
+            val trace = Log.getStackTraceString(e)
+            val lines = trace.split("\n").take(5).joinToString("\n")
+            logToFile("CRITICAL: NumberFormatException for input: ${e.message}\n$trace")
+            bookDao.updateDownloadStatus(dbBookId, DownloadStatus.FAILED.name, 0f, null, error = "Critical error: malformed data (${e.message})\n$lines")
             Result.failure()
         } catch (e: Throwable) {
             val urlInfo = if (downloadUrl != null) "URL: ${downloadUrl.replace(Regex("token=[^&]+"), "token=REDACTED")}" else "URL not resolved"

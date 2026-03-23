@@ -135,7 +135,7 @@ data class ReadAloudResponse(
 
 data class Position(
     val locator: Locator,
-    val timestamp: Long = System.currentTimeMillis()
+    val timestamp: Double = System.currentTimeMillis().toDouble()
 )
 
 data class Locator(
