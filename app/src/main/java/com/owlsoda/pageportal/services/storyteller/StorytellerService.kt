@@ -225,13 +225,13 @@ class StorytellerService(
                 }
                 // ReadAloud - ONLY if completed/aligned
                 readaloud?.let {
-                    Log.d(TAG, "Book $bookIdFromResponse ReadAloud status: ${it.status}")
+                    Log.d(TAG, "Book $bookIdFromResponse ReadAloud status: ${it.status}, uuid: ${it.uuid}, id: ${it.id}, filepath: ${it.filepath}")
                     if (isReadAloudReady(it.status)) {
                         val fileId = it.uuid ?: it.id ?: "readaloud"
                         val url = if (it.uuid != null || it.id != null) {
                             "${baseUrl?.trimEnd('/')}/api/v2/books/$bookIdFromResponse/files/$fileId"
                         } else {
-                            getSyncDownloadUrl(bookIdFromResponse)
+                            getReadAloudDownloadUrl(bookIdFromResponse)
                         }
                         
                         add(BookFile(
@@ -356,9 +356,9 @@ class StorytellerService(
         return "$base/api/v2/books/$bookId/files?format=audiobook"
     }
     
-    fun getSyncDownloadUrl(bookId: String): String {
+    fun getReadAloudDownloadUrl(bookId: String): String {
         val base = baseUrl?.trimEnd('/') ?: return ""
-        return "$base/api/v2/books/$bookId/files?format=sync"
+        return "$base/api/v2/books/$bookId/files?format=readaloud"
     }
 
     suspend fun triggerReadAloudProcessing(bookId: String): Result<Unit> {
