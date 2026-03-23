@@ -329,8 +329,8 @@ class DownloadWorker(
             Result.success()
             
         } catch (e: NumberFormatException) {
-            val stackTrace = e.stackTrace.take(20).joinToString("\n") { "  at $it" }
-            logToFile("NUMBER FORMAT ERROR: ${e.message}\n$stackTrace")
+            val stackTrace = Log.getStackTraceString(e)
+            logToFile("CRITICAL: NumberFormatException for input: ${e.message}\n$stackTrace")
             Log.e(TAG, "NumberFormatException during download", e)
             bookDao.updateDownloadStatus(dbBookId, DownloadStatus.FAILED.name, 0f, null, error = "Critical error: malformed data (${e.message})")
             Result.failure()
