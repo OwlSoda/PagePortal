@@ -59,13 +59,14 @@ class DownloadWorker(
      * Pre-flight validation: HEAD request to check URL returns a downloadable file.
      * Returns null on success, or a user-friendly error message on failure.
      */
-    private suspend fun validateDownloadUrl(client: OkHttpClient, url: String): String? {
+    private suspend fun validateDownloadUrl(client: OkHttpClient, url: String, headers: Map<String, String> = emptyMap()): String? {
         return try {
             // Use GET with Range: bytes=0-0 instead of HEAD. 
             // Many servers/proxies return 404 for HEAD on dynamic file routes but allow GET.
             val request = Request.Builder()
                 .url(url)
                 .addHeader("Range", "bytes=0-0")
+                .apply { headers.forEach { (k, v) -> addHeader(k, v) } }
                 .get()
                 .build()
             
@@ -219,11 +220,24 @@ class DownloadWorker(
                 return Result.failure()
             }
             
+            var lastNotificationProgress = 0
+            
             // --- Step 4: Use base client (AuthInterceptor handles standard auth) ---
             val downloadClient = baseOkHttpClient
             
+            // Prepare auth headers (needed for pre-flight and multi-part)
+            val headers = mutableMapOf<String, String>()
+            val serviceEntity = serviceManager.getServiceEntity(serverId)
+            if (serviceEntity?.authToken != null) {
+                if (serviceEntity.serviceType == "BOOKLORE") {
+                    headers["Authorization"] = serviceEntity.authToken
+                } else {
+                    headers["Authorization"] = "Bearer ${serviceEntity.authToken}"
+                }
+            }
+            
             // --- Step 1: Pre-flight URL validation ---
-            val validationError = validateDownloadUrl(downloadClient, downloadUrl)
+            val validationError = validateDownloadUrl(downloadClient, downloadUrl, headers)
             if (validationError != null) {
                 logToFile("Pre-flight FAILED: $validationError")
                 bookDao.updateDownloadStatus(dbBookId, DownloadStatus.FAILED.name, 0f, null, error = validationError)
@@ -242,19 +256,6 @@ class DownloadWorker(
             
             // Show initial notification
             setForeground(createForegroundInfo(0, book.title))
-            
-            var lastNotificationProgress = 0
-            
-            // Prepare auth headers
-            val headers = mutableMapOf<String, String>()
-            val serviceEntity = serviceManager.getServiceEntity(serverId)
-            if (serviceEntity?.authToken != null) {
-                if (serviceEntity.serviceType == "BOOKLORE") {
-                    headers["Authorization"] = serviceEntity.authToken
-                } else {
-                    headers["Authorization"] = "Bearer ${serviceEntity.authToken}"
-                }
-            }
             
             logToFile("Starting download to: ${targetFile.absolutePath}")
             
@@ -312,6 +313,11 @@ class DownloadWorker(
             logToFile("SUCCESS: $filePath")
             Result.success()
             
+        } catch (e: NumberFormatException) {
+            logToFile("NUMBER FORMAT ERROR: ${e.message}")
+            Log.e(TAG, "NumberFormatException during download", e)
+            bookDao.updateDownloadStatus(dbBookId, DownloadStatus.FAILED.name, 0f, null, error = "Critical error: malformed data from server")
+            Result.failure()
         } catch (e: Throwable) {
             val urlInfo = if (downloadUrl != null) "URL: ${downloadUrl.replace(Regex("token=[^&]+"), "token=REDACTED")}" else "URL not resolved"
             val errorDetails = "${e.javaClass.simpleName}: ${e.message}"

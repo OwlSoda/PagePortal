@@ -324,17 +324,35 @@ object DownloadUtils {
                     val isResuming = response.code == 206
                     val totalSize = if (isResuming) contentLength + existingSize else contentLength
                     
+                    // If totalSize is unknown (contentLength == -1), report indeterminate progress
+                    if (totalSize <= 0) {
+                        onProgress(-1f)
+                    }
+
                     FileOutputStream(file, isResuming).use { output ->
                         val input = body.byteStream()
                         val buffer = ByteArray(2 * 1024 * 1024) // 2MB buffer
                         var bytesRead: Int
                         var totalBytesRead = if (isResuming) existingSize else 0L
+                        var lastReportedBytes = totalBytesRead
                         
                         while (input.read(buffer).also { bytesRead = it } != -1) {
                             output.write(buffer, 0, bytesRead)
                             totalBytesRead += bytesRead
+                            
                             if (totalSize > 0) {
-                                onProgress(totalBytesRead.toFloat() / totalSize)
+                                val progress = totalBytesRead.toFloat() / totalSize
+                                // Report at most every 1% or 2MB to avoid flooding the UI
+                                if (progress.isFinite() && (totalBytesRead > lastReportedBytes + (totalSize / 100) || totalBytesRead > lastReportedBytes + (2 * 1024 * 1024))) {
+                                    lastReportedBytes = totalBytesRead
+                                    onProgress(progress)
+                                }
+                            } else {
+                                // Indeterminate progress: report -1f every 2MB to keep notification alive
+                                if (totalBytesRead > lastReportedBytes + (2 * 1024 * 1024)) {
+                                    lastReportedBytes = totalBytesRead
+                                    onProgress(-1f)
+                                }
                             }
                         }
                         output.flush()
