@@ -76,6 +76,7 @@ data class BookEntity(
     
     // Legacy fields (kept for migration compatibility)
     val downloadStatus: String = "NONE", // Enum name: NONE, QUEUED, DOWNLOADING, COMPLETED, FAILED
+    val downloadError: String? = null, // Human-readable failure reason shown to user
     val localFilePath: String? = null,
     val downloadProgress: Float = 0f  // 0.0 to 1.0
 )

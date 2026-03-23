@@ -9,6 +9,7 @@ import com.owlsoda.pageportal.core.database.dao.BookDao
 import com.owlsoda.pageportal.services.DownloadStatus
 import com.owlsoda.pageportal.util.DownloadUtils
 import okhttp3.OkHttpClient
+import okhttp3.Request
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
 import dagger.hilt.android.EntryPointAccessors
@@ -17,6 +18,12 @@ import dagger.hilt.components.SingletonComponent
 /**
  * Worker for downloading book files in the background.
  * Uses manual EntryPoint injection to bypass HiltWorkerFactory complexity/instability.
+ *
+ * Features:
+ * - Pre-flight URL validation (HEAD request before download)
+ * - User-facing error messages stored to DB
+ * - Auth conflict prevention (skips AuthInterceptor when URL has token=)
+ * - Smart download strategy (single vs multi-part)
  */
 class DownloadWorker(
     appContext: Context,
@@ -47,8 +54,110 @@ class DownloadWorker(
         } catch (e: Exception) { }
     }
 
+    /**
+     * Build an OkHttpClient for downloading.
+     * If the URL contains a token= param, strip the AuthInterceptor to prevent double-auth.
+     */
+    private fun buildDownloadClient(baseClient: OkHttpClient, url: String): OkHttpClient {
+        val hasTokenInUrl = url.contains("token=")
+        if (!hasTokenInUrl) return baseClient
+
+        // Remove AuthInterceptor to prevent double-auth
+        logToFile("URL has embedded token — building client without AuthInterceptor")
+        return baseClient.newBuilder()
+            .interceptors().apply {
+                removeAll { it.javaClass.simpleName == "AuthInterceptor" }
+            }.let {
+                baseClient.newBuilder().apply {
+                    interceptors().clear()
+                    // Re-add all interceptors EXCEPT AuthInterceptor
+                    baseClient.interceptors.forEach { interceptor ->
+                        if (interceptor.javaClass.simpleName != "AuthInterceptor") {
+                            addInterceptor(interceptor)
+                        }
+                    }
+                }.build()
+            }
+    }
+
+    /**
+     * Pre-flight validation: HEAD request to check URL returns a downloadable file.
+     * Returns null on success, or a user-friendly error message on failure.
+     */
+    private suspend fun validateDownloadUrl(client: OkHttpClient, url: String): String? {
+        return try {
+            val request = Request.Builder().url(url).head().build()
+            val response = client.newCall(request).execute()
+            val code = response.code
+            val contentType = response.header("Content-Type") ?: ""
+            
+            logToFile("Pre-flight: HTTP $code, Content-Type: $contentType")
+
+            when {
+                code == 401 || code == 403 -> "Authentication expired — try logging out and back in"
+                code == 404 -> "File not found on server — the book may need reprocessing"
+                code == 500 -> "Server error (500) — try again later"
+                code in 502..504 -> "Server is temporarily unavailable — try again later"
+                code == 429 -> "Server is rate-limiting requests — wait a moment and try again"
+                code >= 400 -> "Server returned error $code"
+                contentType.contains("text/html") -> {
+                    logToFile("WARNING: Server returned HTML instead of binary file")
+                    "Server returned an error page instead of the file"
+                }
+                else -> null // Success
+            }
+        } catch (e: java.net.UnknownHostException) {
+            "Cannot reach server — check your connection"
+        } catch (e: java.net.ConnectException) {
+            "Connection refused — is the server running?"
+        } catch (e: java.net.SocketTimeoutException) {
+            "Server took too long to respond"
+        } catch (e: javax.net.ssl.SSLException) {
+            "SSL/TLS error — check server certificate"
+        } catch (e: Exception) {
+            logToFile("Pre-flight exception: ${e.javaClass.simpleName}: ${e.message}")
+            // Don't fail here — let the actual download attempt provide a better error
+            null
+        }
+    }
+
+    /**
+     * Map a download exception to a user-friendly error message.
+     */
+    private fun getErrorMessage(e: Throwable): String {
+        return when (e) {
+            is java.net.SocketTimeoutException -> "Download timed out — server was too slow"
+            is java.net.UnknownHostException -> "Cannot reach server — check your connection"
+            is java.net.ConnectException -> "Connection refused — is the server running?"
+            is javax.net.ssl.SSLException -> "SSL/TLS error — check server certificate"
+            is java.io.EOFException -> "Connection dropped unexpectedly — try again"
+            is java.io.IOException -> {
+                val msg = e.message ?: ""
+                when {
+                    msg.contains("HTTP 401") || msg.contains("HTTP 403") -> "Authentication expired — re-login required"
+                    msg.contains("HTTP 404") -> "File not found on server"
+                    msg.contains("HTTP 429") -> "Server rate limit — wait and try again"
+                    msg.contains("HTTP 5") -> "Server error — try again later"
+                    msg.contains("unexpected end") -> "Download interrupted — try again"
+                    else -> "Network error: $msg"
+                }
+            }
+            else -> {
+                val msg = e.message ?: ""
+                when {
+                    msg.contains("HTTP 401") || msg.contains("HTTP 403") -> "Authentication expired — re-login required"
+                    msg.contains("HTTP 404") -> "File not found on server"
+                    msg.contains("HTTP 429") -> "Server rate limit — wait and try again"
+                    msg.contains("HTTP 5") -> "Server error — try again later"
+                    msg.contains("Content-Type") -> "Server returned wrong file type"
+                    else -> "Download failed: ${e.javaClass.simpleName}"
+                }
+            }
+        }
+    }
+
     override suspend fun doWork(): Result {
-        logToFile("DownloadWorker (Std) started")
+        logToFile("DownloadWorker started")
         
         // Manual Injection
         val entryPoint = EntryPointAccessors.fromApplication(
@@ -57,7 +166,7 @@ class DownloadWorker(
         )
         val bookDao = entryPoint.bookDao()
         val serviceManager = entryPoint.serviceManager()
-        val okHttpClient = entryPoint.okHttpClient()
+        val baseOkHttpClient = entryPoint.okHttpClient()
 
         val dbBookId = inputData.getLong(KEY_DB_BOOK_ID, -1L)
         val serverId = inputData.getLong(KEY_SERVER_ID, -1L)
@@ -83,6 +192,7 @@ class DownloadWorker(
             val service = serviceManager.getService(serverId)
             if (service == null) {
                 logToFile("ERROR: Service not found: $serverId")
+                bookDao.updateDownloadStatus(dbBookId, DownloadStatus.FAILED.name, 0f, null, error = "Service connection lost — re-add the server")
                 return Result.failure()
             }
 
@@ -97,9 +207,10 @@ class DownloadWorker(
                 else -> DownloadUtils.DownloadFormat.AUDIO
             }
             
+            // --- File matching (broad) ---
             val availableFiles = details.files
             logToFile("Found ${availableFiles.size} candidate files for book $serviceBookId")
-            availableFiles.forEach { logToFile("  - File: ${it.filename}, Mime: ${it.mimeType}") }
+            availableFiles.forEach { logToFile("  - File: ${it.filename}, Mime: ${it.mimeType}, URL: ${it.downloadUrl.take(80)}...") }
 
             downloadUrl = when (format) {
                 DownloadUtils.DownloadFormat.AUDIO -> 
@@ -110,60 +221,70 @@ class DownloadWorker(
                     availableFiles.firstOrNull { it.mimeType == "application/pdf" }?.downloadUrl
                 DownloadUtils.DownloadFormat.READALOUD -> 
                     availableFiles.firstOrNull { it.mimeType == "application/zip" || it.filename.contains("readaloud") || it.filename.contains("sync") }?.downloadUrl
-                else -> availableFiles.firstOrNull()?.downloadUrl
             }
 
             if (downloadUrl == null) {
-                val availableMimeTypes = availableFiles.map { "${it.filename} (${it.mimeType})" }
-                logToFile("ERROR: No suitable URL found for $downloadType among $availableMimeTypes")
-                // Also log to regular Logcat
-                Log.e(TAG, "No download URL for $downloadType. Book: ${book.title}. Available: $availableMimeTypes")
+                val available = availableFiles.joinToString { "${it.filename} (${it.mimeType})" }
+                val errorMsg = if (availableFiles.isEmpty()) {
+                    "No files available for this book — the server may not have processed it yet"
+                } else {
+                    "No $downloadType file found — available: $available"
+                }
+                logToFile("ERROR: $errorMsg")
+                Log.e(TAG, errorMsg)
+                bookDao.updateDownloadStatus(dbBookId, DownloadStatus.FAILED.name, 0f, null, error = errorMsg)
                 return Result.failure()
             }
             
-            // Log full URL for debugging (sanitized token)
+            // --- Step 4: Build client without AuthInterceptor if URL has token= ---
+            val downloadClient = buildDownloadClient(baseOkHttpClient, downloadUrl)
+            
+            // --- Step 1: Pre-flight URL validation ---
+            val validationError = validateDownloadUrl(downloadClient, downloadUrl)
+            if (validationError != null) {
+                logToFile("Pre-flight FAILED: $validationError")
+                bookDao.updateDownloadStatus(dbBookId, DownloadStatus.FAILED.name, 0f, null, error = validationError)
+                return Result.failure()
+            }
+            logToFile("Pre-flight OK")
+            
+            // Log sanitized URL
             val logUrl = downloadUrl.replace(Regex("token=[^&]+"), "token=REDACTED")
             logToFile("Resolved URL for $downloadType: $logUrl")
-            Log.d(TAG, "Download URL: $logUrl")
-            
-            logToFile("Starting download: $downloadUrl")
             
             val targetFile = DownloadUtils.getFilePath(applicationContext.filesDir, book, format)
             targetFile.parentFile?.mkdirs()
             
-            bookDao.updateDownloadStatus(dbBookId, DownloadStatus.DOWNLOADING.name, 0f, null)
+            bookDao.updateDownloadStatus(dbBookId, DownloadStatus.DOWNLOADING.name, 0f, null, error = null)
             
             // Show initial notification
             setForeground(createForegroundInfo(0, book.title))
             
-            var lastLoggedProgress = 0
             var lastNotificationProgress = 0
             
-            // Prepare headers
+            // Prepare auth headers (only if URL doesn't have embedded token)
             val headers = mutableMapOf<String, String>()
-            val hasTokenInUrl = downloadUrl.contains("token=")
-            val serviceEntity = serviceManager.getServiceEntity(serverId)
-            
-            if (!hasTokenInUrl && serviceEntity?.authToken != null) {
-                if (serviceEntity.serviceType == "BOOKLORE") {
-                    headers["Authorization"] = serviceEntity.authToken
-                } else {
-                    headers["Authorization"] = "Bearer ${serviceEntity.authToken}"
+            if (!downloadUrl.contains("token=")) {
+                val serviceEntity = serviceManager.getServiceEntity(serverId)
+                if (serviceEntity?.authToken != null) {
+                    if (serviceEntity.serviceType == "BOOKLORE") {
+                        headers["Authorization"] = serviceEntity.authToken
+                    } else {
+                        headers["Authorization"] = "Bearer ${serviceEntity.authToken}"
+                    }
                 }
             }
             
-            logToFile("Starting robust download to: ${targetFile.absolutePath}")
+            logToFile("Starting download to: ${targetFile.absolutePath}")
             
+            // --- Step 3: Smart download strategy (DownloadUtils decides internally) ---
             DownloadUtils.downloadFile(
-                client = okHttpClient,
+                client = downloadClient,
                 url = downloadUrl,
                 file = targetFile,
                 headers = headers,
-                numParts = 2, // Low parallelism for stability
                 onProgress = { progress ->
                     val percent = (progress * 100).toInt()
-                    
-                    // Reporting to DB and Notification
                     if (percent > lastNotificationProgress + 2) {
                         lastNotificationProgress = percent
                         setForeground(createForegroundInfo(percent, book.title))
@@ -171,6 +292,15 @@ class DownloadWorker(
                     }
                 }
             )
+            
+            // --- Step 5: Post-download validation ---
+            val validationResult = DownloadUtils.validateDownloadedFile(targetFile, format)
+            if (validationResult != null) {
+                logToFile("Post-download validation FAILED: $validationResult")
+                targetFile.delete()
+                bookDao.updateDownloadStatus(dbBookId, DownloadStatus.FAILED.name, 0f, null, error = validationResult)
+                return Result.failure()
+            }
 
             val filePath = targetFile.absolutePath
             when (format) {
@@ -183,7 +313,7 @@ class DownloadWorker(
                 DownloadUtils.DownloadFormat.READALOUD -> 
                     bookDao.updateReadAloudDownloaded(dbBookId, true, filePath)
             }
-            bookDao.updateDownloadStatus(dbBookId, DownloadStatus.COMPLETED.name, 1f, filePath)
+            bookDao.updateDownloadStatus(dbBookId, DownloadStatus.COMPLETED.name, 1f, filePath, error = null)
             
             // Post-processing for ReadAloud
             if (format == DownloadUtils.DownloadFormat.READALOUD) {
@@ -194,7 +324,6 @@ class DownloadWorker(
                     logToFile("ReadAloud unzipped to: ${destDir.absolutePath}")
                 } catch (e: Exception) {
                     logToFile("ReadAloud unzip FAILED: ${e.message}")
-                    // Don't fail the whole download, but log it
                 }
             }
             
@@ -208,13 +337,15 @@ class DownloadWorker(
             logToFile("CRITICAL ERROR ($urlInfo): $errorDetails")
             Log.e(TAG, "DownloadWorker CRITICAL ERROR: $errorDetails", e)
             
-            // Log stack trace summary to log file
+            // Stack trace to log file
             val stackSummary = e.stackTrace.take(8).joinToString("\n") { "  at $it" }
             logToFile("Stack:\n$stackSummary")
             
-            bookDao.updateDownloadStatus(dbBookId, DownloadStatus.FAILED.name, 0f, null)
+            // User-facing error message
+            val userMessage = getErrorMessage(e)
+            bookDao.updateDownloadStatus(dbBookId, DownloadStatus.FAILED.name, 0f, null, error = userMessage)
             
-            if (runAttemptCount < 3 && e is java.io.IOException) {
+            if (runAttemptCount < 5 && e is java.io.IOException) {
                  logToFile("Retrying (attempt $runAttemptCount)...")
                  Result.retry()
             } else {
@@ -226,7 +357,6 @@ class DownloadWorker(
     private fun createForegroundInfo(progress: Int, title: String): androidx.work.ForegroundInfo {
         val channelId = "downloads"
         val notificationId = 1001 + (inputData.getLong(KEY_DB_BOOK_ID, 0).toInt()) 
-        // Unique ID per book
         
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
             val channel = android.app.NotificationChannel(
@@ -258,4 +388,3 @@ class DownloadWorker(
         return androidx.work.ForegroundInfo(notificationId, notification)
     }
 }
-

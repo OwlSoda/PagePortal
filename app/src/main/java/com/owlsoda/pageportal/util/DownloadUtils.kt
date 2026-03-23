@@ -134,36 +134,29 @@ object DownloadUtils {
     }
 
     /**
-     * Download a file with support for:
-     * - Parallel multi-part downloads (for speed)
-     * - Resumable downloads (Range header)
-     * - Progress callbacks
-     * - SHA-256 hash verification
-     * 
-     * @param client OkHttpClient
-     * @param url The download URL
-     * @param file The destination file
-     * @param numParts Number of parallel parts to download
+     * Download a file with smart strategy selection:
+     * - Token URLs → always single stream (servers reject Range on token URLs)
+     * - Large files + Range support → 2-part parallel
+     * - Everything else → single stream with resume
      */
     suspend fun downloadFile(
         client: OkHttpClient,
         url: String,
         file: File,
         headers: Map<String, String> = emptyMap(),
-        numParts: Int = 1,
         onProgress: suspend (Float) -> Unit
     ) = coroutineScope {
-        // Force single stream for small files (< 10MB) or if only 1 part requested
-        val useSingleStream = numParts <= 1
-        
-        if (useSingleStream) {
+        // Smart strategy: token URLs always use single stream
+        val hasToken = url.contains("token=")
+        if (hasToken) {
+            Log.d(TAG, "URL has embedded token — forcing single stream")
             downloadFileSingle(client, url, file, headers, onProgress)
             return@coroutineScope
         }
 
         file.parentFile?.mkdirs()
         
-        // 1. Get total size and check if server supports ranges
+        // Probe server capabilities
         val headRequest = Request.Builder()
             .url(url)
             .head()
@@ -183,19 +176,20 @@ object DownloadUtils {
             }
         }
 
-        if (contentLength <= 10 * 1024 * 1024 || !acceptsRanges) {
-            Log.d(TAG, "Server doesn't support ranges or file too small ($contentLength). Using single stream.")
+        // Only use multi-part for large files (>20MB) with Range support
+        if (contentLength <= 20 * 1024 * 1024 || !acceptsRanges) {
+            Log.d(TAG, "Using single stream (size=$contentLength, ranges=$acceptsRanges)")
             downloadFileSingle(client, url, file, headers, onProgress)
             return@coroutineScope
         }
 
+        val numParts = 2
         Log.d(TAG, "Starting multi-part download ($numParts parts, size=$contentLength)")
         
         val partSize = contentLength / numParts
         val progressMap = java.util.concurrent.ConcurrentHashMap<Int, Long>()
         var lastTotalReported = 0L
 
-        // Initialize file size
         withContext(Dispatchers.IO) {
             RandomAccessFile(file, "rw").use { raf ->
                 if (raf.length() != contentLength) {
@@ -210,12 +204,11 @@ object DownloadUtils {
                 val end = if (i == numParts - 1) contentLength - 1 else (i + 1) * partSize - 1
                 
                 downloadPart(client, url, file, start, end, headers) { bytesRead ->
-                    // Guard against progress jumping back during retries
                     val currentStored = progressMap[i] ?: 0L
                     if (bytesRead > currentStored) {
                         progressMap[i] = bytesRead
                         val totalRead = progressMap.values.sum()
-                        if (totalRead > lastTotalReported + (contentLength / 200)) { // 0.5% increments
+                        if (totalRead > lastTotalReported + (contentLength / 200)) {
                             lastTotalReported = totalRead
                             onProgress(totalRead.toFloat() / contentLength)
                         }
@@ -291,7 +284,7 @@ object DownloadUtils {
         onProgress: suspend (Float) -> Unit
     ) {
         var attempts = 0
-        val maxAttempts = 3
+        val maxAttempts = 5
         var lastError: Exception? = null
 
         while (attempts < maxAttempts) {
@@ -315,7 +308,14 @@ object DownloadUtils {
                             onProgress(1f)
                             return
                         }
-                        throw Exception("HTTP Error ${response.code}: ${response.message}")
+                        // Special handling for 429 and 5xx: longer delay
+                        if (response.code == 429 || response.code in 500..599) {
+                            val retryAfter = response.header("Retry-After")?.toLongOrNull() ?: (5L * (attempts + 1))
+                            Log.w(TAG, "HTTP ${response.code} — waiting ${retryAfter}s before retry")
+                            kotlinx.coroutines.delay(retryAfter * 1000)
+                            throw java.io.IOException("HTTP ${response.code}: ${response.message}")
+                        }
+                        throw java.io.IOException("HTTP ${response.code}: ${response.message}")
                     }
 
                     val serverHash = response.header("X-Storyteller-Hash")
@@ -326,7 +326,7 @@ object DownloadUtils {
                     
                     FileOutputStream(file, isResuming).use { output ->
                         val input = body.byteStream()
-                        val buffer = ByteArray(2 * 1024 * 1024) // 2MB buffer for single stream
+                        val buffer = ByteArray(2 * 1024 * 1024) // 2MB buffer
                         var bytesRead: Int
                         var totalBytesRead = if (isResuming) existingSize else 0L
                         
@@ -348,9 +348,12 @@ object DownloadUtils {
             } catch (e: Exception) {
                 attempts++
                 lastError = e
-                Log.w(TAG, "Single download attempt $attempts failed: ${e.message}")
+                Log.w(TAG, "Download attempt $attempts/$maxAttempts failed: ${e.message}")
                 if (attempts < maxAttempts) {
-                    kotlinx.coroutines.delay(1000L * attempts)
+                    // Exponential backoff: 2s, 4s, 8s, 16s
+                    val delayMs = (2000L * (1L shl (attempts - 1))).coerceAtMost(32000L)
+                    Log.d(TAG, "Waiting ${delayMs}ms before retry...")
+                    kotlinx.coroutines.delay(delayMs)
                 }
             }
         }
@@ -380,6 +383,60 @@ object DownloadUtils {
         } catch (e: Exception) {
             Log.e(TAG, "Failed to verify hash", e)
         }
+    }
+
+    /**
+     * Validate a downloaded file by checking size and magic bytes.
+     * Returns null on success, or a user-friendly error message on failure.
+     */
+    fun validateDownloadedFile(file: File, format: DownloadFormat): String? {
+        if (!file.exists()) return "Downloaded file is missing"
+        if (file.length() == 0L) return "Downloaded file is empty (0 bytes)"
+        if (file.length() < 1024) return "Downloaded file is suspiciously small (${file.length()} bytes) — may be an error page"
+
+        // Check magic bytes
+        try {
+            val header = ByteArray(12)
+            file.inputStream().use { it.read(header) }
+            val headerStr = String(header, 0, minOf(header.size, 5), Charsets.ISO_8859_1)
+
+            when (format) {
+                DownloadFormat.EBOOK, DownloadFormat.READALOUD -> {
+                    // EPUB and ZIP both start with PK (0x50 0x4B)
+                    if (header[0] != 0x50.toByte() || header[1] != 0x4B.toByte()) {
+                        // Check if it's HTML
+                        if (headerStr.contains("<") || headerStr.contains("html", ignoreCase = true)) {
+                            return "Server returned an HTML error page instead of the file"
+                        }
+                        Log.w(TAG, "File magic bytes don't match ZIP/EPUB: ${header.take(4).map { "0x%02x".format(it) }}")
+                        // Don't fail — some valid files have unusual headers
+                    }
+                }
+                DownloadFormat.AUDIO -> {
+                    // M4B/M4A/MP4 contain 'ftyp' at offset 4
+                    val ftypCheck = String(header, 4, 4, Charsets.ISO_8859_1)
+                    if (ftypCheck != "ftyp" && !headerStr.startsWith("ID3")) {
+                        if (headerStr.contains("<") || headerStr.contains("html", ignoreCase = true)) {
+                            return "Server returned an HTML error page instead of the audio file"
+                        }
+                        Log.w(TAG, "File magic bytes don't match audio: ${header.take(8).map { "0x%02x".format(it) }}")
+                    }
+                }
+                DownloadFormat.PDF -> {
+                    if (!headerStr.startsWith("%PDF")) {
+                        if (headerStr.contains("<") || headerStr.contains("html", ignoreCase = true)) {
+                            return "Server returned an HTML error page instead of the PDF"
+                        }
+                        Log.w(TAG, "File magic bytes don't match PDF: $headerStr")
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Magic byte check failed: ${e.message}")
+            // Don't fail validation for read errors
+        }
+
+        return null // Valid
     }
 
     /**

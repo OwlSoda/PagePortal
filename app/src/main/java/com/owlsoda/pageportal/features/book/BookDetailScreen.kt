@@ -341,7 +341,39 @@ fun BookDetailScreen(
                                         Text("Cancel", color = MaterialTheme.colorScheme.error)
                                     }
                                 }
-                            } else {
+                            }
+                            
+                            // Download Error Display
+                            val downloadError = state.downloadError
+                            if (downloadError != null) {
+                                androidx.compose.material3.Card(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = androidx.compose.material3.CardDefaults.cardColors(
+                                        containerColor = MaterialTheme.colorScheme.errorContainer
+                                    )
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(12.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Warning,
+                                            contentDescription = "Error",
+                                            tint = MaterialTheme.colorScheme.error,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            downloadError,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onErrorContainer,
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                    }
+                                }
+                            }
+                            
+                            if (!state.isDownloading) {
                                 // Audio Download Status
                                 if (book.hasAudiobook) {
                                     if (!book.isAudiobookDownloaded) {
