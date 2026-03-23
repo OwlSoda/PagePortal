@@ -48,11 +48,7 @@ class DownloadWorker(
     }
 
     private fun logToFile(message: String) {
-        try {
-            val debugFile = java.io.File(applicationContext.filesDir, "download_debug.log")
-            val timestamp = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US).format(java.util.Date())
-            debugFile.appendText("[$timestamp] $message\n")
-        } catch (e: Exception) { }
+        com.owlsoda.pageportal.util.LogManager.log(TAG, message)
     }
 
 

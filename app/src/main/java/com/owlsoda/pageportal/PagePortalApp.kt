@@ -26,6 +26,7 @@ class PagePortalApp : Application(), Configuration.Provider, ImageLoaderFactory 
 
     override fun onCreate() {
         super.onCreate()
+        com.owlsoda.pageportal.util.LogManager.init(this)
         android.util.Log.d("PagePortalApp", "Application Created. WorkerFactory injected: ${::workerFactory.isInitialized}")
         scheduleSyncWorker()
     }

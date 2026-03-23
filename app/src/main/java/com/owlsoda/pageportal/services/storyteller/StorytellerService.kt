@@ -12,6 +12,7 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import java.util.concurrent.TimeUnit
+import com.owlsoda.pageportal.util.LogManager
 
 /**
  * Implementation of BookService for Storyteller servers.
@@ -23,6 +24,10 @@ class StorytellerService(
 
     companion object {
         private const val TAG = "StorytellerService"
+    }
+
+    private fun log(message: String) {
+        LogManager.log(TAG, message)
     }
     
     override val serviceType: ServiceType = ServiceType.STORYTELLER
@@ -140,6 +145,7 @@ class StorytellerService(
     }
     
     override suspend fun getBookDetails(bookId: String): ServiceBookDetails {
+        log("getBookDetails(bookId=$bookId) started")
         val response = getApi().getBookDetails(bookId)
         val position = try {
             getApi().getPosition(bookId)
@@ -220,7 +226,9 @@ class StorytellerService(
             lastProgress = position?.toReadingProgress(bookIdFromResponse),
             readAloudStatus = raStatus,
             readAloudProgress = raProgress
-        )
+        ).also {
+            log("Book details fetched: ${it.book.title}, ReadAloud Status: $raStatus")
+        }
     }
     
     override suspend fun getProgress(bookId: String): ReadingProgress? {
@@ -272,8 +280,10 @@ class StorytellerService(
                 response = api.updateCover(bookId, coverPart)
             }
 
-            response.toServiceBook()?.let { Result.success(it) } 
-                ?: Result.failure(Exception("Failed to map updated book metadata"))
+            response.toServiceBook()?.let { 
+                log("Metadata update successful for $bookId")
+                Result.success(it) 
+            } ?: Result.failure(Exception("Failed to map updated book metadata"))
         } catch (e: retrofit2.HttpException) {
             val errorBody = e.response()?.errorBody()?.string()
             Log.e(TAG, "Server error (${e.code()}): $errorBody", e)
@@ -330,8 +340,10 @@ class StorytellerService(
     }
 
     suspend fun triggerReadAloudProcessing(bookId: String): Result<Unit> {
+        log("triggerReadAloudProcessing(bookId=$bookId) started")
         return try {
             getApi().processBook(bookId)
+            log("ReadAloud processing triggered for $bookId")
             Result.success(Unit)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to trigger ReadAloud processing for $bookId", e)

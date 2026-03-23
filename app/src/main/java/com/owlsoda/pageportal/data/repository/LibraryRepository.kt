@@ -10,6 +10,7 @@ import com.owlsoda.pageportal.services.ServiceManager
 import javax.inject.Inject
 import javax.inject.Singleton
 import com.owlsoda.pageportal.data.repository.SyncRepository
+import com.owlsoda.pageportal.util.LogManager
 
 @Singleton
 class LibraryRepository @Inject constructor(
@@ -20,8 +21,12 @@ class LibraryRepository @Inject constructor(
     private val progressDao: com.owlsoda.pageportal.core.database.dao.ProgressDao,
     private val syncRepository: SyncRepository
 ) {
+    private fun log(message: String) {
+        LogManager.log("LibraryRepository", message)
+    }
     
     suspend fun syncLibrary(): Result<Unit> {
+        log("syncLibrary() started")
         return try {
             val results = try {
                 serviceManager.getAllBooks()
@@ -129,10 +134,10 @@ class LibraryRepository @Inject constructor(
                 android.util.Log.e("LibraryRepository", "Matching failed", e)
             }
             
-            android.util.Log.i("LibraryRepository", "Sync successful")
+            log("Sync successful (${booksToInsert.size} books)")
             Result.success(Unit)
         } catch (e: Exception) {
-            android.util.Log.e("LibraryRepository", "Sync failed", e)
+            log("Sync failed: ${e.message}")
             Result.failure(Exception("Failed to sync library: ${e.message}", e))
         }
     }
@@ -204,6 +209,7 @@ class LibraryRepository @Inject constructor(
     }
 
     suspend fun refreshBookMetadata(bookId: Long): Result<BookEntity> {
+        log("refreshBookMetadata(bookId=$bookId) started")
         return try {
             val book = bookDao.getBookById(bookId) ?: return Result.failure(Exception("Book not found"))
             val service = serviceManager.getService(book.serverId) ?: return Result.failure(Exception("Service not found"))

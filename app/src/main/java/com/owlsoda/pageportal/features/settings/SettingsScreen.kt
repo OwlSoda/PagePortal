@@ -21,6 +21,9 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.compose.ui.platform.LocalContext
 import android.widget.Toast
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.text.font.FontFamily
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import android.os.Environment
@@ -50,6 +53,7 @@ val settingsCategories = listOf(
     SettingsCategory("library", "Library", Icons.Default.Dns, "Server management"),
     SettingsCategory("storage", "Storage", Icons.Default.SdStorage, "Cache and downloads"),
     SettingsCategory("accessibility", "Accessibility", Icons.Default.Accessibility, "Accessibility options"),
+    SettingsCategory("diagnostics", "Diagnostics", Icons.Default.BugReport, "App logs and debugging"),
     SettingsCategory("about", "About", Icons.Default.Info, "Version and info")
 )
 
@@ -116,6 +120,7 @@ fun SettingsScreen(
                 SettingsCategoriesList(
                     categories = settingsCategories,
                     selectedCategory = selectedCategory,
+                    viewModel = viewModel,
                     onCategoryClick = { selectedCategory = it.id }
                 )
             },
@@ -139,6 +144,7 @@ fun SettingsScreen(
 fun SettingsCategoriesList(
     categories: List<SettingsCategory>,
     selectedCategory: String?,
+    viewModel: SettingsViewModel,
     onCategoryClick: (SettingsCategory) -> Unit
 ) {
     LazyColumn(
@@ -186,6 +192,16 @@ fun SettingsCategoriesList(
                 }
             )
         }
+
+        item {
+            Spacer(modifier = Modifier.height(16.dp))
+            HorizontalDivider(
+                modifier = Modifier.padding(horizontal = 16.dp),
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+            )
+            val state by viewModel.state.collectAsState()
+            SettingsVersionItem(state, viewModel)
+        }
     }
 }
 
@@ -209,6 +225,7 @@ fun SettingsCategoryDetail(
             "library" -> item { LibrarySettings(state, onServersClick, onMatchReviewClick) }
             "storage" -> item { StorageSettings(state, viewModel, onStorageClick) }
             "accessibility" -> item { AccessibilitySettings(state, viewModel) }
+            "diagnostics" -> item { DiagnosticsSettings(state, viewModel) }
             "about" -> item { AboutSettings(state, viewModel) }
         }
     }
@@ -661,6 +678,109 @@ fun AccessibilitySettings(state: SettingsState, viewModel: SettingsViewModel) {
     }
 }
 
+// DIAGNOSTICS SETTINGS
+@Composable
+fun DiagnosticsSettings(state: SettingsState, viewModel: SettingsViewModel) {
+    val context = LocalContext.current
+    var showLogsDialog by remember { mutableStateOf(false) }
+
+    Column {
+        SettingsSectionHeader("Logs")
+        SettingsItem(
+            icon = Icons.Default.List,
+            title = "View App Logs",
+            subtitle = "Read internal debug logs",
+            onClick = { 
+                viewModel.loadLogs()
+                showLogsDialog = true 
+            }
+        )
+        
+        SettingsItem(
+            icon = Icons.Default.Share,
+            title = "Export Logs",
+            subtitle = "Share log file for debugging",
+            onClick = {
+                val logFile = com.owlsoda.pageportal.util.LogManager.getLogFile()
+                if (logFile.exists() && logFile.length() > 0) {
+                    val uri = FileProvider.getUriForFile(
+                        context,
+                        "${context.packageName}.fileprovider",
+                        logFile
+                    )
+                    val intent = Intent(Intent.ACTION_SEND).apply {
+                        type = "text/plain"
+                        putExtra(Intent.EXTRA_STREAM, uri)
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }
+                    context.startActivity(Intent.createChooser(intent, "Share PagePortal Logs"))
+                } else {
+                    Toast.makeText(context, "No logs to export", Toast.LENGTH_SHORT).show()
+                }
+            }
+        )
+
+        SettingsItem(
+            icon = Icons.Default.DeleteForever,
+            title = "Clear Logs",
+            subtitle = "Delete all log contents",
+            showChevron = false,
+            onClick = { viewModel.clearLogs() }
+        )
+
+        if (showLogsDialog) {
+            LogsViewDialog(
+                logs = state.logsText,
+                onDismiss = { showLogsDialog = false },
+                onRefresh = { viewModel.loadLogs() }
+            )
+        }
+    }
+}
+
+@Composable
+fun LogsViewDialog(
+    logs: String,
+    onDismiss: () -> Unit,
+    onRefresh: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("App Logs")
+                IconButton(onClick = onRefresh) {
+                    Icon(Icons.Default.Refresh, contentDescription = "Refresh")
+                }
+            }
+        },
+        text = {
+            val scrollState = rememberScrollState()
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight(0.8f)
+                    .verticalScroll(scrollState)
+            ) {
+                Text(
+                    text = logs,
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        fontFamily = FontFamily.Monospace
+                    )
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Close")
+            }
+        }
+    )
+}
+
 // ABOUT SETTINGS
 @Composable
 fun AboutSettings(state: SettingsState, viewModel: SettingsViewModel) {
@@ -680,59 +800,61 @@ fun AboutSettings(state: SettingsState, viewModel: SettingsViewModel) {
         SettingsItem(
             icon = Icons.Default.Info,
             title = "Version",
-            subtitle = versionName,
+            subtitle = state.versionName,
             showChevron = true,
-            onClick = {
-                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/OwlSoda/PagePortal/releases"))
-                context.startActivity(intent)
-            }
+            onClick = { viewModel.openGitHub() }
         )
 
-        Spacer(Modifier.height(8.dp))
-        SettingsSectionHeader("Updates")
+        SettingsItem(
+            icon = Icons.Default.Code,
+            title = "Source Code",
+            subtitle = "View on GitHub",
+            onClick = { viewModel.openGitHub() }
+        )
         
-        when (val s = updateState) {
-            is UpdateState.Idle, is UpdateState.NoUpdate -> {
-                SettingsItem(
-                    icon = Icons.Default.SystemUpdate,
-                    title = "Check for Updates",
-                    subtitle = if (s is UpdateState.NoUpdate) "App is up to date" else "Latest version from GitHub",
-                    onClick = { viewModel.checkForUpdates() }
-                )
-            }
-            is UpdateState.Checking -> {
-                ListItem(
-                    headlineContent = { Text("Checking for updates...") },
-                    leadingContent = { CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp) }
-                )
-            }
-            is UpdateState.UpdateAvailable -> {
-                SettingsItem(
-                    icon = Icons.Default.DownloadForOffline,
-                    title = "Update Available: ${s.release.tagName}",
-                    subtitle = "Click to download and install",
-                    onClick = { viewModel.downloadAndInstallUpdate(s.release) },
-                    tint = PagePortalPurple
-                )
-            }
-            is UpdateState.Downloading -> {
-                ListItem(
-                    headlineContent = { Text("Downloading update...") },
-                    supportingContent = { LinearProgressIndicator(modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) },
-                    leadingContent = { Icon(Icons.Default.Download, contentDescription = null, tint = PagePortalPurple) }
-                )
-            }
-            is UpdateState.Error -> {
-                SettingsItem(
-                    icon = Icons.Default.Error,
-                    title = "Update Error",
-                    subtitle = s.message,
-                    onClick = { viewModel.checkForUpdates() },
-                    tint = MaterialTheme.colorScheme.error
-                )
-            }
-        }
+        SettingsItem(
+            icon = Icons.Default.Description,
+            title = "Licenses",
+            subtitle = "Open source libraries used",
+            onClick = { /* TODO */ }
+        )
     }
+}
+
+@Composable
+fun SettingsVersionItem(state: SettingsState, viewModel: SettingsViewModel) {
+    val updateState by viewModel.updateState.collectAsState()
+    
+    val title = "Version ${state.versionName}"
+    val (subtitle, tint) = when (val s = updateState) {
+        is UpdateState.UpdateAvailable -> "Update to ${s.release.tagName} available!" to PagePortalPurple
+        is UpdateState.Downloading -> "Downloading update..." to PagePortalPurple
+        is UpdateState.Checking -> "Checking for updates..." to PagePortalTextSecondary
+        is UpdateState.Error -> "Update error" to MaterialTheme.colorScheme.error
+        is UpdateState.NoUpdate -> "App is up to date" to PagePortalTextSecondary
+        else -> "Tap to check for updates" to PagePortalTextSecondary
+    }
+
+    ListItem(
+        headlineContent = { Text(title, style = MaterialTheme.typography.labelLarge) },
+        supportingContent = { Text(subtitle, style = MaterialTheme.typography.labelSmall, color = tint) },
+        leadingContent = {
+            if (updateState is UpdateState.Checking || updateState is UpdateState.Downloading) {
+                CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+            } else {
+                Icon(
+                    imageVector = if (updateState is UpdateState.UpdateAvailable) Icons.Default.SystemUpdate else Icons.Default.Info,
+                    contentDescription = null,
+                    tint = if (updateState is UpdateState.UpdateAvailable) PagePortalPurple else PagePortalTextSecondary.copy(alpha = 0.5f),
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        },
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { viewModel.onVersionClick() },
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+    )
 }
 
 // DIALOGS
