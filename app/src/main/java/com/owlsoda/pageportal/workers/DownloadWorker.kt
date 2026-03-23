@@ -61,25 +61,33 @@ class DownloadWorker(
      */
     private suspend fun validateDownloadUrl(client: OkHttpClient, url: String): String? {
         return try {
-            val request = Request.Builder().url(url).head().build()
-            val response = client.newCall(request).execute()
-            val code = response.code
-            val contentType = response.header("Content-Type") ?: ""
+            // Use GET with Range: bytes=0-0 instead of HEAD. 
+            // Many servers/proxies return 404 for HEAD on dynamic file routes but allow GET.
+            val request = Request.Builder()
+                .url(url)
+                .addHeader("Range", "bytes=0-0")
+                .get()
+                .build()
             
-            logToFile("Pre-flight: HTTP $code, Content-Type: $contentType")
+            client.newCall(request).execute().use { response ->
+                val code = response.code
+                val contentType = response.header("Content-Type") ?: ""
+                
+                logToFile("Pre-flight: HTTP $code, Content-Type: $contentType")
 
-            when {
-                code == 401 || code == 403 -> "Authentication expired — try logging out and back in"
-                code == 404 -> "File not found on server — the book may need reprocessing"
-                code == 500 -> "Server error (500) — try again later"
-                code in 502..504 -> "Server is temporarily unavailable — try again later"
-                code == 429 -> "Server is rate-limiting requests — wait a moment and try again"
-                code >= 400 -> "Server returned error $code"
-                contentType.contains("text/html") -> {
-                    logToFile("WARNING: Server returned HTML instead of binary file")
-                    "Server returned an error page instead of the file"
+                when {
+                    code == 401 || code == 403 -> "Authentication expired — try logging out and back in"
+                    code == 404 -> "File not found on server — the book may need reprocessing"
+                    code == 500 -> "Server error (500) — try again later"
+                    code in 502..504 -> "Server is temporarily unavailable — try again later"
+                    code == 429 -> "Server is rate-limiting requests — wait a moment and try again"
+                    code >= 400 -> "Server returned error $code"
+                    contentType.contains("text/html") -> {
+                        logToFile("WARNING: Server returned HTML instead of binary file")
+                        "Server returned an error page instead of the file"
+                    }
+                    else -> null // Success (usually 200 or 206)
                 }
-                else -> null // Success
             }
         } catch (e: java.net.UnknownHostException) {
             "Cannot reach server — check your connection"
