@@ -309,20 +309,17 @@ class StorytellerService(
     // URL helpers
     fun getEbookDownloadUrl(bookId: String): String {
         val base = baseUrl?.trimEnd('/') ?: return ""
-        val encodedToken = java.net.URLEncoder.encode(authToken ?: "", "UTF-8")
-        return "$base/api/v2/books/$bookId/files?format=ebook&token=$encodedToken"
+        return "$base/api/v2/books/$bookId/files?format=ebook"
     }
     
     fun getAudiobookDownloadUrl(bookId: String): String {
         val base = baseUrl?.trimEnd('/') ?: return ""
-        val encodedToken = java.net.URLEncoder.encode(authToken ?: "", "UTF-8")
-        return "$base/api/v2/books/$bookId/files?format=audiobook&token=$encodedToken"
+        return "$base/api/v2/books/$bookId/files?format=audiobook"
     }
     
     fun getSyncDownloadUrl(bookId: String): String {
         val base = baseUrl?.trimEnd('/') ?: return ""
-        val encodedToken = java.net.URLEncoder.encode(authToken ?: "", "UTF-8")
-        return "$base/api/v2/books/$bookId/files?format=sync&token=$encodedToken"
+        return "$base/api/v2/books/$bookId/files?format=sync"
     }
 
     suspend fun triggerReadAloudProcessing(bookId: String): Result<Unit> {

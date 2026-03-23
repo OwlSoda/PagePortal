@@ -54,31 +54,6 @@ class DownloadWorker(
         } catch (e: Exception) { }
     }
 
-    /**
-     * Build an OkHttpClient for downloading.
-     * If the URL contains a token= param, strip the AuthInterceptor to prevent double-auth.
-     */
-    private fun buildDownloadClient(baseClient: OkHttpClient, url: String): OkHttpClient {
-        val hasTokenInUrl = url.contains("token=")
-        if (!hasTokenInUrl) return baseClient
-
-        // Remove AuthInterceptor to prevent double-auth
-        logToFile("URL has embedded token — building client without AuthInterceptor")
-        return baseClient.newBuilder()
-            .interceptors().apply {
-                removeAll { it.javaClass.simpleName == "AuthInterceptor" }
-            }.let {
-                baseClient.newBuilder().apply {
-                    interceptors().clear()
-                    // Re-add all interceptors EXCEPT AuthInterceptor
-                    baseClient.interceptors.forEach { interceptor ->
-                        if (interceptor.javaClass.simpleName != "AuthInterceptor") {
-                            addInterceptor(interceptor)
-                        }
-                    }
-                }.build()
-            }
-    }
 
     /**
      * Pre-flight validation: HEAD request to check URL returns a downloadable file.
@@ -236,8 +211,8 @@ class DownloadWorker(
                 return Result.failure()
             }
             
-            // --- Step 4: Build client without AuthInterceptor if URL has token= ---
-            val downloadClient = buildDownloadClient(baseOkHttpClient, downloadUrl)
+            // --- Step 4: Use base client (AuthInterceptor handles standard auth) ---
+            val downloadClient = baseOkHttpClient
             
             // --- Step 1: Pre-flight URL validation ---
             val validationError = validateDownloadUrl(downloadClient, downloadUrl)
@@ -262,16 +237,14 @@ class DownloadWorker(
             
             var lastNotificationProgress = 0
             
-            // Prepare auth headers (only if URL doesn't have embedded token)
+            // Prepare auth headers
             val headers = mutableMapOf<String, String>()
-            if (!downloadUrl.contains("token=")) {
-                val serviceEntity = serviceManager.getServiceEntity(serverId)
-                if (serviceEntity?.authToken != null) {
-                    if (serviceEntity.serviceType == "BOOKLORE") {
-                        headers["Authorization"] = serviceEntity.authToken
-                    } else {
-                        headers["Authorization"] = "Bearer ${serviceEntity.authToken}"
-                    }
+            val serviceEntity = serviceManager.getServiceEntity(serverId)
+            if (serviceEntity?.authToken != null) {
+                if (serviceEntity.serviceType == "BOOKLORE") {
+                    headers["Authorization"] = serviceEntity.authToken
+                } else {
+                    headers["Authorization"] = "Bearer ${serviceEntity.authToken}"
                 }
             }
             
