@@ -911,12 +911,30 @@ fun PlaybackSpeedDialog(
                     style = MaterialTheme.typography.headlineMedium,
                     modifier = Modifier.align(Alignment.CenterHorizontally)
                 )
-                Slider(
-                    value = currentSpeed,
-                    onValueChange = onSpeedChanged,
-                    valueRange = 0.5f..3.0f,
-                    steps = 49
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    IconButton(
+                        onClick = { onSpeedChanged((Math.round((currentSpeed - 0.05f) * 100f) / 100f).coerceAtLeast(0.5f)) },
+                        enabled = currentSpeed > 0.5f
+                    ) {
+                        Icon(Icons.Filled.Remove, contentDescription = "Decrease playback speed")
+                    }
+                    Slider(
+                        value = currentSpeed,
+                        onValueChange = onSpeedChanged,
+                        valueRange = 0.5f..3.0f,
+                        steps = 49,
+                        modifier = Modifier.weight(1f)
+                    )
+                    IconButton(
+                        onClick = { onSpeedChanged((Math.round((currentSpeed + 0.05f) * 100f) / 100f).coerceAtMost(3.0f)) },
+                        enabled = currentSpeed < 3.0f
+                    ) {
+                        Icon(Icons.Filled.Add, contentDescription = "Increase playback speed")
+                    }
+                }
             }
         },
         confirmButton = {
@@ -948,12 +966,30 @@ fun GridSizeDialog(
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.align(Alignment.CenterHorizontally).padding(bottom = 16.dp)
                 )
-                Slider(
-                    value = currentWidth.toFloat(),
-                    onValueChange = { onWidthChanged(it.toInt()) },
-                    valueRange = 100f..300f,
-                    steps = 19
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    IconButton(
+                        onClick = { onWidthChanged((currentWidth - 10).coerceAtLeast(100)) },
+                        enabled = currentWidth > 100
+                    ) {
+                        Icon(Icons.Filled.Remove, contentDescription = "Decrease grid size")
+                    }
+                    Slider(
+                        value = currentWidth.toFloat(),
+                        onValueChange = { onWidthChanged(it.toInt()) },
+                        valueRange = 100f..300f,
+                        steps = 19,
+                        modifier = Modifier.weight(1f)
+                    )
+                    IconButton(
+                        onClick = { onWidthChanged((currentWidth + 10).coerceAtMost(300)) },
+                        enabled = currentWidth < 300
+                    ) {
+                        Icon(Icons.Filled.Add, contentDescription = "Increase grid size")
+                    }
+                }
             }
         },
         confirmButton = {
