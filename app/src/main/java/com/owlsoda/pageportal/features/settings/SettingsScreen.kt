@@ -369,11 +369,26 @@ fun ReadingSettings(state: SettingsState, viewModel: SettingsViewModel) {
             }
             
             if (!isAuto) {
-                Slider(
-                    value = state.readerBrightness,
-                    onValueChange = { viewModel.setReaderBrightness(it) },
-                    valueRange = 0.0f..1.0f
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(
+                        onClick = { viewModel.setReaderBrightness((Math.round((state.readerBrightness - 0.1f) * 10f) / 10f).coerceAtLeast(0.0f)) },
+                        enabled = state.readerBrightness > 0.0f
+                    ) {
+                        Icon(Icons.Default.Remove, "Decrease brightness")
+                    }
+                    Slider(
+                        value = state.readerBrightness,
+                        onValueChange = { viewModel.setReaderBrightness(it) },
+                        valueRange = 0.0f..1.0f,
+                        modifier = Modifier.weight(1f)
+                    )
+                    IconButton(
+                        onClick = { viewModel.setReaderBrightness((Math.round((state.readerBrightness + 0.1f) * 10f) / 10f).coerceAtMost(1.0f)) },
+                        enabled = state.readerBrightness < 1.0f
+                    ) {
+                        Icon(Icons.Default.Add, "Increase brightness")
+                    }
+                }
             }
         }
         
@@ -408,12 +423,27 @@ fun ReadingSettings(state: SettingsState, viewModel: SettingsViewModel) {
         // Font Size
         Column(modifier = Modifier.padding(horizontal = 16.dp)) {
             Text("Font Size: ${(state.readerFontSize * 100).toInt()}%")
-            Slider(
-                value = state.readerFontSize,
-                onValueChange = { viewModel.setReaderFontSize(it) },
-                valueRange = 0.5f..2.0f,
-                steps = 14
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(
+                    onClick = { viewModel.setReaderFontSize((Math.round((state.readerFontSize - 0.1f) * 10f) / 10f).coerceAtLeast(0.5f)) },
+                    enabled = state.readerFontSize > 0.5f
+                ) {
+                    Icon(Icons.Default.Remove, "Decrease font size")
+                }
+                Slider(
+                    value = state.readerFontSize,
+                    onValueChange = { viewModel.setReaderFontSize(it) },
+                    valueRange = 0.5f..2.0f,
+                    steps = 14,
+                    modifier = Modifier.weight(1f)
+                )
+                IconButton(
+                    onClick = { viewModel.setReaderFontSize((Math.round((state.readerFontSize + 0.1f) * 10f) / 10f).coerceAtMost(2.0f)) },
+                    enabled = state.readerFontSize < 2.0f
+                ) {
+                    Icon(Icons.Default.Add, "Increase font size")
+                }
+            }
         }
         
         Spacer(Modifier.height(16.dp))
@@ -421,12 +451,27 @@ fun ReadingSettings(state: SettingsState, viewModel: SettingsViewModel) {
         // Line Height
         Column(modifier = Modifier.padding(horizontal = 16.dp)) {
              Text("Line Spacing: ${String.format("%.1f", state.readerLineHeight)}")
-             Slider(
-                 value = state.readerLineHeight,
-                 onValueChange = { viewModel.setReaderLineHeight(it) },
-                 valueRange = 1.0f..2.5f,
-                 steps = 14
-             )
+             Row(verticalAlignment = Alignment.CenterVertically) {
+                 IconButton(
+                     onClick = { viewModel.setReaderLineHeight((Math.round((state.readerLineHeight - 0.1f) * 10f) / 10f).coerceAtLeast(1.0f)) },
+                     enabled = state.readerLineHeight > 1.0f
+                 ) {
+                     Icon(Icons.Default.Remove, "Decrease line spacing")
+                 }
+                 Slider(
+                     value = state.readerLineHeight,
+                     onValueChange = { viewModel.setReaderLineHeight(it) },
+                     valueRange = 1.0f..2.5f,
+                     steps = 14,
+                     modifier = Modifier.weight(1f)
+                 )
+                 IconButton(
+                     onClick = { viewModel.setReaderLineHeight((Math.round((state.readerLineHeight + 0.1f) * 10f) / 10f).coerceAtMost(2.5f)) },
+                     enabled = state.readerLineHeight < 2.5f
+                 ) {
+                     Icon(Icons.Default.Add, "Increase line spacing")
+                 }
+             }
         }
         
         Spacer(Modifier.height(16.dp))
@@ -460,23 +505,53 @@ fun ReadingSettings(state: SettingsState, viewModel: SettingsViewModel) {
         // Margins
         Column(modifier = Modifier.padding(horizontal = 16.dp)) {
             Text("Margins: ${state.readerMargin}")
-            Slider(
-                value = state.readerMargin.toFloat(),
-                onValueChange = { viewModel.setReaderMargin(it.toInt()) },
-                valueRange = 0f..10f,
-                steps = 9
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(
+                    onClick = { viewModel.setReaderMargin((state.readerMargin - 1).coerceAtLeast(0)) },
+                    enabled = state.readerMargin > 0
+                ) {
+                    Icon(Icons.Default.Remove, "Decrease margins")
+                }
+                Slider(
+                    value = state.readerMargin.toFloat(),
+                    onValueChange = { viewModel.setReaderMargin(it.toInt()) },
+                    valueRange = 0f..10f,
+                    steps = 9,
+                    modifier = Modifier.weight(1f)
+                )
+                IconButton(
+                    onClick = { viewModel.setReaderMargin((state.readerMargin + 1).coerceAtMost(10)) },
+                    enabled = state.readerMargin < 10
+                ) {
+                    Icon(Icons.Default.Add, "Increase margins")
+                }
+            }
         }
         
         // Paragraph Spacing
         Column(modifier = Modifier.padding(horizontal = 16.dp)) {
             Text("Paragraph Spacing: ${String.format("%.1f", state.readerParagraphSpacing)}x")
-            Slider(
-                value = state.readerParagraphSpacing,
-                onValueChange = { viewModel.setReaderParagraphSpacing(it) },
-                valueRange = 0.0f..2.0f,
-                steps = 19
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(
+                    onClick = { viewModel.setReaderParagraphSpacing((Math.round((state.readerParagraphSpacing - 0.1f) * 10f) / 10f).coerceAtLeast(0.0f)) },
+                    enabled = state.readerParagraphSpacing > 0.0f
+                ) {
+                    Icon(Icons.Default.Remove, "Decrease paragraph spacing")
+                }
+                Slider(
+                    value = state.readerParagraphSpacing,
+                    onValueChange = { viewModel.setReaderParagraphSpacing(it) },
+                    valueRange = 0.0f..2.0f,
+                    steps = 19,
+                    modifier = Modifier.weight(1f)
+                )
+                IconButton(
+                    onClick = { viewModel.setReaderParagraphSpacing((Math.round((state.readerParagraphSpacing + 0.1f) * 10f) / 10f).coerceAtMost(2.0f)) },
+                    enabled = state.readerParagraphSpacing < 2.0f
+                ) {
+                    Icon(Icons.Default.Add, "Increase paragraph spacing")
+                }
+            }
         }
         
         // Scroll Mode
@@ -911,12 +986,27 @@ fun PlaybackSpeedDialog(
                     style = MaterialTheme.typography.headlineMedium,
                     modifier = Modifier.align(Alignment.CenterHorizontally)
                 )
-                Slider(
-                    value = currentSpeed,
-                    onValueChange = onSpeedChanged,
-                    valueRange = 0.5f..3.0f,
-                    steps = 49
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(
+                        onClick = { onSpeedChanged((Math.round((currentSpeed - 0.05f) * 100f) / 100f).coerceAtLeast(0.5f)) },
+                        enabled = currentSpeed > 0.5f
+                    ) {
+                        Icon(Icons.Default.Remove, "Decrease playback speed")
+                    }
+                    Slider(
+                        value = currentSpeed,
+                        onValueChange = onSpeedChanged,
+                        valueRange = 0.5f..3.0f,
+                        steps = 49,
+                        modifier = Modifier.weight(1f)
+                    )
+                    IconButton(
+                        onClick = { onSpeedChanged((Math.round((currentSpeed + 0.05f) * 100f) / 100f).coerceAtMost(3.0f)) },
+                        enabled = currentSpeed < 3.0f
+                    ) {
+                        Icon(Icons.Default.Add, "Increase playback speed")
+                    }
+                }
             }
         },
         confirmButton = {
@@ -948,12 +1038,27 @@ fun GridSizeDialog(
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.align(Alignment.CenterHorizontally).padding(bottom = 16.dp)
                 )
-                Slider(
-                    value = currentWidth.toFloat(),
-                    onValueChange = { onWidthChanged(it.toInt()) },
-                    valueRange = 100f..300f,
-                    steps = 19
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(
+                        onClick = { onWidthChanged((currentWidth - 10).coerceAtLeast(100)) },
+                        enabled = currentWidth > 100
+                    ) {
+                        Icon(Icons.Default.Remove, "Decrease grid item size")
+                    }
+                    Slider(
+                        value = currentWidth.toFloat(),
+                        onValueChange = { onWidthChanged(it.toInt()) },
+                        valueRange = 100f..300f,
+                        steps = 19,
+                        modifier = Modifier.weight(1f)
+                    )
+                    IconButton(
+                        onClick = { onWidthChanged((currentWidth + 10).coerceAtMost(300)) },
+                        enabled = currentWidth < 300
+                    ) {
+                        Icon(Icons.Default.Add, "Increase grid item size")
+                    }
+                }
             }
         },
         confirmButton = {
