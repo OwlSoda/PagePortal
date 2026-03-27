@@ -427,7 +427,27 @@ fun BasicSpeedPickerDialog(currentSpeed: Float, onSpeedSelected: (Float) -> Unit
             Text("Playback Speed", style = MaterialTheme.typography.headlineSmall)
             Spacer(modifier = Modifier.height(16.dp))
             Text("${String.format("%.1f", currentSpeed)}x", style = MaterialTheme.typography.displayMedium, color = MaterialTheme.colorScheme.primary)
-            Slider(value = currentSpeed, onValueChange = onSpeedSelected, valueRange = 0.5f..3.0f, steps = 24, modifier = Modifier.fillMaxWidth())
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                IconButton(
+                    onClick = { onSpeedSelected((Math.round((currentSpeed - 0.1f) * 10f) / 10f).coerceAtLeast(0.5f)) },
+                    enabled = currentSpeed > 0.5f
+                ) {
+                    Icon(Icons.Default.Remove, "Decrease playback speed")
+                }
+                Slider(
+                    value = currentSpeed,
+                    onValueChange = onSpeedSelected,
+                    valueRange = 0.5f..3.0f,
+                    steps = 24,
+                    modifier = Modifier.weight(1f)
+                )
+                IconButton(
+                    onClick = { onSpeedSelected((Math.round((currentSpeed + 0.1f) * 10f) / 10f).coerceAtMost(3.0f)) },
+                    enabled = currentSpeed < 3.0f
+                ) {
+                    Icon(Icons.Default.Add, "Increase playback speed")
+                }
+            }
             Spacer(modifier = Modifier.height(24.dp))
             FlowRow(horizontalArrangement = Arrangement.Center, modifier = Modifier.fillMaxWidth()) {
                 listOf(1.0f, 1.2f, 1.5f, 2.0f, 2.5f, 3.0f).forEach { speed ->
