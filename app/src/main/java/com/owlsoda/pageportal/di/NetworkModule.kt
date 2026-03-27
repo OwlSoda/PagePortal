@@ -1,6 +1,7 @@
 package com.owlsoda.pageportal.di
 
 import coil.ImageLoader
+import com.owlsoda.pageportal.BuildConfig
 import com.owlsoda.pageportal.network.AuthInterceptor
 import dagger.Module
 import dagger.Provides
@@ -29,7 +30,8 @@ object NetworkModule {
     @Singleton
     fun provideOkHttpClient(authInterceptor: AuthInterceptor): OkHttpClient {
         val logging = HttpLoggingInterceptor().apply {
-            level = HttpLoggingInterceptor.Level.HEADERS
+            level = if (BuildConfig.DEBUG) HttpLoggingInterceptor.Level.HEADERS 
+                    else HttpLoggingInterceptor.Level.NONE
         }
         
         return OkHttpClient.Builder()

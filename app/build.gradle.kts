@@ -15,8 +15,8 @@ android {
         applicationId = "com.owlsoda.pageportal"
         minSdk = 26
         targetSdk = 34
-        versionCode = 66
-        versionName = "0.1.76"
+        versionCode = 67
+        versionName = "0.1.77"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -132,6 +132,7 @@ dependencies {
     // Auth
     implementation("net.openid:appauth:0.11.1")
     implementation("androidx.browser:browser:1.7.0")
+    implementation("androidx.security:security-crypto:1.1.0-alpha06")
     
     // Media3 (ExoPlayer)
     implementation("androidx.media3:media3-exoplayer:1.2.1")

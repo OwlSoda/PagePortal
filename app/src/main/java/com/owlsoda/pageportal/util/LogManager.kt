@@ -34,7 +34,7 @@ object LogManager {
             val logEntry = StringBuilder()
                 .append("[$timestamp] ")
                 .append("[$tag] ")
-                .append(message)
+                .append(scrubSensitiveData(message))
                 .append("\n")
             
             throwable?.let {
@@ -83,5 +83,17 @@ object LogManager {
         } catch (e: Exception) {
             "Error reading logs: ${e.message}"
         }
+    }
+
+    /**
+     * Scrubs sensitive data (tokens, passwords, auth headers) from log messages.
+     */
+    private fun scrubSensitiveData(message: String): String {
+        return message
+            .replace(Regex("token=[^&\\s]+"), "token=REDACTED")
+            .replace(Regex("Bearer\\s+[^\\s,}\"]+"), "Bearer REDACTED")
+            .replace(Regex("Basic\\s+[^\\s,}\"]+"), "Basic REDACTED")
+            .replace(Regex("Authorization:\\s*[^\\s,}\"]+"), "Authorization: REDACTED")
+            .replace(Regex("password[=:]\\s*[^\\s,}&\"]+", RegexOption.IGNORE_CASE), "password=REDACTED")
     }
 }

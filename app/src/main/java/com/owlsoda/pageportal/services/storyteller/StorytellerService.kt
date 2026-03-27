@@ -1,6 +1,7 @@
 package com.owlsoda.pageportal.services.storyteller
 
 import android.util.Log
+import com.owlsoda.pageportal.BuildConfig
 import com.owlsoda.pageportal.services.*
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -49,7 +50,7 @@ class StorytellerService(
         this.baseUrl = if (cleanUrl.endsWith("/")) cleanUrl else "$cleanUrl/"
         this.authToken = authToken
         
-        android.util.Log.d("StorytellerService", "Configuring with URL: $baseUrl, Token present: ${authToken != null}")
+        if (BuildConfig.DEBUG) android.util.Log.d("StorytellerService", "Configuring with URL: $baseUrl, Token present: ${authToken != null}")
         val retrofit = Retrofit.Builder()
             .baseUrl(baseUrl!!) // Use non-null assertion as baseUrl is set above
             .client(baseOkHttpClient) // Use baseOkHttpClient as per original context
@@ -117,7 +118,7 @@ class StorytellerService(
                 userId = null  // Storyteller doesn't return user ID in token response
             )
         } catch (e: Exception) {
-            android.util.Log.e("StorytellerService", "Authentication failed for $serverUrl", e)
+            if (BuildConfig.DEBUG) android.util.Log.e("StorytellerService", "Authentication failed for $serverUrl", e)
             val message = when {
                 e is java.net.UnknownHostException -> "Could not find server. Check the URL and your connection."
                 e is java.net.ConnectException -> "Connection refused. Is the server running and accessible?"
@@ -137,13 +138,13 @@ class StorytellerService(
     override suspend fun listBooks(page: Int, pageSize: Int): List<ServiceBook> {
         if (page > 0) return emptyList() 
         return try {
-            android.util.Log.d("StorytellerService", "Fetching books from Storyteller API... URL: $baseUrl, Token present: ${authToken != null}")
+            if (BuildConfig.DEBUG) android.util.Log.d("StorytellerService", "Fetching books from Storyteller API...")
             val response = getApi().listBooks(synced = null)
-            android.util.Log.d("StorytellerService", "Received ${response.size} books from Storyteller")
+            if (BuildConfig.DEBUG) android.util.Log.d("StorytellerService", "Received ${response.size} books from Storyteller")
             
             response.mapNotNull { it.toServiceBook() }
         } catch (e: Exception) {
-            android.util.Log.e("StorytellerService", "Failed to fetch books from Storyteller. URL: $baseUrl, Token present: ${authToken != null}", e)
+            if (BuildConfig.DEBUG) android.util.Log.e("StorytellerService", "Failed to fetch books from Storyteller", e)
             emptyList()
         }
     }
@@ -360,11 +361,9 @@ class StorytellerService(
     
     fun getWebReaderUrl(bookId: String): String {
         val base = baseUrl?.trimEnd('/') ?: return ""
-        val token = authToken ?: ""
-        // Storyteller v2 web reader usually lives at /books/{uuid} in the web UI.
-        // We append the token for auto-login if the server supports it,
-        // or we'll handle cookie injection in the WebView.
-        return "$base/books/$bookId?token=$token"
+        // Storyteller v2 web reader URL. Auth is handled by AuthInterceptor
+        // or WebView cookie injection — NOT via URL query param to prevent token leakage.
+        return "$base/books/$bookId"
     }
     
     private fun getApi(): StorytellerApi {

@@ -47,6 +47,12 @@ fun WebReaderScreen(
                             override fun onPageFinished(view: WebView?, url: String?) {
                                 isLoading = false
                             }
+                            override fun shouldOverrideUrlLoading(view: WebView?, request: android.webkit.WebResourceRequest?): Boolean {
+                                val requestHost = request?.url?.host
+                                val originalHost = android.net.Uri.parse(url).host
+                                // Block navigation to any domain other than the original server
+                                return requestHost != null && originalHost != null && requestHost != originalHost
+                            }
                         }
                         settings.javaScriptEnabled = true
                         settings.domStorageEnabled = true
@@ -56,6 +62,7 @@ fun WebReaderScreen(
                         settings.setSupportZoom(true)
                         settings.builtInZoomControls = true
                         settings.displayZoomControls = false
+                        settings.allowFileAccess = false
                         
                         loadUrl(url)
                         webView = this

@@ -49,6 +49,22 @@ fun String?.parseTags(): List<String> {
     }
 }
 
+/**
+ * Escapes a string for safe interpolation into JavaScript string literals.
+ * Prevents JS injection when used with evaluateJavascript().
+ */
+fun String.escapeForJs(): String {
+    return this
+        .replace("\\", "\\\\")
+        .replace("'", "\\'")
+        .replace("\"", "\\\"")
+        .replace("\n", "\\n")
+        .replace("\r", "\\r")
+        .replace("\u0000", "")
+        .replace("<", "\\x3c")  // Prevent </script> breakout
+        .replace(">", "\\x3e")
+}
+
 private fun fallbackSplit(input: String): List<String> {
     // If it starts with [ and ends with ], it might be a malformed/escaped JSON string
     // but we can try to strip them as a last resort if parsing failed

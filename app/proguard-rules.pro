@@ -76,3 +76,10 @@
 -keepclassmembernames class kotlinx.coroutines.android.HandlerContext {
     val handler;
 }
+
+# Tink / EncryptedSharedPreferences (Google Crypto)
+-dontwarn com.google.api.client.**
+-dontwarn org.joda.time.**
+-dontwarn com.google.crypto.tink.util.KeysDownloader
+-keep class com.google.crypto.tink.** { *; }
+-keep class androidx.security.crypto.** { *; }

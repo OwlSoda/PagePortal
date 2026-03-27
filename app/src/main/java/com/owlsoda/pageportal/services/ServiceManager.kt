@@ -2,6 +2,7 @@ package com.owlsoda.pageportal.services
 
 import com.owlsoda.pageportal.core.database.dao.ServerDao
 import com.owlsoda.pageportal.core.database.entity.ServerEntity
+import com.owlsoda.pageportal.core.util.SecureTokenStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
@@ -16,7 +17,8 @@ import javax.inject.Singleton
 @Singleton
 class ServiceManager @Inject constructor(
     private val serverDao: ServerDao,
-    internal val okHttpClient: OkHttpClient
+    internal val okHttpClient: OkHttpClient,
+    private val secureTokenStore: SecureTokenStore
 ) {
     private val services = ConcurrentHashMap<Long, BookService>()
     
@@ -47,11 +49,13 @@ class ServiceManager @Inject constructor(
                 if (existing != null) {
                     // Update existing server
                     val updated = existing.copy(
-                        authToken = authResult.token,
+                        authToken = SecureTokenStore.ENCRYPTED_PLACEHOLDER,
                         userId = authResult.userId,
                         lastSyncAt = System.currentTimeMillis()
                     )
                     serverDao.updateServer(updated)
+                    // Store actual token in encrypted storage
+                    authResult.token?.let { secureTokenStore.storeToken(updated.id, it) }
                     services[updated.id] = service
                     return@withContext Result.success(updated)
                 }
@@ -61,13 +65,16 @@ class ServiceManager @Inject constructor(
                     serviceType = serviceType.name,
                     serverUrl = normalizedUrl,
                     username = username,
-                    authToken = authResult.token,
+                    authToken = SecureTokenStore.ENCRYPTED_PLACEHOLDER,
                     userId = authResult.userId,
                     displayName = "${serviceType.name} - $username"
                 )
                 
                 val serverId = serverDao.insertServer(server)
                 val savedServer = server.copy(id = serverId)
+                
+                // Store actual token in encrypted storage
+                authResult.token?.let { secureTokenStore.storeToken(serverId, it) }
                 
                 // Cache service
                 services[serverId] = service
@@ -97,12 +104,14 @@ class ServiceManager @Inject constructor(
                 val existing = serverDao.getServerByUrlAndType(normalizedUrl, serviceType.name)
                 if (existing != null) {
                     val updated = existing.copy(
-                        authToken = token,
+                        authToken = SecureTokenStore.ENCRYPTED_PLACEHOLDER,
                         userId = userId ?: existing.userId,
                         username = username,
                         lastSyncAt = System.currentTimeMillis()
                     )
                     serverDao.updateServer(updated)
+                    // Store actual token in encrypted storage
+                    secureTokenStore.storeToken(updated.id, token)
                     // Invalidate service cache
                     services.remove(updated.id)
                     return@withContext Result.success(updated)
@@ -113,13 +122,16 @@ class ServiceManager @Inject constructor(
                     serviceType = serviceType.name,
                     serverUrl = normalizedUrl,
                     username = username,
-                    authToken = token,
+                    authToken = SecureTokenStore.ENCRYPTED_PLACEHOLDER,
                     userId = userId,
                     displayName = "${serviceType.name} - $username"
                 )
 
                 val serverId = serverDao.insertServer(server)
                 val savedServer = server.copy(id = serverId)
+                
+                // Store actual token in encrypted storage
+                secureTokenStore.storeToken(serverId, token)
 
                 Result.success(savedServer)
             }
@@ -141,19 +153,19 @@ class ServiceManager @Inject constructor(
         val service = createService(server.toServiceType(), server.serverUrl)
         
         // Configure service with auth token
+        // Resolve token: prefer SecureTokenStore, fall back to Room field for backward compatibility
+        val token = secureTokenStore.getToken(serverId) 
+            ?: server.authToken?.takeIf { it != SecureTokenStore.ENCRYPTED_PLACEHOLDER }
+        
         when (service) {
             is com.owlsoda.pageportal.services.audiobookshelf.AudiobookshelfService -> {
-                server.authToken?.let { service.setAuthToken(it) }
+                token?.let { service.setAuthToken(it) }
             }
             is com.owlsoda.pageportal.services.booklore.BookloreService -> {
-                server.authToken?.let { token ->
-                    service.configure(server.serverUrl, token)
-                }
+                token?.let { service.configure(server.serverUrl, it) }
             }
             is com.owlsoda.pageportal.services.storyteller.StorytellerService -> {
-                server.authToken?.let { token ->
-                    service.configure(server.serverUrl, token)
-                }
+                token?.let { service.configure(server.serverUrl, it) }
             }
         }
         
@@ -220,6 +232,7 @@ class ServiceManager @Inject constructor(
      */
     suspend fun removeServer(serverId: Long) {
         services.remove(serverId)
+        secureTokenStore.removeToken(serverId)
         serverDao.deleteServerById(serverId)
     }
     

@@ -86,6 +86,13 @@ class UpdateManager @Inject constructor(
     private fun installApk(tagName: String) {
         val file = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "PagePortal-$tagName.apk")
         if (file.exists()) {
+            // Verify APK signature matches current app before installing
+            if (!verifyApkSignature(file)) {
+                _updateState.value = UpdateState.Error("Update signature verification failed — the APK may have been tampered with")
+                file.delete()
+                return
+            }
+            
             val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
             val intent = Intent(Intent.ACTION_VIEW).apply {
                 setDataAndType(uri, "application/vnd.android.package-archive")
@@ -93,6 +100,66 @@ class UpdateManager @Inject constructor(
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
             context.startActivity(intent)
+        }
+    }
+
+    /**
+     * Verifies that the downloaded APK is signed with the same certificate as the running app.
+     * Prevents installation of tampered or MITM-replaced APKs.
+     */
+    private fun verifyApkSignature(apkFile: File): Boolean {
+        return try {
+            val pm = context.packageManager
+            
+            // Get current app's signing certificates
+            val currentInfo = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+                pm.getPackageInfo(context.packageName, android.content.pm.PackageManager.GET_SIGNING_CERTIFICATES)
+            } else {
+                @Suppress("DEPRECATION")
+                pm.getPackageInfo(context.packageName, android.content.pm.PackageManager.GET_SIGNATURES)
+            }
+            
+            // Get downloaded APK's signing certificates
+            val apkInfo = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+                pm.getPackageArchiveInfo(apkFile.absolutePath, android.content.pm.PackageManager.GET_SIGNING_CERTIFICATES)
+            } else {
+                @Suppress("DEPRECATION")
+                pm.getPackageArchiveInfo(apkFile.absolutePath, android.content.pm.PackageManager.GET_SIGNATURES)
+            }
+            
+            if (apkInfo == null) {
+                android.util.Log.e("UpdateManager", "Could not read APK package info")
+                return false
+            }
+            
+            // Extract signature bytes for comparison
+            val currentSigs = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+                currentInfo.signingInfo?.apkContentsSigners?.map { it.toByteArray().contentHashCode() } ?: emptyList()
+            } else {
+                @Suppress("DEPRECATION")
+                currentInfo.signatures?.map { it.toByteArray().contentHashCode() } ?: emptyList()
+            }
+            
+            val apkSigs = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+                apkInfo.signingInfo?.apkContentsSigners?.map { it.toByteArray().contentHashCode() } ?: emptyList()
+            } else {
+                @Suppress("DEPRECATION")
+                apkInfo.signatures?.map { it.toByteArray().contentHashCode() } ?: emptyList()
+            }
+            
+            if (currentSigs.isEmpty() || apkSigs.isEmpty()) {
+                android.util.Log.e("UpdateManager", "Could not extract signatures for comparison")
+                return false
+            }
+            
+            val match = currentSigs.toSet() == apkSigs.toSet()
+            if (!match) {
+                android.util.Log.e("UpdateManager", "APK signature does NOT match current app — rejecting update")
+            }
+            match
+        } catch (e: Exception) {
+            android.util.Log.e("UpdateManager", "Signature verification error", e)
+            false
         }
     }
 

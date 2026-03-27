@@ -1,6 +1,7 @@
 package com.owlsoda.pageportal.di
 
 import com.owlsoda.pageportal.core.database.dao.ServerDao
+import com.owlsoda.pageportal.core.util.SecureTokenStore
 import com.owlsoda.pageportal.services.ServiceManager
 import dagger.Module
 import dagger.Provides
@@ -20,8 +21,9 @@ object ServiceModule {
     @Singleton
     fun provideServiceManager(
         serverDao: ServerDao,
-        okHttpClient: OkHttpClient
+        okHttpClient: OkHttpClient,
+        secureTokenStore: SecureTokenStore
     ): ServiceManager {
-        return ServiceManager(serverDao, okHttpClient)
+        return ServiceManager(serverDao, okHttpClient, secureTokenStore)
     }
 }

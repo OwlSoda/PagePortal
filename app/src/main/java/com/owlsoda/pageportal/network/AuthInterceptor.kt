@@ -1,6 +1,8 @@
 package com.owlsoda.pageportal.network
 
+import com.owlsoda.pageportal.BuildConfig
 import com.owlsoda.pageportal.core.database.dao.ServerDao
+import com.owlsoda.pageportal.core.util.SecureTokenStore
 import com.owlsoda.pageportal.services.ServiceType
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -16,7 +18,8 @@ import javax.inject.Singleton
  */
 @Singleton
 class AuthInterceptor @Inject constructor(
-    private val serverDao: ServerDao
+    private val serverDao: ServerDao,
+    private val secureTokenStore: SecureTokenStore
 ) : Interceptor {
 
     override fun intercept(chain: Interceptor.Chain): Response {
@@ -24,11 +27,11 @@ class AuthInterceptor @Inject constructor(
         val url = originalRequest.url.toString()
         
         // Log request for debugging
-        android.util.Log.d("AuthInterceptor", "Intercepting: $url")
+        if (BuildConfig.DEBUG) android.util.Log.d("AuthInterceptor", "Intercepting: $url")
 
         // Skip if already has Authorization header or is an external API (like GitHub)
         if (originalRequest.header("Authorization") != null || url.contains("api.github.com")) {
-            android.util.Log.d("AuthInterceptor", "Skipping: Auth header present or external API ($url)")
+            if (BuildConfig.DEBUG) android.util.Log.d("AuthInterceptor", "Skipping: Auth header present or external API ($url)")
             return chain.proceed(originalRequest)
         }
 
@@ -49,7 +52,7 @@ class AuthInterceptor @Inject constructor(
                 val requestPath = requestHttpUrl.encodedPath.trimEnd('/')
                 val pathMatches = requestPath.startsWith(serverPath)
 
-                android.util.Log.d("AuthInterceptor", "Checking match: Request(${requestHttpUrl.host}:${requestHttpUrl.port}${requestHttpUrl.encodedPath}) vs Server(${serverHttpUrl.host}:${serverHttpUrl.port}${serverHttpUrl.encodedPath}) -> Host:$hostMatches, Port:$portMatches, Path:$pathMatches")
+                if (BuildConfig.DEBUG) android.util.Log.d("AuthInterceptor", "Checking match: Request(${requestHttpUrl.host}:${requestHttpUrl.port}${requestHttpUrl.encodedPath}) vs Server(${serverHttpUrl.host}:${serverHttpUrl.port}${serverHttpUrl.encodedPath}) -> Host:$hostMatches, Port:$portMatches, Path:$pathMatches")
 
                 hostMatches && portMatches && pathMatches
             }
@@ -61,8 +64,10 @@ class AuthInterceptor @Inject constructor(
                 serverDao.getActiveServers().first().find { it.serverUrl.toHttpUrl().host == requestHttpUrl.host }
             }
             if (fallbackServer != null) {
-                android.util.Log.d("AuthInterceptor", "Falling back to host-only match for: ${fallbackServer.serverUrl}")
-                val token = fallbackServer.authToken
+                if (BuildConfig.DEBUG) android.util.Log.d("AuthInterceptor", "Falling back to host-only match for: ${fallbackServer.serverUrl}")
+                // Resolve token: prefer SecureTokenStore, fall back to Room
+                val token = secureTokenStore.getToken(fallbackServer.id) 
+                    ?: fallbackServer.authToken?.takeIf { it != SecureTokenStore.ENCRYPTED_PLACEHOLDER }
                 if (token != null) {
                     return chain.proceed(originalRequest.newBuilder().apply {
                         if (fallbackServer.serviceType == ServiceType.BOOKLORE.name) {
@@ -73,17 +78,19 @@ class AuthInterceptor @Inject constructor(
                     }.build())
                 }
             }
-            android.util.Log.w("AuthInterceptor", "No matching server found for: $url")
+            if (BuildConfig.DEBUG) android.util.Log.w("AuthInterceptor", "No matching server found for: $url")
             return chain.proceed(originalRequest)
         }
 
-        val token = server.authToken
+        // Resolve token: prefer SecureTokenStore, fall back to Room for backward compatibility
+        val token = secureTokenStore.getToken(server.id) 
+            ?: server.authToken?.takeIf { it != SecureTokenStore.ENCRYPTED_PLACEHOLDER }
         if (token == null) {
-            android.util.Log.d("AuthInterceptor", "Server found but no token: ${server.serverUrl}")
+            if (BuildConfig.DEBUG) android.util.Log.d("AuthInterceptor", "Server found but no token: ${server.serverUrl}")
             return chain.proceed(originalRequest)
         }
 
-        android.util.Log.d("AuthInterceptor", "Injecting auth for ${server.serviceType} (${server.serverUrl})")
+        if (BuildConfig.DEBUG) android.util.Log.d("AuthInterceptor", "Injecting auth for ${server.serviceType} (${server.serverUrl})")
 
         val newRequest = originalRequest.newBuilder().apply {
             when (server.serviceType) {

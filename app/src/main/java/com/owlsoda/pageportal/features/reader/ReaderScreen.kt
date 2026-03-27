@@ -1,5 +1,6 @@
 package com.owlsoda.pageportal.features.reader
 
+import com.owlsoda.pageportal.core.extensions.escapeForJs
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
@@ -183,7 +184,7 @@ fun ReaderScreen(
         uiState.activeSmilHighlightId?.let { id ->
             // Small delay to ensure page is loaded and JS functions are injected
             kotlinx.coroutines.delay(50)
-            webViewRef?.evaluateJavascript("if (typeof applySmilHighlight === 'function') { applySmilHighlight('$id'); } else { console.warn('applySmilHighlight not yet available'); }", null)
+            webViewRef?.evaluateJavascript("if (typeof applySmilHighlight === 'function') { applySmilHighlight('${id.escapeForJs()}'); } else { console.warn('applySmilHighlight not yet available'); }", null)
         }
     }
 
@@ -549,7 +550,7 @@ fun ReaderScreen(
                                   color = uiState.smilHighlightColor
                               )
                               showSelectionMenu = false
-                              webViewRef?.evaluateJavascript("highlightSelection('${selectedRange}', '${uiState.smilHighlightColor}');", null)
+                              webViewRef?.evaluateJavascript("highlightSelection('${(selectedRange ?: "").escapeForJs()}', '${uiState.smilHighlightColor.escapeForJs()}');", null)
                           }) {
                               Text("Highlight")
                           }
