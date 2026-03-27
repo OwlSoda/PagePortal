@@ -24,6 +24,7 @@ data class BookDetailState(
     val isDownloaded: Boolean = false,
     val isDownloading: Boolean = false,
     val downloadProgress: Float = 0f,
+    val downloadError: String? = null,
     val isLoading: Boolean = true,
     val error: String? = null,
     val webReaderUrl: String? = null,
@@ -88,7 +89,7 @@ class BookDetailViewModel @Inject constructor(
                         hasEbook = linkedBooks.any { it.hasEbook },
                         hasAudiobook = linkedBooks.any { it.hasAudiobook },
                         hasReadAloud = linkedBooks.any { it.hasReadAloud },
-                        duration = linkedBooks.maxOfOrNull { it.duration } ?: base.duration
+                        duration = linkedBooks.mapNotNull { it.duration }.maxOrNull() ?: base.duration
                     )
                     
                     val progress = progressDao.getProgressByBookId(base.id)
@@ -160,7 +161,8 @@ class BookDetailViewModel @Inject constructor(
                     _state.value = _state.value.copy(
                         isDownloading = status == "DOWNLOADING" || status == "QUEUED",
                         isDownloaded = status == "COMPLETED",
-                        downloadProgress = book.downloadProgress
+                        downloadProgress = book.downloadProgress,
+                        downloadError = if (status == "FAILED") book.downloadError else null
                     )
                     // Update display book if needed to reflect local path
                     if (book.localFilePath != _state.value.book?.localFilePath) {

@@ -36,8 +36,9 @@ object NetworkModule {
             .addInterceptor(logging)
             .addInterceptor(authInterceptor)
             .connectTimeout(120, TimeUnit.SECONDS)
-            .readTimeout(300, TimeUnit.SECONDS)  // 5 min for large downloads
+            .readTimeout(10, TimeUnit.MINUTES)
             .writeTimeout(120, TimeUnit.SECONDS)
+            .callTimeout(30, TimeUnit.MINUTES)
             .followRedirects(true)
             .followSslRedirects(true)
             .retryOnConnectionFailure(true)

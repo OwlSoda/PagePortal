@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
+import com.owlsoda.pageportal.core.extensions.parseAuthors
 
 data class MatchCandidate(
     val book: BookEntity,
@@ -76,10 +77,10 @@ class MatchReviewViewModel @Inject constructor(
             var bestScore = 0.0f
             
             for (uBook in unified) {
-                val unifiedAuthors = parseAuthors(uBook.authors, com.google.gson.Gson())
+                val unifiedAuthors = uBook.authors.parseAuthors()
                 val score = TitleMatcher.calculateMatchScore(
                     book.title,
-                    listOf(book.authors),
+                    book.authors.parseAuthors(),
                     uBook.title,
                     unifiedAuthors
                 )

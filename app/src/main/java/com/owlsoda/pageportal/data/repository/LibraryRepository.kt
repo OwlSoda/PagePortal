@@ -10,6 +10,7 @@ import com.owlsoda.pageportal.services.ServiceManager
 import javax.inject.Inject
 import javax.inject.Singleton
 import com.owlsoda.pageportal.data.repository.SyncRepository
+import com.owlsoda.pageportal.util.LogManager
 
 @Singleton
 class LibraryRepository @Inject constructor(
@@ -20,8 +21,12 @@ class LibraryRepository @Inject constructor(
     private val progressDao: com.owlsoda.pageportal.core.database.dao.ProgressDao,
     private val syncRepository: SyncRepository
 ) {
+    private fun log(message: String) {
+        LogManager.log("LibraryRepository", message)
+    }
     
     suspend fun syncLibrary(): Result<Unit> {
+        log("syncLibrary() started")
         return try {
             val results = try {
                 serviceManager.getAllBooks()
@@ -129,10 +134,10 @@ class LibraryRepository @Inject constructor(
                 android.util.Log.e("LibraryRepository", "Matching failed", e)
             }
             
-            android.util.Log.i("LibraryRepository", "Sync successful")
+            log("Sync successful (${booksToInsert.size} books)")
             Result.success(Unit)
         } catch (e: Exception) {
-            android.util.Log.e("LibraryRepository", "Sync failed", e)
+            log("Sync failed: ${e.message}")
             Result.failure(Exception("Failed to sync library: ${e.message}", e))
         }
     }
@@ -165,6 +170,61 @@ class LibraryRepository @Inject constructor(
             } else {
                 Result.failure(result.exceptionOrNull() ?: Exception("Unknown error triggering sync"))
             }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun updateBookMetadata(bookId: Long, metadata: com.owlsoda.pageportal.services.MetadataUpdate): Result<Unit> {
+        return try {
+            val book = bookDao.getBookById(bookId) ?: return Result.failure(Exception("Book not found"))
+            val service = serviceManager.getService(book.serverId) ?: return Result.failure(Exception("Service not found"))
+            
+            val result = service.updateMetadata(book.serviceBookId, metadata)
+            if (result.isSuccess) {
+                val updatedServiceBook = result.getOrThrow()
+                val gson = Gson()
+                val updatedBook = book.copy(
+                    title = updatedServiceBook.title,
+                    authors = gson.toJson(updatedServiceBook.authors),
+                    narrators = gson.toJson(updatedServiceBook.narrators),
+                    description = updatedServiceBook.description,
+                    coverUrl = updatedServiceBook.coverUrl,
+                    audiobookCoverUrl = updatedServiceBook.audiobookCoverUrl,
+                    series = updatedServiceBook.series,
+                    seriesIndex = updatedServiceBook.seriesIndex?.toString(),
+                    tags = gson.toJson(updatedServiceBook.tags),
+                    isbn = updatedServiceBook.isbn,
+                    asin = updatedServiceBook.asin,
+                    updatedAt = System.currentTimeMillis()
+                )
+                bookDao.updateBook(updatedBook)
+                Result.success(Unit)
+            } else {
+                Result.failure(result.exceptionOrNull() ?: Exception("Unknown error updating metadata"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun refreshBookMetadata(bookId: Long): Result<BookEntity> {
+        log("refreshBookMetadata(bookId=$bookId) started")
+        return try {
+            val book = bookDao.getBookById(bookId) ?: return Result.failure(Exception("Book not found"))
+            val service = serviceManager.getService(book.serverId) ?: return Result.failure(Exception("Service not found"))
+            
+            val details = service.getBookDetails(book.serviceBookId)
+            val updatedBook = book.copy(
+                processingStatus = details.readAloudStatus,
+                processingProgress = details.readAloudProgress,
+                hasEbook = details.files.any { it.mimeType.contains("epub") },
+                hasAudiobook = details.files.any { it.mimeType.contains("audio") || it.filename.endsWith(".m4b") },
+                hasReadAloud = details.readAloudStatus != null,
+                updatedAt = System.currentTimeMillis()
+            )
+            bookDao.updateBook(updatedBook)
+            Result.success(updatedBook)
         } catch (e: Exception) {
             Result.failure(e)
         }

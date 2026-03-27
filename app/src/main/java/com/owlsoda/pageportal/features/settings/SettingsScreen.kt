@@ -21,6 +21,9 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.compose.ui.platform.LocalContext
 import android.widget.Toast
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.text.font.FontFamily
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import android.os.Environment
@@ -50,6 +53,7 @@ val settingsCategories = listOf(
     SettingsCategory("library", "Library", Icons.Default.Dns, "Server management"),
     SettingsCategory("storage", "Storage", Icons.Default.SdStorage, "Cache and downloads"),
     SettingsCategory("accessibility", "Accessibility", Icons.Default.Accessibility, "Accessibility options"),
+    SettingsCategory("diagnostics", "Diagnostics", Icons.Default.BugReport, "App logs and debugging"),
     SettingsCategory("about", "About", Icons.Default.Info, "Version and info")
 )
 
@@ -116,6 +120,7 @@ fun SettingsScreen(
                 SettingsCategoriesList(
                     categories = settingsCategories,
                     selectedCategory = selectedCategory,
+                    viewModel = viewModel,
                     onCategoryClick = { selectedCategory = it.id }
                 )
             },
@@ -139,6 +144,7 @@ fun SettingsScreen(
 fun SettingsCategoriesList(
     categories: List<SettingsCategory>,
     selectedCategory: String?,
+    viewModel: SettingsViewModel,
     onCategoryClick: (SettingsCategory) -> Unit
 ) {
     LazyColumn(
@@ -186,6 +192,16 @@ fun SettingsCategoriesList(
                 }
             )
         }
+
+        item {
+            Spacer(modifier = Modifier.height(16.dp))
+            HorizontalDivider(
+                modifier = Modifier.padding(horizontal = 16.dp),
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+            )
+            val state by viewModel.state.collectAsState()
+            SettingsVersionItem(state, viewModel)
+        }
     }
 }
 
@@ -209,6 +225,7 @@ fun SettingsCategoryDetail(
             "library" -> item { LibrarySettings(state, onServersClick, onMatchReviewClick) }
             "storage" -> item { StorageSettings(state, viewModel, onStorageClick) }
             "accessibility" -> item { AccessibilitySettings(state, viewModel) }
+            "diagnostics" -> item { DiagnosticsSettings(state, viewModel) }
             "about" -> item { AboutSettings(state, viewModel) }
         }
     }
@@ -352,11 +369,26 @@ fun ReadingSettings(state: SettingsState, viewModel: SettingsViewModel) {
             }
             
             if (!isAuto) {
-                Slider(
-                    value = state.readerBrightness,
-                    onValueChange = { viewModel.setReaderBrightness(it) },
-                    valueRange = 0.0f..1.0f
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(
+                        onClick = { viewModel.setReaderBrightness((Math.round((state.readerBrightness - 0.1f) * 10f) / 10f).coerceAtLeast(0.0f)) },
+                        enabled = state.readerBrightness > 0.0f
+                    ) {
+                        Icon(Icons.Default.Remove, "Decrease brightness")
+                    }
+                    Slider(
+                        value = state.readerBrightness,
+                        onValueChange = { viewModel.setReaderBrightness(it) },
+                        valueRange = 0.0f..1.0f,
+                        modifier = Modifier.weight(1f)
+                    )
+                    IconButton(
+                        onClick = { viewModel.setReaderBrightness((Math.round((state.readerBrightness + 0.1f) * 10f) / 10f).coerceAtMost(1.0f)) },
+                        enabled = state.readerBrightness < 1.0f
+                    ) {
+                        Icon(Icons.Default.Add, "Increase brightness")
+                    }
+                }
             }
         }
         
@@ -391,12 +423,27 @@ fun ReadingSettings(state: SettingsState, viewModel: SettingsViewModel) {
         // Font Size
         Column(modifier = Modifier.padding(horizontal = 16.dp)) {
             Text("Font Size: ${(state.readerFontSize * 100).toInt()}%")
-            Slider(
-                value = state.readerFontSize,
-                onValueChange = { viewModel.setReaderFontSize(it) },
-                valueRange = 0.5f..2.0f,
-                steps = 14
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(
+                    onClick = { viewModel.setReaderFontSize((Math.round((state.readerFontSize - 0.1f) * 10f) / 10f).coerceAtLeast(0.5f)) },
+                    enabled = state.readerFontSize > 0.5f
+                ) {
+                    Icon(Icons.Default.Remove, "Decrease font size")
+                }
+                Slider(
+                    value = state.readerFontSize,
+                    onValueChange = { viewModel.setReaderFontSize(it) },
+                    valueRange = 0.5f..2.0f,
+                    steps = 14,
+                    modifier = Modifier.weight(1f)
+                )
+                IconButton(
+                    onClick = { viewModel.setReaderFontSize((Math.round((state.readerFontSize + 0.1f) * 10f) / 10f).coerceAtMost(2.0f)) },
+                    enabled = state.readerFontSize < 2.0f
+                ) {
+                    Icon(Icons.Default.Add, "Increase font size")
+                }
+            }
         }
         
         Spacer(Modifier.height(16.dp))
@@ -404,12 +451,27 @@ fun ReadingSettings(state: SettingsState, viewModel: SettingsViewModel) {
         // Line Height
         Column(modifier = Modifier.padding(horizontal = 16.dp)) {
              Text("Line Spacing: ${String.format("%.1f", state.readerLineHeight)}")
-             Slider(
-                 value = state.readerLineHeight,
-                 onValueChange = { viewModel.setReaderLineHeight(it) },
-                 valueRange = 1.0f..2.5f,
-                 steps = 14
-             )
+             Row(verticalAlignment = Alignment.CenterVertically) {
+                 IconButton(
+                     onClick = { viewModel.setReaderLineHeight((Math.round((state.readerLineHeight - 0.1f) * 10f) / 10f).coerceAtLeast(1.0f)) },
+                     enabled = state.readerLineHeight > 1.0f
+                 ) {
+                     Icon(Icons.Default.Remove, "Decrease line spacing")
+                 }
+                 Slider(
+                     value = state.readerLineHeight,
+                     onValueChange = { viewModel.setReaderLineHeight(it) },
+                     valueRange = 1.0f..2.5f,
+                     steps = 14,
+                     modifier = Modifier.weight(1f)
+                 )
+                 IconButton(
+                     onClick = { viewModel.setReaderLineHeight((Math.round((state.readerLineHeight + 0.1f) * 10f) / 10f).coerceAtMost(2.5f)) },
+                     enabled = state.readerLineHeight < 2.5f
+                 ) {
+                     Icon(Icons.Default.Add, "Increase line spacing")
+                 }
+             }
         }
         
         Spacer(Modifier.height(16.dp))
@@ -443,23 +505,53 @@ fun ReadingSettings(state: SettingsState, viewModel: SettingsViewModel) {
         // Margins
         Column(modifier = Modifier.padding(horizontal = 16.dp)) {
             Text("Margins: ${state.readerMargin}")
-            Slider(
-                value = state.readerMargin.toFloat(),
-                onValueChange = { viewModel.setReaderMargin(it.toInt()) },
-                valueRange = 0f..10f,
-                steps = 9
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(
+                    onClick = { viewModel.setReaderMargin((state.readerMargin - 1).coerceAtLeast(0)) },
+                    enabled = state.readerMargin > 0
+                ) {
+                    Icon(Icons.Default.Remove, "Decrease margins")
+                }
+                Slider(
+                    value = state.readerMargin.toFloat(),
+                    onValueChange = { viewModel.setReaderMargin(it.toInt()) },
+                    valueRange = 0f..10f,
+                    steps = 9,
+                    modifier = Modifier.weight(1f)
+                )
+                IconButton(
+                    onClick = { viewModel.setReaderMargin((state.readerMargin + 1).coerceAtMost(10)) },
+                    enabled = state.readerMargin < 10
+                ) {
+                    Icon(Icons.Default.Add, "Increase margins")
+                }
+            }
         }
         
         // Paragraph Spacing
         Column(modifier = Modifier.padding(horizontal = 16.dp)) {
             Text("Paragraph Spacing: ${String.format("%.1f", state.readerParagraphSpacing)}x")
-            Slider(
-                value = state.readerParagraphSpacing,
-                onValueChange = { viewModel.setReaderParagraphSpacing(it) },
-                valueRange = 0.0f..2.0f,
-                steps = 19
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(
+                    onClick = { viewModel.setReaderParagraphSpacing((Math.round((state.readerParagraphSpacing - 0.1f) * 10f) / 10f).coerceAtLeast(0.0f)) },
+                    enabled = state.readerParagraphSpacing > 0.0f
+                ) {
+                    Icon(Icons.Default.Remove, "Decrease paragraph spacing")
+                }
+                Slider(
+                    value = state.readerParagraphSpacing,
+                    onValueChange = { viewModel.setReaderParagraphSpacing(it) },
+                    valueRange = 0.0f..2.0f,
+                    steps = 19,
+                    modifier = Modifier.weight(1f)
+                )
+                IconButton(
+                    onClick = { viewModel.setReaderParagraphSpacing((Math.round((state.readerParagraphSpacing + 0.1f) * 10f) / 10f).coerceAtMost(2.0f)) },
+                    enabled = state.readerParagraphSpacing < 2.0f
+                ) {
+                    Icon(Icons.Default.Add, "Increase paragraph spacing")
+                }
+            }
         }
         
         // Scroll Mode
@@ -661,6 +753,109 @@ fun AccessibilitySettings(state: SettingsState, viewModel: SettingsViewModel) {
     }
 }
 
+// DIAGNOSTICS SETTINGS
+@Composable
+fun DiagnosticsSettings(state: SettingsState, viewModel: SettingsViewModel) {
+    val context = LocalContext.current
+    var showLogsDialog by remember { mutableStateOf(false) }
+
+    Column {
+        SettingsSectionHeader("Logs")
+        SettingsItem(
+            icon = Icons.Default.List,
+            title = "View App Logs",
+            subtitle = "Read internal debug logs",
+            onClick = { 
+                viewModel.loadLogs()
+                showLogsDialog = true 
+            }
+        )
+        
+        SettingsItem(
+            icon = Icons.Default.Share,
+            title = "Export Logs",
+            subtitle = "Share log file for debugging",
+            onClick = {
+                val logFile = com.owlsoda.pageportal.util.LogManager.getLogFile()
+                if (logFile.exists() && logFile.length() > 0) {
+                    val uri = FileProvider.getUriForFile(
+                        context,
+                        "${context.packageName}.fileprovider",
+                        logFile
+                    )
+                    val intent = Intent(Intent.ACTION_SEND).apply {
+                        type = "text/plain"
+                        putExtra(Intent.EXTRA_STREAM, uri)
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }
+                    context.startActivity(Intent.createChooser(intent, "Share PagePortal Logs"))
+                } else {
+                    Toast.makeText(context, "No logs to export", Toast.LENGTH_SHORT).show()
+                }
+            }
+        )
+
+        SettingsItem(
+            icon = Icons.Default.DeleteForever,
+            title = "Clear Logs",
+            subtitle = "Delete all log contents",
+            showChevron = false,
+            onClick = { viewModel.clearLogs() }
+        )
+
+        if (showLogsDialog) {
+            LogsViewDialog(
+                logs = state.logsText,
+                onDismiss = { showLogsDialog = false },
+                onRefresh = { viewModel.loadLogs() }
+            )
+        }
+    }
+}
+
+@Composable
+fun LogsViewDialog(
+    logs: String,
+    onDismiss: () -> Unit,
+    onRefresh: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("App Logs")
+                IconButton(onClick = onRefresh) {
+                    Icon(Icons.Default.Refresh, contentDescription = "Refresh")
+                }
+            }
+        },
+        text = {
+            val scrollState = rememberScrollState()
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight(0.8f)
+                    .verticalScroll(scrollState)
+            ) {
+                Text(
+                    text = logs,
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        fontFamily = FontFamily.Monospace
+                    )
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Close")
+            }
+        }
+    )
+}
+
 // ABOUT SETTINGS
 @Composable
 fun AboutSettings(state: SettingsState, viewModel: SettingsViewModel) {
@@ -680,59 +875,61 @@ fun AboutSettings(state: SettingsState, viewModel: SettingsViewModel) {
         SettingsItem(
             icon = Icons.Default.Info,
             title = "Version",
-            subtitle = versionName,
+            subtitle = state.versionName,
             showChevron = true,
-            onClick = {
-                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/OwlSoda/PagePortal/releases"))
-                context.startActivity(intent)
-            }
+            onClick = { viewModel.openGitHub() }
         )
 
-        Spacer(Modifier.height(8.dp))
-        SettingsSectionHeader("Updates")
+        SettingsItem(
+            icon = Icons.Default.Code,
+            title = "Source Code",
+            subtitle = "View on GitHub",
+            onClick = { viewModel.openGitHub() }
+        )
         
-        when (val s = updateState) {
-            is UpdateState.Idle, is UpdateState.NoUpdate -> {
-                SettingsItem(
-                    icon = Icons.Default.SystemUpdate,
-                    title = "Check for Updates",
-                    subtitle = if (s is UpdateState.NoUpdate) "App is up to date" else "Latest version from GitHub",
-                    onClick = { viewModel.checkForUpdates() }
-                )
-            }
-            is UpdateState.Checking -> {
-                ListItem(
-                    headlineContent = { Text("Checking for updates...") },
-                    leadingContent = { CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp) }
-                )
-            }
-            is UpdateState.UpdateAvailable -> {
-                SettingsItem(
-                    icon = Icons.Default.DownloadForOffline,
-                    title = "Update Available: ${s.release.tagName}",
-                    subtitle = "Click to download and install",
-                    onClick = { viewModel.downloadAndInstallUpdate(s.release) },
-                    tint = PagePortalPurple
-                )
-            }
-            is UpdateState.Downloading -> {
-                ListItem(
-                    headlineContent = { Text("Downloading update...") },
-                    supportingContent = { LinearProgressIndicator(modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) },
-                    leadingContent = { Icon(Icons.Default.Download, contentDescription = null, tint = PagePortalPurple) }
-                )
-            }
-            is UpdateState.Error -> {
-                SettingsItem(
-                    icon = Icons.Default.Error,
-                    title = "Update Error",
-                    subtitle = s.message,
-                    onClick = { viewModel.checkForUpdates() },
-                    tint = MaterialTheme.colorScheme.error
-                )
-            }
-        }
+        SettingsItem(
+            icon = Icons.Default.Description,
+            title = "Licenses",
+            subtitle = "Open source libraries used",
+            onClick = { /* TODO */ }
+        )
     }
+}
+
+@Composable
+fun SettingsVersionItem(state: SettingsState, viewModel: SettingsViewModel) {
+    val updateState by viewModel.updateState.collectAsState()
+    
+    val title = "Version ${state.versionName}"
+    val (subtitle, tint) = when (val s = updateState) {
+        is UpdateState.UpdateAvailable -> "Update to ${s.release.tagName} available!" to PagePortalPurple
+        is UpdateState.Downloading -> "Downloading update..." to PagePortalPurple
+        is UpdateState.Checking -> "Checking for updates..." to PagePortalTextSecondary
+        is UpdateState.Error -> "Update error" to MaterialTheme.colorScheme.error
+        is UpdateState.NoUpdate -> "App is up to date" to PagePortalTextSecondary
+        else -> "Tap to check for updates" to PagePortalTextSecondary
+    }
+
+    ListItem(
+        headlineContent = { Text(title, style = MaterialTheme.typography.labelLarge) },
+        supportingContent = { Text(subtitle, style = MaterialTheme.typography.labelSmall, color = tint) },
+        leadingContent = {
+            if (updateState is UpdateState.Checking || updateState is UpdateState.Downloading) {
+                CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+            } else {
+                Icon(
+                    imageVector = if (updateState is UpdateState.UpdateAvailable) Icons.Default.SystemUpdate else Icons.Default.Info,
+                    contentDescription = null,
+                    tint = if (updateState is UpdateState.UpdateAvailable) PagePortalPurple else PagePortalTextSecondary.copy(alpha = 0.5f),
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        },
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { viewModel.onVersionClick() },
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+    )
 }
 
 // DIALOGS
@@ -789,12 +986,27 @@ fun PlaybackSpeedDialog(
                     style = MaterialTheme.typography.headlineMedium,
                     modifier = Modifier.align(Alignment.CenterHorizontally)
                 )
-                Slider(
-                    value = currentSpeed,
-                    onValueChange = onSpeedChanged,
-                    valueRange = 0.5f..3.0f,
-                    steps = 49
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(
+                        onClick = { onSpeedChanged((Math.round((currentSpeed - 0.05f) * 100f) / 100f).coerceAtLeast(0.5f)) },
+                        enabled = currentSpeed > 0.5f
+                    ) {
+                        Icon(Icons.Default.Remove, "Decrease playback speed")
+                    }
+                    Slider(
+                        value = currentSpeed,
+                        onValueChange = onSpeedChanged,
+                        valueRange = 0.5f..3.0f,
+                        steps = 49,
+                        modifier = Modifier.weight(1f)
+                    )
+                    IconButton(
+                        onClick = { onSpeedChanged((Math.round((currentSpeed + 0.05f) * 100f) / 100f).coerceAtMost(3.0f)) },
+                        enabled = currentSpeed < 3.0f
+                    ) {
+                        Icon(Icons.Default.Add, "Increase playback speed")
+                    }
+                }
             }
         },
         confirmButton = {
@@ -826,12 +1038,27 @@ fun GridSizeDialog(
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.align(Alignment.CenterHorizontally).padding(bottom = 16.dp)
                 )
-                Slider(
-                    value = currentWidth.toFloat(),
-                    onValueChange = { onWidthChanged(it.toInt()) },
-                    valueRange = 100f..300f,
-                    steps = 19
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(
+                        onClick = { onWidthChanged((currentWidth - 10).coerceAtLeast(100)) },
+                        enabled = currentWidth > 100
+                    ) {
+                        Icon(Icons.Default.Remove, "Decrease grid item size")
+                    }
+                    Slider(
+                        value = currentWidth.toFloat(),
+                        onValueChange = { onWidthChanged(it.toInt()) },
+                        valueRange = 100f..300f,
+                        steps = 19,
+                        modifier = Modifier.weight(1f)
+                    )
+                    IconButton(
+                        onClick = { onWidthChanged((currentWidth + 10).coerceAtMost(300)) },
+                        enabled = currentWidth < 300
+                    ) {
+                        Icon(Icons.Default.Add, "Increase grid item size")
+                    }
+                }
             }
         },
         confirmButton = {

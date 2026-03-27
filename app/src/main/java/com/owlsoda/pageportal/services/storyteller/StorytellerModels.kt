@@ -13,9 +13,9 @@ data class TokenResponse(
 )
 
 data class BookResponse(
-    val uuid: String,
-    val title: String,
-    val id: Long? = null,
+    val uuid: String? = null,
+    val id: String? = null,
+    val title: String? = null,
     val subtitle: String? = null,
     val description: String? = null,
     val language: String? = null,
@@ -24,6 +24,9 @@ data class BookResponse(
     val createdAt: String? = null,
     val updatedAt: String? = null,
     val publicationDate: String? = null,
+    val duration: Float? = null,
+    @SerializedName("total_duration") val totalDuration: Float? = null,
+    @SerializedName("totalDurationMs") val totalDurationMs: Double? = null,
     val authors: List<AuthorResponse>? = emptyList(),
     val narrators: List<NarratorResponse>? = emptyList(),
     val series: List<SeriesResponse>? = emptyList(),
@@ -32,21 +35,26 @@ data class BookResponse(
     val status: Any? = null,
     val position: Any? = null,
     val audiobook: AudiobookResponse? = null,
+    @SerializedName("audioBook") val audioBookField: AudiobookResponse? = null,
     val ebook: EbookResponse? = null,
-    @SerializedName("readaloud") val readaloud: ReadAloudResponse? = null
+    @SerializedName("eBook") val eBookField: EbookResponse? = null,
+    @SerializedName("readaloud") val readaloud: ReadAloudResponse? = null,
+    @SerializedName("readAloud") val readAloudField: ReadAloudResponse? = null
 )
 
 data class CollectionResponse(
-    val uuid: String,
-    val name: String,
+    val uuid: String? = null,
+    val id: String? = null,
+    val name: String? = null,
     val description: String? = null,
     val createdAt: String? = null,
     val updatedAt: String? = null
 )
 
 data class SeriesResponse(
-    val uuid: String,
-    val name: String,
+    val uuid: String? = null,
+    val id: String? = null,
+    val name: String? = null,
     val featured: Any? = null,
     val createdAt: String? = null,
     val updatedAt: String? = null,
@@ -69,47 +77,56 @@ data class SeriesResponse(
 }
 
 data class AuthorResponse(
-    val uuid: String,
-    val name: String,
+    val uuid: String? = null,
+    val id: String? = null,
+    val name: String? = null,
     val fileAs: String? = null,
     val createdAt: String? = null,
     val updatedAt: String? = null
 )
 
 data class NarratorResponse(
-    val uuid: String,
-    val name: String,
+    val uuid: String? = null,
+    val id: String? = null,
+    val name: String? = null,
     val fileAs: String? = null,
     val createdAt: String? = null,
     val updatedAt: String? = null
 )
 
 data class TagResponse(
-    val uuid: String,
-    val name: String,
+    val uuid: String? = null,
+    val id: String? = null,
+    val name: String? = null,
     val createdAt: String? = null,
     val updatedAt: String? = null
 )
 
 data class AudiobookResponse(
-    val uuid: String,
-    val filepath: String?,
+    val uuid: String? = null,
+    val id: String? = null,
+    val filepath: String? = null,
+    val duration: Float? = null,
+    @SerializedName("total_duration") val totalDuration: Float? = null,
+    @SerializedName("totalDurationMs") val totalDurationMs: Double? = null,
     val createdAt: String? = null,
     val updatedAt: String? = null
 )
 
 data class EbookResponse(
-    val uuid: String,
-    val filepath: String?,
+    val uuid: String? = null,
+    val id: String? = null,
+    val filepath: String? = null,
     val createdAt: String? = null,
     val updatedAt: String? = null
 )
 
 data class ReadAloudResponse(
-    val uuid: String,
+    val uuid: String? = null,
+    val id: String? = null,
     val status: String? = null,
     val filepath: String? = null,
-    val queuePosition: Int? = null,
+    val queuePosition: Double? = null,
     val currentStage: String? = null,
     val stageProgress: Double? = null,
     val createdAt: String? = null,
@@ -118,7 +135,7 @@ data class ReadAloudResponse(
 
 data class Position(
     val locator: Locator,
-    val timestamp: Long = System.currentTimeMillis()
+    val timestamp: Double = System.currentTimeMillis().toDouble()
 )
 
 data class Locator(
@@ -130,18 +147,28 @@ data class Locator(
 
 data class Locations(
     val progression: Double? = 0.0,
-    val position: Int? = null,
+    val position: Double? = null,
     @SerializedName("totalProgression") val totalProgression: Double? = null,
-    val audioTimestampMs: Long? = null,
-    val chapterIndex: Int? = null,
+    val audioTimestampMs: Double? = null,
+    val chapterIndex: Double? = null,
     val elementId: String? = null,
-    val totalChapters: Int? = null,
-    val totalDurationMs: Long? = null
+    val totalChapters: Double? = null,
+    val totalDurationMs: Double? = null
 )
 
 data class UserResponse(
     val id: String,
     val name: String,
     val email: String? = null
+)
+
+data class MetadataRequest(
+    val title: String? = null,
+    val description: String? = null,
+    val series: String? = null,
+    val seriesIndex: Float? = null,
+    val authors: List<String>? = null,
+    val narrators: List<String>? = null,
+    val tags: List<String>? = null
 )
 

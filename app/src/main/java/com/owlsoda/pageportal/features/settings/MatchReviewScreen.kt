@@ -12,6 +12,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -20,6 +21,8 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.owlsoda.pageportal.core.extensions.parseAuthors
+import com.owlsoda.pageportal.core.database.entity.BookEntity
 import coil.compose.AsyncImage
 import com.owlsoda.pageportal.ui.theme.PagePortalPurple
 import com.owlsoda.pageportal.ui.theme.PagePortalTextSecondary
@@ -161,24 +164,20 @@ fun MatchCard(
                             color = PagePortalTextSecondary
                         )
                         Text(
-                            candidate.potentialMatch.title, 
+                            text = candidate.potentialMatch.title, 
                             style = MaterialTheme.typography.titleMedium
                         )
-                        val unifiedAuthors = remember(candidate.potentialMatch.authors) {
-                            try {
-                                com.google.gson.Gson().fromJson(candidate.potentialMatch.authors, Array<String>::class.java).firstOrNull() ?: "Unknown"
-                            } catch (e: Exception) {
-                                candidate.potentialMatch.authors
-                            }
+                        val authors = remember(candidate.potentialMatch.authors) {
+                            candidate.potentialMatch.authors.parseAuthors()
                         }
                         Text(
-                            unifiedAuthors, 
+                            text = "Author: ${authors.joinToString(", ")}",
                             style = MaterialTheme.typography.bodyMedium,
                             color = PagePortalTextSecondary
                         )
                         
                         Text(
-                            "Similarity: ${(candidate.score * 100).toInt()}%", 
+                            text = "Similarity: ${(candidate.score * 100).toInt()}%", 
                             style = MaterialTheme.typography.labelSmall,
                             color = PagePortalPurple,
                             modifier = Modifier.padding(top = 8.dp)

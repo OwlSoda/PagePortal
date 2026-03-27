@@ -24,6 +24,7 @@ import coil.compose.AsyncImage
 import com.owlsoda.pageportal.core.database.entity.BookEntity
 import com.owlsoda.pageportal.ui.components.EmptyState
 import androidx.compose.material.icons.automirrored.filled.LibraryBooks
+import com.owlsoda.pageportal.core.extensions.parseAuthors
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -125,7 +126,7 @@ fun BookGridItem(
         }
         
         Text(
-            text = book.authors ?: "", // Authors is string
+            text = book.authors.parseAuthors().joinToString(", "),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 1,

@@ -85,8 +85,8 @@ interface BookDao {
     @Query("SELECT * FROM books WHERE unifiedBookId IS NULL")
     suspend fun getUnlinkedBooks(): List<BookEntity>
     
-    @Query("UPDATE books SET downloadStatus = :status, downloadProgress = :progress, localFilePath = :localPath WHERE id = :bookId")
-    suspend fun updateDownloadStatus(bookId: Long, status: String, progress: Float, localPath: String?)
+    @Query("UPDATE books SET downloadStatus = :status, downloadProgress = :progress, localFilePath = :localPath, downloadError = :error WHERE id = :bookId")
+    suspend fun updateDownloadStatus(bookId: Long, status: String, progress: Float, localPath: String?, error: String? = null)
     
     // Per-format download updates
     @Query("UPDATE books SET isAudiobookDownloaded = :downloaded, localFilePath = :path WHERE id = :bookId")

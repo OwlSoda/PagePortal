@@ -11,7 +11,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
-import org.json.JSONArray
+import com.owlsoda.pageportal.core.extensions.parseAuthors
+import com.owlsoda.pageportal.core.extensions.parseTags
 
 sealed class EntityType(val title: String) {
     object Authors : EntityType("Authors")
@@ -82,20 +83,9 @@ class EntityViewModel @Inject constructor(
         val authorMap = mutableMapOf<String, MutableList<BookEntity>>()
         
         books.forEach { book ->
-            try {
-                // Parse authors JSON array string
-                val jsonArray = JSONArray(book.authors)
-                for (i in 0 until jsonArray.length()) {
-                    val authorName = jsonArray.getString(i)
-                    if (authorName.isNotBlank()) {
-                        authorMap.getOrPut(authorName) { mutableListOf() }.add(book)
-                    }
-                }
-            } catch (e: Exception) {
-                // Fallback or single string handling if legacy
-                val authorName = book.authors
-                if (!authorName.startsWith("[") && authorName.isNotBlank()) {
-                     authorMap.getOrPut(authorName) { mutableListOf() }.add(book)
+            book.authors.parseAuthors().forEach { authorName ->
+                if (authorName.isNotBlank()) {
+                    authorMap.getOrPut(authorName) { mutableListOf() }.add(book)
                 }
             }
         }
@@ -134,17 +124,10 @@ class EntityViewModel @Inject constructor(
         val tagMap = mutableMapOf<String, MutableList<BookEntity>>()
         
         books.forEach { book ->
-            try {
-                // Parse tags JSON array string
-                val jsonArray = org.json.JSONArray(book.tags)
-                for (i in 0 until jsonArray.length()) {
-                    val tagName = jsonArray.getString(i)
-                    if (tagName.isNotBlank()) {
-                        tagMap.getOrPut(tagName) { mutableListOf() }.add(book)
-                    }
+            book.tags.parseTags().forEach { tagName ->
+                if (tagName.isNotBlank()) {
+                    tagMap.getOrPut(tagName) { mutableListOf() }.add(book)
                 }
-            } catch (e: Exception) {
-                // No tags or invalid JSON
             }
         }
         

@@ -55,6 +55,19 @@ interface StorytellerApi {
         @Path("uuid") uuid: String,
         @Part parts: List<MultipartBody.Part>
     ): BookResponse
+
+    @PUT("api/v2/books/{uuid}")
+    suspend fun updateMetadataJson(
+        @Path("uuid") uuid: String,
+        @Body metadata: MetadataRequest
+    ): BookResponse
+
+    @Multipart
+    @PUT("api/v2/books/{uuid}/cover")
+    suspend fun updateCover(
+        @Path("uuid") uuid: String,
+        @Part cover: MultipartBody.Part
+    ): BookResponse
     
     @GET("api/v2/creators")
     suspend fun getCreators(): List<AuthorResponse>

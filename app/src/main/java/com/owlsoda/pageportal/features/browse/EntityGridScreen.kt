@@ -24,6 +24,7 @@ import coil.compose.AsyncImage
 
 import com.owlsoda.pageportal.ui.components.EmptyState
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.LocalOffer
 import androidx.compose.material.icons.automirrored.filled.LibraryBooks
 import androidx.compose.material.icons.filled.CollectionsBookmark
 

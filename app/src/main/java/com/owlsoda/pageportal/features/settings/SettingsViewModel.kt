@@ -11,11 +11,13 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.first
 import javax.inject.Inject
 import com.owlsoda.pageportal.network.GitHubRelease
 import com.owlsoda.pageportal.features.settings.UpdateManager
 import com.owlsoda.pageportal.features.settings.UpdateState
 import android.content.Context
+import android.content.Intent
 import android.net.Uri
 import com.google.gson.Gson
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -49,6 +51,8 @@ data class SettingsState(
     val keepScreenOn: Boolean = false,
     val reduceAnimations: Boolean = false,
     
+    val versionName: String = "",
+    val logsText: String = "",
     val toastMessage: String? = null
 )
 
@@ -145,6 +149,8 @@ class SettingsViewModel @Inject constructor(
         }
         
         calculateCacheSize()
+        loadLogs()
+        _state.update { it.copy(versionName = getAppVersionName()) }
     }
 
     fun toggleOfflineMode(enabled: Boolean) {
@@ -250,6 +256,21 @@ class SettingsViewModel @Inject constructor(
         _state.update { it.copy(toastMessage = null) }
     }
 
+    fun loadLogs() {
+        viewModelScope.launch {
+            val logs = com.owlsoda.pageportal.util.LogManager.readLogs()
+            _state.update { it.copy(logsText = logs) }
+        }
+    }
+
+    fun clearLogs() {
+        viewModelScope.launch {
+            com.owlsoda.pageportal.util.LogManager.clearLogs()
+            loadLogs()
+            _state.update { it.copy(toastMessage = "Logs cleared") }
+        }
+    }
+
     fun checkForUpdates() {
         viewModelScope.launch {
             updateManager.checkForUpdates()
@@ -258,6 +279,47 @@ class SettingsViewModel @Inject constructor(
 
     fun downloadAndInstallUpdate(release: GitHubRelease) {
         updateManager.downloadAndInstall(release)
+    }
+
+    fun onVersionClick() {
+        viewModelScope.launch {
+            when (val current = updateState.value) {
+                is UpdateState.UpdateAvailable -> downloadAndInstallUpdate(current.release)
+                is UpdateState.NoUpdate -> openGitHub()
+                is UpdateState.Idle, is UpdateState.Error -> {
+                    updateManager.checkForUpdates()
+                    // Wait for result and auto-act
+                    updateState.first { 
+                        it !is UpdateState.Checking && it !is UpdateState.Idle 
+                    }
+                    val result = updateState.value
+                    if (result is UpdateState.UpdateAvailable) {
+                        downloadAndInstallUpdate(result.release)
+                    } else if (result is UpdateState.NoUpdate) {
+                        openGitHub()
+                    }
+                }
+                else -> {} // Checking or Downloading, do nothing
+            }
+        }
+    }
+
+    fun openGitHub() {
+        try {
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/OwlSoda/PagePortal"))
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            context.startActivity(intent)
+        } catch (e: Exception) {
+            _state.update { it.copy(toastMessage = "Could not open browser") }
+        }
+    }
+
+    private fun getAppVersionName(): String {
+        return try {
+            context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "Unknown"
+        } catch (e: Exception) {
+            "Unknown"
+        }
     }
 
     private fun calculateCacheSize() {

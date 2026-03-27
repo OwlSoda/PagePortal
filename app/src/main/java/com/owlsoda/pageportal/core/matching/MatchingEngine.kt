@@ -7,6 +7,7 @@ import com.owlsoda.pageportal.core.database.entity.BookEntity
 import com.owlsoda.pageportal.core.database.entity.UnifiedBookEntity
 import javax.inject.Inject
 import javax.inject.Singleton
+import com.owlsoda.pageportal.core.extensions.parseAuthors
 
 @Singleton
 class MatchingEngine @Inject constructor(
@@ -29,14 +30,14 @@ class MatchingEngine @Inject constructor(
             // If the user unlinked it, unifiedBookId is null.
             if (book.isManuallyLinked) continue
             
-            val bookAuthors = parseAuthors(book.authors, gson)
+            val bookAuthors = book.authors.parseAuthors()
             
             var bestMatch: UnifiedBookEntity? = null
             var bestScore = 0.0f
             
             // Search in existing (and newly created in this session)
             for (unified in existingUnifiedBooks) {
-                val unifiedAuthors = parseAuthors(unified.authors, gson)
+                val unifiedAuthors = unified.authors.parseAuthors()
                 
                 val score = TitleMatcher.calculateMatchScore(
                     book.title,
@@ -75,14 +76,6 @@ class MatchingEngine @Inject constructor(
                 // Link
                 bookDao.updateBook(book.copy(unifiedBookId = newId))
             }
-        }
-    }
-    
-    private fun parseAuthors(json: String, gson: Gson): List<String> {
-        return try {
-            gson.fromJson(json, Array<String>::class.java).toList()
-        } catch (e: Exception) {
-            listOf(json) // Fallback
         }
     }
 }

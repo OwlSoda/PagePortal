@@ -21,7 +21,6 @@ import com.owlsoda.pageportal.features.book.BookDetailScreen
 import com.owlsoda.pageportal.features.comic.ComicReaderScreen
 import com.owlsoda.pageportal.features.library.LibraryScreen
 import com.owlsoda.pageportal.features.player.AudiobookPlayerScreen
-import com.owlsoda.pageportal.features.player.ReadAloudPlayerScreen
 import com.owlsoda.pageportal.features.reader.ReaderScreen
 import androidx.compose.material3.*
 import androidx.compose.material.icons.Icons
@@ -50,9 +49,6 @@ sealed class Screen(val route: String) {
     object Reader : Screen("reader/{bookId}?isReadAloud={isReadAloud}") {
         fun createRoute(bookId: String, isReadAloud: Boolean = false) = 
             "reader/$bookId?isReadAloud=$isReadAloud"
-    }
-    object ReadAloudPlayer : Screen("readaloud_player/{bookId}") {
-        fun createRoute(bookId: String) = "readaloud_player/$bookId"
     }
     object ComicReader : Screen("comic/{bookId}?filePath={filePath}") {
         fun createRoute(bookId: String, filePath: String): String {
@@ -85,6 +81,9 @@ sealed class Screen(val route: String) {
         fun createRoute(serverId: Long) = "test_service/$serverId"
     }
     object MatchReview : Screen("matches")
+    object EditBook : Screen("edit_book/{id}") {
+        fun createRoute(id: Long) = "edit_book/$id"
+    }
 }
 
 @Composable
@@ -374,7 +373,21 @@ fun PagePortalNavHost(
                         },
                         onOpenWebReader = { url ->
                             navController.navigate(Screen.WebReader.createRoute(url))
+                        },
+                        onEditClick = { id ->
+                            navController.navigate(Screen.EditBook.createRoute(id))
                         }
+                    )
+                }
+
+                composable(
+                    route = Screen.EditBook.route,
+                    arguments = listOf(navArgument("id") { type = NavType.LongType })
+                ) { backStackEntry ->
+                    val id = backStackEntry.arguments?.getLong("id") ?: return@composable
+                    com.owlsoda.pageportal.features.book.EditBookScreen(
+                        bookId = id,
+                        onBack = { navController.popBackStack() }
                     )
                 }
                 
@@ -419,18 +432,6 @@ fun PagePortalNavHost(
                     ReaderScreen(
                         bookId = bookId,
                         isReadAloud = isReadAloud,
-                        onBack = { navController.popBackStack() }
-                    )
-                }
-                
-                // Keep the old player route just in case, but BookDetail will redirect to Reader now
-                composable(
-                    route = Screen.ReadAloudPlayer.route,
-                    arguments = listOf(navArgument("bookId") { type = NavType.StringType })
-                ) { backStackEntry ->
-                    val bookId = backStackEntry.arguments?.getString("bookId") ?: return@composable
-                    ReadAloudPlayerScreen(
-                        bookId = bookId,
                         onBack = { navController.popBackStack() }
                     )
                 }
