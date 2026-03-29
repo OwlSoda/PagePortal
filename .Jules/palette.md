@@ -13,3 +13,7 @@
 ## 2024-05-25 - Preventing Slider Drift
 **Learning:** Sliders bound to floating point values tend to accumulate small drift issues when interacted with via discrete tap increments or continuous drags. Without bounding and rounding constraints, precision numbers may become visibly mangled or crash configurations.
 **Action:** Sliders bound to floats (e.g. brightness, playback speed) must be bounded with `.coerceAtLeast` and `.coerceAtMost`, and when discrete step values are needed, value transformations should use robust logic like `Math.round((current - step) * scale) / scale` to avoid floating-point imprecision.
+
+## 2024-05-26 - Numeric Keyboards for Specific Inputs
+**Learning:** Text fields intended for numerical inputs (like series indices, jump-to-page fields) without specific keyboard types require users to manually switch layouts, causing friction.
+**Action:** Always provide `keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)` or `KeyboardType.Decimal` on `TextField`s intended for numbers. This automatically opens the correct keyboard, streamlining input.
