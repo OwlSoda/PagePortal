@@ -14,6 +14,15 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.owlsoda.pageportal.features.library.LibraryViewModel
 import com.owlsoda.pageportal.features.library.UnifiedBookDisplay
 import com.owlsoda.pageportal.features.library.BookCard
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Color
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -24,21 +33,33 @@ fun UnifiedHomeScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     
+    val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        uri?.let { viewModel.importBook(it) }
+    }
+    
     // Calculate continues reading or similar logic if available
     // For now we use recentBooks from VM
     
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Unified Home") }
+                title = { Text("Unified Home") },
+                actions = {
+                    IconButton(onClick = { 
+                        importLauncher.launch(arrayOf("application/epub+zip", "audio/*", "application/zip", "application/octet-stream"))
+                    }) {
+                        Icon(Icons.Default.Add, contentDescription = "Import Local File")
+                    }
+                }
             )
         }
     ) { padding ->
-        LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(padding),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(24.dp)
-        ) {
+        Box(modifier = Modifier.fillMaxSize().padding(padding)) {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(24.dp)
+            ) {
             
             // Continue Reading (Mock logic for now: take first book with progress > 0)
             val continueReading = uiState.books.filter { it.downloadProgress > 0 || it.isDownloaded }.take(1) // Simplified
@@ -80,6 +101,32 @@ fun UnifiedHomeScreen(
                 // ... Row of cards for Storyteller, ABS, etc if desired
             }
             */
+            }
+            
+            // Import Loading Overlay
+            if (uiState.isImporting) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.5f))
+                        .clickable(enabled = false) {},
+                    contentAlignment = Alignment.Center
+                ) {
+                    Card(
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(24.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text("Adding to Library...", style = MaterialTheme.typography.titleMedium)
+                        }
+                    }
+                }
+            }
         }
     }
 }
