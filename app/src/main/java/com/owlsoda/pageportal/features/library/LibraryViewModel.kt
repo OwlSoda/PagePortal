@@ -36,7 +36,8 @@ data class UnifiedBookDisplay(
     val seriesIndex: String? = null,
     val addedAt: Long = 0L,
     val duration: Long = 0L,
-    val listeningProgress: Float = 0f
+    val listeningProgress: Float = 0f,
+    val isLocal: Boolean = false
 )
  
 data class AuthorDisplay(
@@ -105,7 +106,8 @@ data class LibraryUiState(
     val selectedFilter: String? = null,  // Selected author or series
     
     // Appearance
-    val gridMinWidth: Int = 120
+    val gridMinWidth: Int = 120,
+    val isImporting: Boolean = false
 )
 
 @HiltViewModel
@@ -277,9 +279,11 @@ class LibraryViewModel @Inject constructor(
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.Default) {
             combine(
                 unifiedBookDao.getAllWithBooks(),
-                progressDao.getInProgressBooks() // This is a flow of all in-progress progress entities
-            ) { unifiedList, progressList ->
+                progressDao.getInProgressBooks(),
+                serverDao.getAllServers()
+            ) { unifiedList, progressList, serverList ->
                 val progressMap = progressList.associateBy { it.bookId }
+                val localServerId = serverList.find { it.serviceType == ServiceType.LOCAL.name }?.id
                 
                 unifiedList.map { item ->
                     val books = item.books
@@ -312,7 +316,8 @@ class LibraryViewModel @Inject constructor(
                         seriesIndex = books.firstOrNull()?.seriesIndex,
                         addedAt = books.mapNotNull { it.addedAt }.minOrNull() ?: 0L,
                         duration = maxDuration,
-                        listeningProgress = (progress?.percentComplete ?: 0f) / 100f
+                        listeningProgress = (progress?.percentComplete ?: 0f) / 100f,
+                        isLocal = books.any { it.serverId == localServerId }
                     )
                 }
             }.collect { mappedBooks ->
@@ -517,13 +522,13 @@ class LibraryViewModel @Inject constructor(
 
     fun importBook(uri: android.net.Uri) {
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true) }
+            _uiState.update { it.copy(isImporting = true) }
             val result = localBookImporter.importBook(uri)
             if (result.isSuccess) {
                 // Refresh list handling is automatic via Flow, but we might want to trigger a "server" refresh or just wait for DB emission
-                _uiState.update { it.copy(isLoading = false) }
+                _uiState.update { it.copy(isImporting = false) }
             } else {
-                _uiState.update { it.copy(isLoading = false, error = "Import failed: ${result.exceptionOrNull()?.message}") }
+                _uiState.update { it.copy(isImporting = false, error = "Import failed: ${result.exceptionOrNull()?.message}") }
             }
         }
     }

@@ -32,8 +32,9 @@ import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.MoreVert
 
 import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Home
+import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.material3.*
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
@@ -109,6 +110,43 @@ fun LibraryScreen(
             onLoginSuccess = { /* Auto-dismiss when hasServers becomes true */ }
         )
         return
+    }
+    
+    // Importing Overlay
+    if (uiState.isImporting) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.7f))
+                .clickable(enabled = false) {},
+            contentAlignment = Alignment.Center
+        ) {
+            Surface(
+                shape = MaterialTheme.shapes.large,
+                color = MaterialTheme.colorScheme.surface,
+                tonalElevation = 8.dp,
+                modifier = Modifier.padding(32.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    CircularProgressIndicator(modifier = Modifier.size(48.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = "Adding to Library...",
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    Text(
+                        text = "Optimizing for ReadAloud playback",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
+                }
+            }
+        }
     }
     
     Scaffold(
@@ -210,6 +248,23 @@ fun LibraryScreen(
                     }
                 }
             )
+        },
+        floatingActionButton = {
+            val selectedTab = uiState.serverTabs.getOrNull(uiState.selectedTabIndex)
+            val isLocalTab = selectedTab?.serviceType == ServiceType.LOCAL
+            val isBooksTab = pagerState.currentPage == 3
+            
+            if (isBooksTab && isLocalTab) {
+                ExtendedFloatingActionButton(
+                    onClick = { 
+                        importLauncher.launch(arrayOf("application/epub+zip", "audio/*", "video/mp4")) 
+                    },
+                    icon = { Icon(Icons.Default.Add, null) },
+                    text = { Text("Import Book") },
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
+                )
+            }
         }
     ) { padding ->
         Column(
@@ -349,7 +404,7 @@ fun LibraryScreen(
                         0 -> HomeTabContent(uiState, viewModel, pagerState, scope, onBookClick, onAuthorClick, onSettingsClick)
                         1 -> AuthorsTabContent(uiState, viewModel)
                         2 -> SeriesTabContent(uiState, viewModel)
-                        3 -> BooksTabContent(uiState, gridState, viewModel, onBookClick)
+                        3 -> BooksTabContent(uiState, gridState, viewModel, onBookClick, importLauncher)
                     }
                 }
                 
@@ -454,8 +509,12 @@ fun BooksTabContent(
     uiState: LibraryUiState,
     gridState: androidx.compose.foundation.lazy.grid.LazyGridState,
     viewModel: LibraryViewModel,
-    onBookClick: (String) -> Unit
+    onBookClick: (String) -> Unit,
+    importLauncher: androidx.activity.result.ActivityResultLauncher<Array<String>>
 ) {
+    val selectedTab = uiState.serverTabs.getOrNull(uiState.selectedTabIndex)
+    val isLocalTab = selectedTab?.serviceType == ServiceType.LOCAL
+
     Column(modifier = Modifier.fillMaxSize()) {
         // Service Filter Row
         ScrollableTabRow(
@@ -483,10 +542,34 @@ fun BooksTabContent(
                                 contentDescription = null,
                                 modifier = Modifier.size(16.dp)
                             )
+                            // Hide text on narrow screens or many tabs? Let's keep it for now.
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(text = tab.name, style = MaterialTheme.typography.labelMedium)
                         }
                     }
+                )
+            }
+        }
+
+        // Section Title for Local Tab (Visual Push)
+        if (isLocalTab && uiState.books.isNotEmpty()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp, vertical = 16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    Icons.Default.PhoneAndroid,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(
+                    text = "Personal Collection",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.primary
                 )
             }
         }
@@ -514,22 +597,100 @@ fun BooksTabContent(
         }
 
         Box(modifier = Modifier.fillMaxSize()) {
-            LazyVerticalGrid(
-                state = gridState,
-                columns = GridCells.Fixed(2),
-                contentPadding = PaddingValues(20.dp),
-                horizontalArrangement = Arrangement.spacedBy(20.dp),
-                verticalArrangement = Arrangement.spacedBy(24.dp),
-                modifier = Modifier.fillMaxSize()
-            ) {
-                items(uiState.books, key = { it.id }) { book ->
-                    BookCard(
-                        book = book,
-                        onClick = { onBookClick("u_${book.id}") }
-                    )
+            val selectedTab = uiState.serverTabs.getOrNull(uiState.selectedTabIndex)
+            val isLocalTab = selectedTab?.serviceType == ServiceType.LOCAL
+
+            if (uiState.books.isEmpty() && !uiState.isLoading) {
+                LocalEmptyState(isLocalTab, viewModel, importLauncher)
+            } else {
+                LazyVerticalGrid(
+                    state = gridState,
+                    columns = GridCells.Fixed(2),
+                    contentPadding = PaddingValues(
+                        start = 20.dp, 
+                        end = 20.dp, 
+                        top = 20.dp, 
+                        bottom = 80.dp // Extra padding for FAB
+                    ),
+                    horizontalArrangement = Arrangement.spacedBy(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(24.dp),
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    items(uiState.books, key = { it.id }) { book ->
+                        BookCard(
+                            book = book,
+                            onClick = { onBookClick("u_${book.id}") }
+                        )
+                    }
                 }
             }
         }
+    }
+}
+
+@Composable
+fun LocalEmptyState(
+    isLocalTab: Boolean,
+    viewModel: LibraryViewModel,
+    importLauncher: androidx.activity.result.ActivityResultLauncher<Array<String>>
+) {
+    if (isLocalTab) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Surface(
+                shape = androidx.compose.foundation.shape.CircleShape,
+                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f),
+                modifier = Modifier.size(120.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        Icons.Default.Folder,
+                        contentDescription = null,
+                        modifier = Modifier.size(64.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(24.dp))
+            
+            Text(
+                text = "Your Local Library is Empty",
+                style = MaterialTheme.typography.headlineSmall,
+                textAlign = TextAlign.Center
+            )
+            
+            Text(
+                text = "Toss in your .epub or ReadAloud files to start building your personal collection.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(top = 8.dp)
+            )
+            
+            Spacer(modifier = Modifier.height(32.dp))
+            
+            Button(
+                onClick = { importLauncher.launch(arrayOf("application/epub+zip", "audio/*")) },
+                contentPadding = PaddingValues(horizontal = 32.dp, vertical = 12.dp),
+                shape = MaterialTheme.shapes.medium
+            ) {
+                Icon(Icons.Default.Add, null)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Select Files to Import")
+            }
+        }
+    } else {
+        EmptyState(
+            icon = Icons.AutoMirrored.Filled.LibraryBooks, 
+            title = "No Books Found", 
+            message = "This server currently has no books matching your filters."
+        )
     }
 }
 
@@ -802,6 +963,7 @@ fun ServiceCarousel(
     }
 }
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun BookCard(
     book: UnifiedBookDisplay,
@@ -816,12 +978,26 @@ fun BookCard(
         // Cover image with large rounded corners and subtle shadow
         val coverUrl = book.audiobookCoverUrl ?: book.coverUrl
         
+        val sharedScope = com.owlsoda.pageportal.ui.theme.LocalSharedTransitionScope.current
+        val animatedScope = com.owlsoda.pageportal.ui.theme.LocalNavAnimatedVisibilityScope.current
+        
+        var surfaceModifier: Modifier = Modifier
+            .fillMaxWidth()
+            .aspectRatio(0.66f)
+            
+        if (sharedScope != null && animatedScope != null) {
+            with(sharedScope) {
+                surfaceModifier = surfaceModifier.sharedElement(
+                    state = rememberSharedContentState(key = "cover_${book.id}"),
+                    animatedVisibilityScope = animatedScope
+                )
+            }
+        }
+        
         Surface(
             shape = MaterialTheme.shapes.medium,
             shadowElevation = 4.dp,
-            modifier = Modifier
-                .fillMaxWidth()
-                .aspectRatio(0.66f)
+            modifier = surfaceModifier
         ) {
             AsyncImage(
                 model = coverUrl,
@@ -841,6 +1017,16 @@ fun BookCard(
                     }
                     if (book.hasAudiobook) {
                         BadgeIcon(Icons.Default.Headphones)
+                    }
+                }
+                
+                // Local/Device Badge (bottom left)
+                if (book.isLocal) {
+                    Box(modifier = Modifier.align(Alignment.BottomStart)) {
+                        BadgeIcon(
+                            Icons.Default.PhoneAndroid,
+                            containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.85f)
+                        )
                     }
                 }
             }
@@ -892,9 +1078,12 @@ fun BookCard(
 }
 
 @Composable
-private fun BadgeIcon(icon: ImageVector) {
+private fun BadgeIcon(
+    icon: ImageVector,
+    containerColor: Color = Color.Black.copy(alpha = 0.6f)
+) {
     Surface(
-        color = Color.Black.copy(alpha = 0.6f),
+        color = containerColor,
         shape = androidx.compose.foundation.shape.CircleShape,
         modifier = Modifier.size(28.dp)
     ) {

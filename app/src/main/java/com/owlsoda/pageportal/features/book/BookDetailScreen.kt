@@ -40,7 +40,8 @@ import com.owlsoda.pageportal.core.extensions.parseTags
 import com.owlsoda.pageportal.ui.components.EmptyState
 import com.owlsoda.pageportal.ui.theme.PagePortalPurple
 
-@OptIn(ExperimentalMaterial3Api::class)
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
 @Composable
 fun BookDetailScreen(
     bookId: String,
@@ -58,6 +59,9 @@ fun BookDetailScreen(
 ) {
     val state by viewModel.state.collectAsState()
     val scrollState = rememberScrollState()
+    
+    val sharedScope = com.owlsoda.pageportal.ui.theme.LocalSharedTransitionScope.current
+    val animatedScope = com.owlsoda.pageportal.ui.theme.LocalNavAnimatedVisibilityScope.current
     
     LaunchedEffect(bookId) {
         viewModel.loadBook(bookId)
@@ -147,12 +151,23 @@ fun BookDetailScreen(
                         val coverUrl = state.book?.audiobookCoverUrl ?: state.book?.coverUrl
                         val aspectRatio = if (state.book?.audiobookCoverUrl != null) 1f else 2f / 3f
                         
+                        var surfaceModifier: Modifier = Modifier
+                            .width(if (aspectRatio == 1f) 260.dp else 220.dp)
+                            .aspectRatio(aspectRatio)
+
+                        if (sharedScope != null && animatedScope != null) {
+                            with(sharedScope) {
+                                surfaceModifier = surfaceModifier.sharedElement(
+                                    state = rememberSharedContentState(key = "cover_${book.id}"),
+                                    animatedVisibilityScope = animatedScope
+                                )
+                            }
+                        }
+                        
                         Surface(
                             shape = MaterialTheme.shapes.medium,
                             shadowElevation = 32.dp,
-                            modifier = Modifier
-                                .width(if (aspectRatio == 1f) 260.dp else 220.dp)
-                                .aspectRatio(aspectRatio)
+                            modifier = surfaceModifier
                         ) {
                             AsyncImage(
                                 model = coverUrl,

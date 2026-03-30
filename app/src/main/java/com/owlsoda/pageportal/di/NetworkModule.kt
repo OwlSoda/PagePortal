@@ -49,6 +49,28 @@ object NetworkModule {
 
     @Provides
     @Singleton
+    @Named("DownloadClient")
+    fun provideDownloadOkHttpClient(authInterceptor: AuthInterceptor): OkHttpClient {
+        val logging = HttpLoggingInterceptor().apply {
+            level = if (BuildConfig.DEBUG) HttpLoggingInterceptor.Level.HEADERS 
+                    else HttpLoggingInterceptor.Level.NONE
+        }
+        
+        return OkHttpClient.Builder()
+            .addInterceptor(logging)
+            .addInterceptor(authInterceptor)
+            .connectTimeout(120, TimeUnit.SECONDS)
+            .readTimeout(15, TimeUnit.MINUTES) // Even longer for slow servers
+            .writeTimeout(120, TimeUnit.SECONDS)
+            .callTimeout(0, TimeUnit.MINUTES) // DISABLED: No limit on overall transfer duration
+            .followRedirects(true)
+            .followSslRedirects(true)
+            .retryOnConnectionFailure(true)
+            .build()
+    }
+
+    @Provides
+    @Singleton
     fun provideImageLoader(
         @ApplicationContext context: Context,
         okHttpClient: OkHttpClient
@@ -75,4 +97,3 @@ object NetworkModule {
         return retrofit.create(GitHubUpdateService::class.java)
     }
 }
-

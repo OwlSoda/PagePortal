@@ -18,7 +18,11 @@ data class EpubBook(
     val cssFiles: List<String>,
     val basePath: String, // Path inside zip where OPF is located
     val hasMediaOverlays: Boolean = false,
-    val smilData: Map<String, SmilData> = emptyMap() // ID -> SmilData
+    val smilData: Map<String, SmilData> = emptyMap(), // ID -> SmilData
+    val description: String? = null,
+    val series: String? = null,
+    val seriesIndex: String? = null,
+    val tags: List<String> = emptyList()
 )
 
 data class EpubChapter(
@@ -90,6 +94,10 @@ class EpubParser {
         var coverId: String? = null
         var hasMediaOverlays = false
         var ncxHref: String? = null // NCX file for chapter titles
+        var description: String? = null
+        var series: String? = null
+        var seriesIndex: String? = null
+        val tags = mutableListOf<String>()
 
         while (parser.next() != XmlPullParser.END_DOCUMENT) {
             if (parser.eventType == XmlPullParser.START_TAG) {
@@ -99,6 +107,12 @@ class EpubParser {
                     }
                     "dc:creator", "creator" -> {
                         if (parser.next() == XmlPullParser.TEXT) author = parser.text
+                    }
+                    "dc:description", "description" -> {
+                        if (parser.next() == XmlPullParser.TEXT) description = parser.text
+                    }
+                    "dc:subject", "subject" -> {
+                        if (parser.next() == XmlPullParser.TEXT) tags.add(parser.text)
                     }
                     "item" -> {
                         val id = parser.getAttributeValue(null, "id")
@@ -137,8 +151,22 @@ class EpubParser {
                         if (idref != null) spine.add(idref)
                     }
                     "meta" -> {
-                        if (parser.getAttributeValue(null, "name") == "cover") {
-                            coverId = parser.getAttributeValue(null, "content")
+                        val property = parser.getAttributeValue(null, "property")
+                        val name = parser.getAttributeValue(null, "name")
+                        val content = parser.getAttributeValue(null, "content")
+                        
+                        if (name == "cover") {
+                            coverId = content
+                        }
+                        
+                        // Series parsing (standard EPUB 3/Calibre meta)
+                        when (property ?: name) {
+                            "belongs-to-collection", "calibre:series" -> {
+                                series = content ?: if (parser.next() == XmlPullParser.TEXT) parser.text else null
+                            }
+                            "group-position", "calibre:series_index" -> {
+                                seriesIndex = content ?: if (parser.next() == XmlPullParser.TEXT) parser.text else null
+                            }
                         }
                     }
                 }
@@ -272,7 +300,11 @@ class EpubParser {
             cssFiles = cssFiles,
             basePath = basePath,
             hasMediaOverlays = hasMediaOverlays,
-            smilData = smilDataMap
+            smilData = smilDataMap,
+            description = description,
+            series = series,
+            seriesIndex = seriesIndex,
+            tags = tags
         )
     }
 }

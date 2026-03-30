@@ -24,6 +24,10 @@ interface UnifiedBookDao {
     fun getAllWithBooks(): Flow<List<UnifiedBookWithBooks>>
 
     @Transaction
+    @Query("SELECT * FROM unified_books ORDER BY lastUpdated DESC")
+    fun getPagedBooks(): androidx.paging.PagingSource<Int, UnifiedBookWithBooks>
+
+    @Transaction
     @Query("SELECT * FROM unified_books WHERE id = :id")
     suspend fun getUnifiedBookWithBooksById(id: Long): UnifiedBookWithBooks?
     

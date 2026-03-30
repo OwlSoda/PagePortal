@@ -251,7 +251,7 @@ object DownloadUtils {
                     RandomAccessFile(file, "rw").use { raf ->
                         raf.seek(start)
                         val input = body.byteStream()
-                        val buffer = ByteArray(1024 * 1024) // 1MB buffer
+                        val buffer = ByteArray(8 * 1024 * 1024) // 8MB buffer for large part writes
                         var bytesRead: Int
                         var totalPartRead = 0L
                         
@@ -305,8 +305,9 @@ object DownloadUtils {
                 client.newCall(request).execute().use { response ->
                     if (!response.isSuccessful && response.code != 206) {
                         if (response.code == 416) {
-                            onProgress(1f)
-                            return
+                            Log.w(TAG, "HTTP 416 Range Not Satisfiable — Local fragment may be larger than server file. Deleting and retrying...")
+                            file.delete()
+                            throw java.io.IOException("HTTP 416: Local fragment invalid, retrying from scratch")
                         }
                         // Special handling for 429 and 5xx: longer delay
                         if (response.code == 429 || response.code in 500..599) {
@@ -331,7 +332,7 @@ object DownloadUtils {
 
                     FileOutputStream(file, isResuming).use { output ->
                         val input = body.byteStream()
-                        val buffer = ByteArray(2 * 1024 * 1024) // 2MB buffer
+                        val buffer = ByteArray(8 * 1024 * 1024) // 8MB buffer for large file writes
                         var bytesRead: Int
                         var totalBytesRead = if (isResuming) existingSize else 0L
                         var lastReportedBytes = totalBytesRead
@@ -397,9 +398,12 @@ object DownloadUtils {
                 Log.i(TAG, "Hash verification successful for ${file.name}")
             } else {
                 Log.e(TAG, "Hash verification FAILED for ${file.name}! Expected: $expectedHash, Got: $computedHash")
+                throw java.io.IOException("Hash verification failed: content is corrupted")
             }
+        } catch (e: java.io.IOException) {
+            throw e
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to verify hash", e)
+            Log.e(TAG, "Failed to compute or verify hash", e)
         }
     }
 

@@ -1,9 +1,12 @@
 package com.owlsoda.pageportal.navigation
 
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -22,6 +25,8 @@ import com.owlsoda.pageportal.features.comic.ComicReaderScreen
 import com.owlsoda.pageportal.features.library.LibraryScreen
 import com.owlsoda.pageportal.features.player.AudiobookPlayerScreen
 import com.owlsoda.pageportal.features.reader.ReaderScreen
+import com.owlsoda.pageportal.ui.theme.LocalSharedTransitionScope
+import com.owlsoda.pageportal.ui.theme.LocalNavAnimatedVisibilityScope
 import androidx.compose.material3.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
@@ -86,6 +91,7 @@ sealed class Screen(val route: String) {
     }
 }
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun PagePortalNavHost(
     audiobookPlayerViewModel: com.owlsoda.pageportal.features.player.AudiobookPlayerViewModel = androidx.hilt.navigation.compose.hiltViewModel(),
@@ -220,41 +226,47 @@ fun PagePortalNavHost(
         modifier = Modifier.fillMaxSize()
     ) { innerPadding ->
         Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
-            NavHost(
-                navController = navController,
-                startDestination = Screen.Library.route,
-                modifier = Modifier.fillMaxSize().padding(bottom = if (showMiniPlayer) 88.dp else 0.dp)
-            ) {
-                // Unified Home
-                composable(Screen.Library.route) {
-                    com.owlsoda.pageportal.features.home.UnifiedHomeScreen(
-                        onBookClick = { bookId ->
-                             navController.navigate(Screen.BookDetail.createRoute(bookId))
-                        },
-                        onNavigateToService = { service ->
-                             navController.navigate("service/$service")
+            SharedTransitionLayout {
+                CompositionLocalProvider(LocalSharedTransitionScope provides this@SharedTransitionLayout) {
+                    NavHost(
+                        navController = navController,
+                        startDestination = Screen.Library.route,
+                        modifier = Modifier.fillMaxSize().padding(bottom = if (showMiniPlayer) 88.dp else 0.dp)
+                    ) {
+                        // Unified Home
+                        composable(Screen.Library.route) {
+                            CompositionLocalProvider(LocalNavAnimatedVisibilityScope provides this@composable) {
+                                com.owlsoda.pageportal.features.home.UnifiedHomeScreen(
+                                    onBookClick = { bookId ->
+                                         navController.navigate(Screen.BookDetail.createRoute(bookId))
+                                    },
+                                    onNavigateToService = { service ->
+                                         navController.navigate("service/$service")
+                                    }
+                                )
+                            }
                         }
-                    )
-                }
                 
                 // Generic Service Route
                 composable(
                     route = "service/{serviceName}",
                     arguments = listOf(navArgument("serviceName") { type = NavType.StringType })
                 ) { backStackEntry ->
-                    val serviceName = backStackEntry.arguments?.getString("serviceName") ?: ""
-                    com.owlsoda.pageportal.features.service.ServiceScreen(
-                        serviceType = serviceName,
-                        onBookClick = { bookId ->
-                             navController.navigate(Screen.BookDetail.createRoute(bookId))
-                        },
-                        onAuthorClick = { author ->
-                             navController.navigate(Screen.FilteredBooks.createRoute("AUTHOR", author, serviceName))
-                        },
-                        onSeriesClick = { series ->
-                            navController.navigate(Screen.FilteredBooks.createRoute("SERIES", series, serviceName))
-                        }
-                    )
+                    CompositionLocalProvider(LocalNavAnimatedVisibilityScope provides this@composable) {
+                        val serviceName = backStackEntry.arguments?.getString("serviceName") ?: ""
+                        com.owlsoda.pageportal.features.service.ServiceScreen(
+                            serviceType = serviceName,
+                            onBookClick = { bookId ->
+                                 navController.navigate(Screen.BookDetail.createRoute(bookId))
+                            },
+                            onAuthorClick = { author ->
+                                 navController.navigate(Screen.FilteredBooks.createRoute("AUTHOR", author, serviceName))
+                            },
+                            onSeriesClick = { series ->
+                                navController.navigate(Screen.FilteredBooks.createRoute("SERIES", series, serviceName))
+                            }
+                        )
+                    }
                 }
 
                 composable(
@@ -297,12 +309,14 @@ fun PagePortalNavHost(
                         navArgument("serviceType") { type = NavType.StringType; nullable = true }
                     )
                 ) {
-                     com.owlsoda.pageportal.features.book.BookListScreen(
-                        onBack = { navController.popBackStack() },
-                        onBookClick = { bookId ->
-                             navController.navigate(Screen.BookDetail.createRoute(bookId))
-                        }
-                     )
+                     CompositionLocalProvider(LocalNavAnimatedVisibilityScope provides this@composable) {
+                         com.owlsoda.pageportal.features.book.BookListScreen(
+                            onBack = { navController.popBackStack() },
+                            onBookClick = { bookId ->
+                                 navController.navigate(Screen.BookDetail.createRoute(bookId))
+                            }
+                         )
+                     }
                 }
                 
                 composable(Screen.Settings.route) {
@@ -347,37 +361,38 @@ fun PagePortalNavHost(
                     route = Screen.BookDetail.route,
                     arguments = listOf(navArgument("bookId") { type = NavType.StringType })
                 ) { backStackEntry ->
-                    val bookId = backStackEntry.arguments?.getString("bookId") ?: return@composable
-                    BookDetailScreen(
-                        bookId = bookId,
-                        onBack = { navController.popBackStack() },
-                        onPlayAudiobook = { id ->
-                            audiobookPlayerViewModel.loadBook(id) // Preload
-                            navController.navigate(Screen.AudiobookPlayer.createRoute(id))
-                        },
-                        onReadEbook = { id ->
-                            navController.navigate(Screen.Reader.createRoute(id))
-                        },
-                        onPlayReadAloud = { id ->
-                            // Use Reader Screen for True ReadAloud (Text+Audio)
-                            navController.navigate(Screen.Reader.createRoute(id, true))
-                        },
-                        onAuthorClick = { author ->
-                            navController.navigate(Screen.FilteredBooks.createRoute("AUTHOR", author))
-                        },
-                        onSeriesClick = { series ->
-                            navController.navigate(Screen.FilteredBooks.createRoute("SERIES", series))
-                        },
-                        onTagClick = { tag ->
-                            navController.navigate(Screen.FilteredBooks.createRoute("TAG", tag))
-                        },
-                        onOpenWebReader = { url ->
-                            navController.navigate(Screen.WebReader.createRoute(url))
-                        },
-                        onEditClick = { id ->
-                            navController.navigate(Screen.EditBook.createRoute(id))
-                        }
-                    )
+                    CompositionLocalProvider(LocalNavAnimatedVisibilityScope provides this@composable) {
+                        val bookId = backStackEntry.arguments?.getString("bookId") ?: return@CompositionLocalProvider
+                        BookDetailScreen(
+                            bookId = bookId,
+                            onBack = { navController.popBackStack() },
+                            onPlayAudiobook = { id ->
+                                audiobookPlayerViewModel.loadBook(id) // Preload
+                                navController.navigate(Screen.AudiobookPlayer.createRoute(id))
+                            },
+                            onReadEbook = { id ->
+                                navController.navigate(Screen.Reader.createRoute(id))
+                            },
+                            onPlayReadAloud = { id ->
+                                navController.navigate(Screen.Reader.createRoute(id, true))
+                            },
+                            onAuthorClick = { author ->
+                                navController.navigate(Screen.FilteredBooks.createRoute("AUTHOR", author))
+                            },
+                            onSeriesClick = { series ->
+                                navController.navigate(Screen.FilteredBooks.createRoute("SERIES", series))
+                            },
+                            onTagClick = { tag ->
+                                navController.navigate(Screen.FilteredBooks.createRoute("TAG", tag))
+                            },
+                            onOpenWebReader = { url ->
+                                navController.navigate(Screen.WebReader.createRoute(url))
+                            },
+                            onEditClick = { id ->
+                                navController.navigate(Screen.EditBook.createRoute(id))
+                            }
+                        )
+                    }
                 }
 
                 composable(
@@ -460,7 +475,9 @@ fun PagePortalNavHost(
                          onBack = { navController.popBackStack() }
                      )
                 }
-            }
+            } // NavHost End
+            } // CompositionLocalProvider End
+            } // SharedTransitionLayout End
             
             // Persistent Mini Player
             com.owlsoda.pageportal.features.player.MiniPlayerBar(

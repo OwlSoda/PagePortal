@@ -14,6 +14,7 @@ import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
 import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.components.SingletonComponent
+import javax.inject.Named
 
 /**
  * Worker for downloading book files in the background.
@@ -35,6 +36,8 @@ class DownloadWorker(
     interface DownloadWorkerEntryPoint {
         fun serviceManager(): ServiceManager
         fun bookDao(): BookDao
+        @Named("DownloadClient")
+        fun downloadOkHttpClient(): OkHttpClient
         fun okHttpClient(): OkHttpClient
         fun libraryRepository(): com.owlsoda.pageportal.data.repository.LibraryRepository
     }
@@ -154,6 +157,7 @@ class DownloadWorker(
         val bookDao = entryPoint.bookDao()
         val serviceManager = entryPoint.serviceManager()
         val baseOkHttpClient = entryPoint.okHttpClient()
+        val downloadOkHttpClient = entryPoint.downloadOkHttpClient()
         val libraryRepository = entryPoint.libraryRepository()
 
         val dbBookId = inputData.getLong(KEY_DB_BOOK_ID, -1L)
@@ -244,8 +248,8 @@ class DownloadWorker(
             
             var lastNotificationProgress = 0
             
-            // --- Step 4: Use base client (AuthInterceptor handles standard auth) ---
-            val downloadClient = baseOkHttpClient
+            // --- Step 4: Use specialized client for high-durability downloads ---
+            val downloadClient = downloadOkHttpClient
             
             // Prepare auth headers (needed for pre-flight and multi-part)
             val headers = mutableMapOf<String, String>()
@@ -258,7 +262,7 @@ class DownloadWorker(
                 }
             }
             
-            // --- Step 1: Pre-flight URL validation ---
+            // --- Step 1: Pre-flight URL validation and size check ---
             // Skip pre-flight for Storyteller /files endpoints — these are dynamic file-serving
             // routes that don't support Range requests and return 404 for partial GETs even
             // though a full download works fine.
@@ -267,7 +271,7 @@ class DownloadWorker(
                 logToFile("Skipping pre-flight for dynamic file endpoint: $downloadType")
             } else {
                 logToFile("Pre-flight check for $downloadType")
-                val validationError = validateDownloadUrl(downloadClient, downloadUrl, headers)
+                val validationError = validateDownloadUrl(baseOkHttpClient, downloadUrl, headers)
                 if (validationError != null) {
                     logToFile("Pre-flight FAILED: $validationError")
                     bookDao.updateDownloadStatus(dbBookId, DownloadStatus.FAILED.name, 0f, null, error = validationError)
@@ -282,6 +286,20 @@ class DownloadWorker(
             
             val targetFile = DownloadUtils.getFilePath(applicationContext.filesDir, currentBook, format)
             targetFile.parentFile?.mkdirs()
+            
+            // --- Disk Space Protection ---
+            try {
+                val stat = android.os.StatFs(applicationContext.filesDir.path)
+                val availableBytes = stat.availableBytes
+                // For ReadAloud (ZIP), we ideally want twice the file size (ZIP + unzipped contents)
+                // Since we might not know content size yet if pre-flight skipped, we check for a safe minimum
+                val minBytes = 100 * 1024 * 1024L // 100MB minimum
+                if (availableBytes < minBytes) {
+                    logToFile("WARNING: Low disk space (${availableBytes / 1024 / 1024}MB available)")
+                }
+            } catch (e: Exception) {
+                logToFile("Disk space check failed (non-fatal): ${e.message}")
+            }
             
             bookDao.updateDownloadStatus(dbBookId, DownloadStatus.DOWNLOADING.name, 0f, null, error = null)
             

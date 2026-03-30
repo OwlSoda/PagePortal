@@ -11,6 +11,7 @@ import com.owlsoda.pageportal.core.database.entity.ServerEntity
 import com.owlsoda.pageportal.core.database.entity.UnifiedBookEntity
 import com.owlsoda.pageportal.reader.epub.EpubParser
 import com.owlsoda.pageportal.services.ServiceType
+import com.owlsoda.pageportal.util.DownloadUtils
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -72,9 +73,13 @@ class LocalBookImporter @Inject constructor(
                 isReadAloudDownloaded = bookMetadata.hasMediaOverlays,
                 
                 localFilePath = destinationFile.absolutePath,
-                addedAt = System.currentTimeMillis()
+                addedAt = System.currentTimeMillis(),
+                description = bookMetadata.description,
+                series = bookMetadata.series,
+                seriesIndex = bookMetadata.seriesIndex,
+                tags = bookMetadata.tags.joinToString(",")
             )
-
+            
             // 5. Insert into DB (Unified + Book)
             val unifiedBook = UnifiedBookEntity(
                 title = bookEntity.title,
@@ -85,6 +90,19 @@ class LocalBookImporter @Inject constructor(
             val unifiedId = unifiedBookDao.insert(unifiedBook)
             
             val bookId = bookDao.insertBook(bookEntity.copy(unifiedBookId = unifiedId))
+            
+            // 6. Proactive Unzip for ReadAloud (Now we have the real ID)
+            if (bookEntity.hasReadAloud) {
+                try {
+                    val cacheDir = File(context.cacheDir, "readaloud/$bookId")
+                    if (!cacheDir.exists() || cacheDir.listFiles()?.isEmpty() == true) {
+                        DownloadUtils.unzipFile(destinationFile, cacheDir)
+                        android.util.Log.i("LocalBookImporter", "Proactively unzipped ReadAloud for book $bookId")
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.e("LocalBookImporter", "Failed to proactive unzip", e)
+                }
+            }
             
             Result.success(bookEntity.copy(id = bookId))
         } catch (e: Exception) {
@@ -138,7 +156,11 @@ class LocalBookImporter @Inject constructor(
         val author: String,
         val duration: Long? = null,
         val coverUrl: String?,
-        val hasMediaOverlays: Boolean = false
+        val hasMediaOverlays: Boolean = false,
+        val description: String? = null,
+        val series: String? = null,
+        val seriesIndex: String? = null,
+        val tags: List<String> = emptyList()
     )
 
     private suspend fun parseEpub(file: File): ParsedMetadata {
@@ -166,7 +188,11 @@ class LocalBookImporter @Inject constructor(
             title = result.title,
             author = result.author,
             coverUrl = coverUrl,
-            hasMediaOverlays = result.hasMediaOverlays
+            hasMediaOverlays = result.hasMediaOverlays,
+            description = result.description,
+            series = result.series,
+            seriesIndex = result.seriesIndex,
+            tags = result.tags
         )
     }
 

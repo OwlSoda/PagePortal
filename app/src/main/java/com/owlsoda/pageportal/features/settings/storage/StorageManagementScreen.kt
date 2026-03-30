@@ -1,6 +1,7 @@
 package com.owlsoda.pageportal.features.settings.storage
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -64,30 +65,84 @@ fun StorageManagementScreen(
                     containerColor = PagePortalPurple.copy(alpha = 0.08f)
                 )
             ) {
-                Row(
-                    modifier = Modifier
-                        .padding(16.dp)
-                        .fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
+                Column(
+                    modifier = Modifier.padding(16.dp).fillMaxWidth()
                 ) {
-                    Column {
-                        Text(
-                            text = "Used Storage",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = PagePortalPurple
-                        )
-                        Text(
-                            text = uiState.formattedTotalSize,
-                            style = MaterialTheme.typography.headlineMedium
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column {
+                            Text(
+                                text = "Used Storage",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = PagePortalPurple
+                            )
+                            Text(
+                                text = uiState.formattedTotalSize,
+                                style = MaterialTheme.typography.headlineMedium
+                            )
+                        }
+                        Icon(
+                            imageVector = Icons.Default.SdStorage,
+                            contentDescription = null,
+                            modifier = Modifier.size(40.dp),
+                            tint = PagePortalPurple
                         )
                     }
-                    Icon(
-                        imageVector = Icons.Default.SdStorage,
-                        contentDescription = null,
-                        modifier = Modifier.size(40.dp),
-                        tint = PagePortalPurple
-                    )
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    // Breakdown Progress Bar
+                    val total = uiState.totalSizeBytes.toFloat().coerceAtLeast(1f)
+                    val audioRatio = uiState.audioSizeBytes / total
+                    val ebookRatio = uiState.ebookSizeBytes / total
+                    val cacheRatio = uiState.cacheSizeBytes / total
+                    
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(8.dp)
+                            .clip(RoundedCornerShape(4.dp))
+                    ) {
+                        if (audioRatio > 0) {
+                            Box(modifier = Modifier.weight(audioRatio).fillMaxHeight().background(PagePortalPurple))
+                        }
+                        if (ebookRatio > 0) {
+                            Box(modifier = Modifier.weight(ebookRatio).fillMaxHeight().background(MaterialTheme.colorScheme.secondary))
+                        }
+                        if (cacheRatio > 0) {
+                            Box(modifier = Modifier.weight(cacheRatio).fillMaxHeight().background(MaterialTheme.colorScheme.tertiary))
+                        }
+                        val remaining = 1f - audioRatio - ebookRatio - cacheRatio
+                        if (remaining > 0f) {
+                            Box(modifier = Modifier.weight(remaining).fillMaxHeight().background(MaterialTheme.colorScheme.surfaceVariant))
+                        }
+                    }
+                    
+                    Spacer(modifier = Modifier.height(12.dp))
+                    
+                    // Legend
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        LegendItem("Audio", uiState.formattedAudioSize, PagePortalPurple)
+                        LegendItem("Books", uiState.formattedEbookSize, MaterialTheme.colorScheme.secondary)
+                        LegendItem("Cache", uiState.formattedCacheSize, MaterialTheme.colorScheme.tertiary)
+                    }
+                    
+                    if (uiState.cacheSizeBytes > 0) {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        OutlinedButton(
+                            onClick = { viewModel.clearReadAloudCache() },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.tertiary)
+                        ) {
+                            Text("Clear Unread Caches")
+                        }
+                    }
                 }
             }
 
@@ -179,4 +234,21 @@ fun StorageItemRow(
         }
     )
     HorizontalDivider()
+}
+
+@Composable
+fun LegendItem(label: String, value: String, color: androidx.compose.ui.graphics.Color) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(
+            modifier = Modifier
+                .size(10.dp)
+                .clip(CircleShape)
+                .background(color)
+        )
+        Spacer(modifier = Modifier.width(6.dp))
+        Column {
+            Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(value, style = MaterialTheme.typography.bodySmall, fontWeight = androidx.compose.ui.text.font.FontWeight.Medium)
+        }
+    }
 }
