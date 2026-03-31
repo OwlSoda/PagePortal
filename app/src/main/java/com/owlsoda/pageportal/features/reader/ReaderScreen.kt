@@ -32,6 +32,7 @@ import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -700,7 +701,12 @@ fun ReaderScreen(
                                       },
                                       trailingContent = {
                                           if (hasAudio) {
-                                              Text("🔊", style = MaterialTheme.typography.bodySmall)
+                                              Icon(
+                                                  imageVector = Icons.Filled.VolumeUp,
+                                                  contentDescription = "Has Audio",
+                                                  modifier = Modifier.size(16.dp),
+                                                  tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                              )
                                           }
                                       },
                                       modifier = Modifier.clickable {
