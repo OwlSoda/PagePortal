@@ -13,3 +13,7 @@
 ## 2024-05-25 - Preventing Slider Drift
 **Learning:** Sliders bound to floating point values tend to accumulate small drift issues when interacted with via discrete tap increments or continuous drags. Without bounding and rounding constraints, precision numbers may become visibly mangled or crash configurations.
 **Action:** Sliders bound to floats (e.g. brightness, playback speed) must be bounded with `.coerceAtLeast` and `.coerceAtMost`, and when discrete step values are needed, value transformations should use robust logic like `Math.round((current - step) * scale) / scale` to avoid floating-point imprecision.
+
+## 2024-05-26 - Keyboard Navigation in Forms
+**Learning:** For multi-field forms like logins, users expect to seamlessly tab or 'Next' through fields without manually interacting with the screen. A missing sequence halts the flow and frustrates users.
+**Action:** Always verify `OutlinedTextField` and other inputs in forms have `KeyboardOptions(imeAction = ImeAction.Next)` for intermediate fields and `ImeAction.Done` for the final field. Combine this with `KeyboardActions` (using `FocusManager` or triggering final submission) to provide frictionless data entry.
