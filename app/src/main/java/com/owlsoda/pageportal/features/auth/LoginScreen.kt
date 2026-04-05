@@ -18,6 +18,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
@@ -160,6 +164,8 @@ fun LoginScreen(
                         
                         Spacer(modifier = Modifier.height(24.dp))
                         
+                        val focusManager = LocalFocusManager.current
+
                         // Server URL with Scheme Toggle
                         OutlinedTextField(
                             value = uiState.serverUrl,
@@ -175,7 +181,13 @@ fun LoginScreen(
                             },
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true,
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+                            keyboardOptions = KeyboardOptions(
+                                keyboardType = KeyboardType.Uri,
+                                imeAction = ImeAction.Next
+                            ),
+                            keyboardActions = KeyboardActions(
+                                onNext = { focusManager.moveFocus(FocusDirection.Down) }
+                            ),
                             leadingIcon = {
                                 Surface(
                                     onClick = { viewModel.toggleScheme() },
@@ -204,7 +216,11 @@ fun LoginScreen(
                                     onValueChange = { viewModel.updateUsername(it) },
                                     label = { Text("Username") },
                                     modifier = Modifier.fillMaxWidth(),
-                                    singleLine = true
+                                    singleLine = true,
+                                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                                    keyboardActions = KeyboardActions(
+                                        onNext = { focusManager.moveFocus(FocusDirection.Down) }
+                                    )
                                 )
                                 
                                 Spacer(modifier = Modifier.height(16.dp))
@@ -217,7 +233,19 @@ fun LoginScreen(
                                     modifier = Modifier.fillMaxWidth(),
                                     singleLine = true,
                                     visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                                    keyboardOptions = KeyboardOptions(
+                                        keyboardType = KeyboardType.Password,
+                                        imeAction = ImeAction.Done
+                                    ),
+                                    keyboardActions = KeyboardActions(
+                                        onDone = {
+                                            focusManager.clearFocus()
+                                            if (!uiState.isLoading && uiState.serverUrl.isNotBlank() &&
+                                                uiState.username.isNotBlank() && uiState.password.isNotBlank()) {
+                                                viewModel.login(uiState.selectedService)
+                                            }
+                                        }
+                                    ),
                                     trailingIcon = {
                                         IconButton(onClick = { passwordVisible = !passwordVisible }) {
                                             Icon(
