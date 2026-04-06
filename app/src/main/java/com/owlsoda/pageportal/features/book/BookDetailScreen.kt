@@ -39,6 +39,9 @@ import com.owlsoda.pageportal.core.extensions.parseAuthors
 import com.owlsoda.pageportal.core.extensions.parseTags
 import com.owlsoda.pageportal.ui.components.EmptyState
 import com.owlsoda.pageportal.ui.theme.PagePortalPurple
+import com.owlsoda.pageportal.ui.util.rememberCoverColors
+import com.owlsoda.pageportal.ui.util.animatedCoverColor
+import com.owlsoda.pageportal.ui.components.SkeletonBookDetail
 
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
@@ -66,6 +69,22 @@ fun BookDetailScreen(
     LaunchedEffect(bookId) {
         viewModel.loadBook(bookId)
     }
+    
+    // Dynamic cover theming — extract colors from cover art
+    val coverUrl = state.book?.audiobookCoverUrl ?: state.book?.coverUrl
+    val coverColors = rememberCoverColors(coverUrl)
+    val animatedOverlayColor = animatedCoverColor(
+        targetColor = coverColors?.darkMuted?.copy(alpha = 0.65f),
+        fallback = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)
+    )
+    val animatedPrimary = animatedCoverColor(
+        targetColor = coverColors?.vibrant,
+        fallback = PagePortalPurple
+    )
+    val animatedPrimaryContainer = animatedCoverColor(
+        targetColor = coverColors?.vibrant?.copy(alpha = 0.15f),
+        fallback = MaterialTheme.colorScheme.primaryContainer
+    )
     
     Scaffold(
         topBar = {
@@ -122,14 +141,19 @@ fun BookDetailScreen(
                         .fillMaxSize()
                         .blur(60.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded),
                     contentScale = ContentScale.Crop,
-                    alpha = 0.25f // Reduced alpha for better legibility on fixed background
+                    alpha = 0.25f
                 )
-                // Subtle dark overlay for better text contrast
+                // Dynamic overlay — uses the cover's dominant dark color for a cohesive feel
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.5f))
+                        .background(animatedOverlayColor)
                 )
+            }
+            
+            // Show skeleton while book is loading
+            if (state.book == null) {
+                SkeletonBookDetail()
             }
 
             Column(
@@ -291,7 +315,7 @@ fun BookDetailScreen(
                                     icon = Icons.Default.Headphones,
                                     onClick = { onPlayAudiobook(book.id.toString()) },
                                     modifier = Modifier.weight(1f, fill = false).widthIn(min = 100.dp),
-                                    containerColor = PagePortalPurple,
+                                    containerColor = animatedPrimary,
                                     contentColor = Color.White
                                 )
                             }

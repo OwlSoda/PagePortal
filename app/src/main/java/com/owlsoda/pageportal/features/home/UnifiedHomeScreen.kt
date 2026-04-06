@@ -14,6 +14,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.owlsoda.pageportal.features.library.LibraryViewModel
 import com.owlsoda.pageportal.features.library.UnifiedBookDisplay
 import com.owlsoda.pageportal.features.library.BookCard
+import com.owlsoda.pageportal.ui.components.SkeletonHorizontalRow
+import com.owlsoda.pageportal.ui.components.SkeletonLibraryGrid
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -60,6 +62,21 @@ fun UnifiedHomeScreen(
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(24.dp)
             ) {
+            
+            // Skeleton loading state — show shimmer placeholders while data loads
+            if (uiState.isLoading && uiState.books.isEmpty()) {
+                item {
+                    SkeletonHorizontalRow(itemCount = 3)
+                }
+                item {
+                    Spacer(Modifier.height(8.dp))
+                    SkeletonHorizontalRow(itemCount = 4)
+                }
+                item {
+                    Spacer(Modifier.height(8.dp))
+                    SkeletonLibraryGrid(columns = 3, rows = 2)
+                }
+            }
             
             // Continue Reading (Mock logic for now: take first book with progress > 0)
             val continueReading = uiState.books.filter { it.downloadProgress > 0 || it.isDownloaded }.take(1) // Simplified

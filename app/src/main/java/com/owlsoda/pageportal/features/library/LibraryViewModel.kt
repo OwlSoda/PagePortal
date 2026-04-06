@@ -15,6 +15,7 @@ import com.owlsoda.pageportal.services.ServiceType
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import javax.inject.Inject
 import com.owlsoda.pageportal.core.extensions.parseAuthors
 import com.owlsoda.pageportal.core.extensions.parseTags
@@ -130,11 +131,14 @@ class LibraryViewModel @Inject constructor(
 
     init {
         observeServers()
-        observeBooks()
+        observeBooks()       // Room emits cached data immediately — UI renders first
         observeOfflineMode()
         observeGridSettings()
-        // Auto-sync library on first load
+        // Deferred sync — let the first frame render with cached data before hitting the network.
+        // This makes app launch feel instant even on slow connections.
         viewModelScope.launch {
+            delay(500) // Let first frame render with cached Room data
+            _uiState.update { it.copy(isLoading = true) }
             val result = libraryRepository.syncLibrary()
             _uiState.update { it.copy(isLoading = false, error = result.exceptionOrNull()?.message) }
         }

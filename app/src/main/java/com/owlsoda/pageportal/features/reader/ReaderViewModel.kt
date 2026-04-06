@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import android.util.LruCache
 import java.io.File
 import java.io.InputStream
 import javax.inject.Inject
@@ -142,6 +143,9 @@ class ReaderViewModel @Inject constructor(
     
     // Cache for extracted audio files
     private var audioCacheDir: File? = null
+    
+    // Chapter HTML cache — avoids re-parsing EPUB entries on swipe
+    private val chapterHtmlCache = LruCache<Int, String>(5)
     
     fun loadBook(bookId: String, context: android.content.Context, preferReadAloud: Boolean = false) {
         viewModelScope.launch {
@@ -299,6 +303,9 @@ class ReaderViewModel @Inject constructor(
                          _uiState.update { it.copy(currentChapterIndex = firstSmilChapter) }
                      }
                  }
+                 
+                 // Preload adjacent chapters for instant swipe
+                 preloadAdjacentChapters(_uiState.value.currentChapterIndex)
                  
                  if (hasAudio) {
                      prepareReadAloudFiles(file, bookId)
@@ -924,14 +931,51 @@ class ReaderViewModel @Inject constructor(
     }
     
     fun getChapterHtml(chapterIndex: Int): String? {
+        // Check cache first
+        chapterHtmlCache.get(chapterIndex)?.let { return it }
+        
         val book = _uiState.value.book ?: return null
         val chapter = book.chapters.getOrNull(chapterIndex) ?: return null
         
         return try {
             val stream = parser.getInputStream(chapter.href)
-            stream?.bufferedReader()?.use { it.readText() }
+            val html = stream?.bufferedReader()?.use { it.readText() }
+            // Cache the result
+            if (html != null) {
+                chapterHtmlCache.put(chapterIndex, html)
+            }
+            html
         } catch (e: Exception) {
             null
+        }
+    }
+    
+    /**
+     * Preloads HTML for chapters adjacent to [currentIndex] in the background.
+     * This eliminates the parse delay when swiping to the next/previous chapter.
+     */
+    private fun preloadAdjacentChapters(currentIndex: Int) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val totalChapters = _uiState.value.book?.chapters?.size ?: return@launch
+            listOf(currentIndex - 1, currentIndex + 1)
+                .filter { it in 0 until totalChapters }
+                .forEach { idx ->
+                    if (chapterHtmlCache.get(idx) == null) {
+                        try {
+                            val chapter = _uiState.value.book?.chapters?.getOrNull(idx)
+                            if (chapter != null) {
+                                val stream = parser.getInputStream(chapter.href)
+                                val html = stream?.bufferedReader()?.use { it.readText() }
+                                if (html != null) {
+                                    chapterHtmlCache.put(idx, html)
+                                    android.util.Log.d("ReaderViewModel", "Preloaded chapter $idx (${html.length} chars)")
+                                }
+                            }
+                        } catch (e: Exception) {
+                            // Non-critical — the chapter will be loaded on demand
+                        }
+                    }
+                }
         }
     }
     
@@ -941,7 +985,7 @@ class ReaderViewModel @Inject constructor(
         if (currentState.currentChapterIndex < book.chapters.size - 1) {
             val nextIndex = currentState.currentChapterIndex + 1
             _uiState.value = currentState.copy(currentChapterIndex = nextIndex)
-            // Audio continues playing independently — only audio controls affect playback
+            preloadAdjacentChapters(nextIndex)
         }
     }
     
@@ -951,7 +995,7 @@ class ReaderViewModel @Inject constructor(
         if (currentState.currentChapterIndex > 0) {
             val prevIndex = currentState.currentChapterIndex - 1
             _uiState.value = currentState.copy(currentChapterIndex = prevIndex)
-            // Audio continues playing independently — only audio controls affect playback
+            preloadAdjacentChapters(prevIndex)
         }
     }
     
@@ -1153,13 +1197,21 @@ class ReaderViewModel @Inject constructor(
     
     override fun onCleared() {
         super.onCleared()
-        // Try to sync one last time if there's a pending job
-        syncJob?.let {
-            if (it.isActive) {
-                currentBookId?.let { id ->
-                    // We can't use viewModelScope as it's being cancelled, 
-                    // but we can fire a sync if needed. 
-                    // Actually repository should probably handle this or use workmanager.
+        // Guaranteed final progress sync — runs outside viewModelScope which is being cancelled.
+        // Uses NonCancellable to ensure the coroutine completes even during teardown.
+        syncJob?.cancel()
+        currentBookId?.let { id ->
+            @Suppress("GlobalCoroutineUsage")
+            kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO + kotlinx.coroutines.NonCancellable) {
+                try {
+                    val progress = progressDao.getProgressByBookId(id)
+                    if (progress != null && (progress.syncedAt == null || progress.lastUpdated > progress.syncedAt!!)) {
+                        android.util.Log.d("ReaderViewModel", "onCleared: Pushing final progress for book $id")
+                        syncRepository.pushProgress(id)
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.e("ReaderViewModel", "onCleared: Final sync failed for book $id: ${e.message}")
+                    // Progress is already saved in Room — SyncWorker will pick it up on next run
                 }
             }
         }

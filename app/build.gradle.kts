@@ -15,8 +15,8 @@ android {
         applicationId = "com.owlsoda.pageportal"
         minSdk = 26
         targetSdk = 34
-        versionCode = 69
-        versionName = "0.1.79"
+        versionCode = 70
+        versionName = "0.1.80"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -129,6 +129,9 @@ dependencies {
     // Image Loading
     implementation("io.coil-kt:coil-compose:2.5.0")
     
+    // Dynamic Color Extraction (Apple Books / Spotify-style cover theming)
+    implementation("androidx.palette:palette-ktx:1.0.0")
+    
     // Auth
     implementation("net.openid:appauth:0.11.1")
     implementation("androidx.browser:browser:1.7.0")
@@ -142,6 +145,9 @@ dependencies {
     
     // DataStore
     implementation("androidx.datastore:datastore-preferences:1.0.0")
+
+    // Baseline Profile Runtime (enables AOT compilation of hot paths for faster cold starts)
+    implementation("androidx.profileinstaller:profileinstaller:1.3.1")
 
     // Paging 3
     implementation("androidx.paging:paging-runtime:3.2.1")
