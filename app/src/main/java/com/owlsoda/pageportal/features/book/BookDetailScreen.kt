@@ -479,14 +479,23 @@ fun BookDetailScreen(
                                  // ReadAloud / Sync Download Status
                                 if (book.hasReadAloud) {
                                     if (!book.isReadAloudDownloaded) {
-                                        OutlinedButton(
-                                            onClick = { viewModel.startDownload("readaloud") },
-                                            modifier = Modifier.fillMaxWidth(),
-                                            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.tertiary)
-                                        ) {
-                                            Icon(Icons.Default.Sync, null, modifier = Modifier.size(18.dp))
-                                            Spacer(modifier = Modifier.width(8.dp))
-                                            Text("Download ReadAloud")
+                                        Column(modifier = Modifier.fillMaxWidth()) {
+                                            OutlinedButton(
+                                                onClick = { viewModel.startDownload("readaloud") },
+                                                modifier = Modifier.fillMaxWidth(),
+                                                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.tertiary)
+                                            ) {
+                                                Icon(Icons.Default.Sync, null, modifier = Modifier.size(18.dp))
+                                                Spacer(modifier = Modifier.width(8.dp))
+                                                Text("Download ReadAloud")
+                                            }
+                                            
+                                            TextButton(
+                                                onClick = { viewModel.triggerReadAloudCreation(restart = true) },
+                                                modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 4.dp)
+                                            ) {
+                                                Text("Force Re-sync", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
+                                            }
                                         }
                                     } else {
                                         Row(
@@ -504,15 +513,36 @@ fun BookDetailScreen(
                                     }
                                 } else if (book.hasEbook && book.hasAudiobook) {
                                     // Option to create ReadAloud
-                                    if (book.processingStatus == "processing" || book.processingStatus == "queued") {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                                            horizontalArrangement = Arrangement.Center
+                                    val isSyncing = book.processingStatus?.lowercase() in listOf("processing", "queued", "transcribing", "aligning")
+                                    if (isSyncing) {
+                                        Column(
+                                            modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+                                            horizontalAlignment = Alignment.CenterHorizontally
                                         ) {
-                                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-                                            Spacer(modifier = Modifier.width(12.dp))
-                                            Text("Syncing ReadAloud...", style = MaterialTheme.typography.labelMedium)
+                                            val stage = (book.processingStage ?: book.processingStatus ?: "Syncing").replaceFirstChar { it.uppercase() }
+                                            val progress = book.processingProgress ?: 0f
+                                            
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                                                Spacer(modifier = Modifier.width(12.dp))
+                                                Text("$stage...", style = MaterialTheme.typography.labelMedium)
+                                            }
+                                            
+                                            if (progress > 0f) {
+                                                Spacer(modifier = Modifier.height(8.dp))
+                                                LinearProgressIndicator(
+                                                    progress = { progress },
+                                                    modifier = Modifier.fillMaxWidth(0.8f).height(4.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(2.dp)),
+                                                    color = PagePortalPurple,
+                                                    trackColor = PagePortalPurple.copy(alpha = 0.1f)
+                                                )
+                                                Text(
+                                                    "${(progress * 100).toInt()}%", 
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    modifier = Modifier.padding(top = 4.dp),
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            }
                                         }
                                     } else {
                                         OutlinedButton(

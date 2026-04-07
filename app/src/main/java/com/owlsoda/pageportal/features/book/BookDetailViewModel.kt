@@ -254,11 +254,11 @@ class BookDetailViewModel @Inject constructor(
         }
     }
     
-    fun triggerReadAloudCreation() {
+    fun triggerReadAloudCreation(restart: Boolean = false) {
         val book = _state.value.book ?: return
         viewModelScope.launch {
             _state.value = _state.value.copy(isLoading = true)
-            val result = libraryRepository.triggerReadAloud(book.id)
+            val result = libraryRepository.triggerReadAloud(book.id, restart)
             if (result.isSuccess) {
                 // Success - status will be updated via DAO observation
                 _state.value = _state.value.copy(isLoading = false)

@@ -45,6 +45,7 @@ class PreferencesRepository @Inject constructor(
         val READER_BRIGHTNESS = floatPreferencesKey("reader_brightness") // -1.0 = system, 0.0-1.0 = manual
         val READER_SMIL_HIGHLIGHT_COLOR = stringPreferencesKey("reader_smil_highlight_color")
         val READER_SMIL_UNDERLINE_COLOR = stringPreferencesKey("reader_smil_underline_color")
+        val READER_LIVE_SYNC_ENABLED = booleanPreferencesKey("reader_live_sync_enabled")
         
         // Gesture Settings
         val GESTURE_TAP_LEFT = stringPreferencesKey("gesture_tap_left") // "PREV", "NEXT", "MENU", "NONE"
@@ -213,6 +214,14 @@ class PreferencesRepository @Inject constructor(
 
     suspend fun setReaderSmilUnderlineColor(color: String) {
         context.dataStore.edit { it[PreferencesKeys.READER_SMIL_UNDERLINE_COLOR] = color }
+    }
+
+    val readerLiveSyncEnabled: Flow<Boolean> = context.dataStore.data
+        .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
+        .map { it[PreferencesKeys.READER_LIVE_SYNC_ENABLED] ?: false }
+
+    suspend fun setReaderLiveSyncEnabled(enabled: Boolean) {
+        context.dataStore.edit { it[PreferencesKeys.READER_LIVE_SYNC_ENABLED] = enabled }
     }
     
     // Gesture Accessors

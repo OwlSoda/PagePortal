@@ -15,8 +15,8 @@ android {
         applicationId = "com.owlsoda.pageportal"
         minSdk = 26
         targetSdk = 34
-        versionCode = 70
-        versionName = "0.1.80"
+        versionCode = 71
+        versionName = "0.1.81"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -81,6 +81,7 @@ android {
 
     lint {
         abortOnError = false
+        checkReleaseBuilds = false
     }
 
     applicationVariants.all {

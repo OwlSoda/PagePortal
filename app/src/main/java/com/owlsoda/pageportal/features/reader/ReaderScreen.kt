@@ -30,6 +30,7 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.VolumeUp
@@ -46,6 +47,7 @@ import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.ui.zIndex
@@ -209,6 +211,42 @@ fun ReaderScreen(
             .background(Color(android.graphics.Color.parseColor(uiState.theme.backgroundColor))) // Match Stage to Theme
     ) {
         // --- 1. Book Content Layer ---
+        
+        // Zero-Sync HUD Indicator (Top-Center Overlay)
+        if (uiState.isZeroSyncActive) {
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .statusBarsPadding()
+                    .padding(top = 12.dp)
+                    .zIndex(5f),
+                color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.9f),
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.tertiary),
+                shadowElevation = 4.dp
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Default.Sync, 
+                        "Live Sync Active", 
+                        modifier = Modifier.size(16.dp).graphicsLayer { 
+                            // Subtle rotation or pulse could be added here
+                        },
+                        tint = MaterialTheme.colorScheme.onTertiaryContainer
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        "LIVE AUDIO SYNC", 
+                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.onTertiaryContainer,
+                        letterSpacing = 1.2.sp
+                    )
+                }
+            }
+        }
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -279,23 +317,24 @@ fun ReaderScreen(
                                     val width = this@apply.width
                                     val x = e.x
                                     when {
-                                        x < width * 0.3 -> {
+                                        x < width * 0.25 -> {
                                             if (uiState.isVerticalScroll) {
                                                 // In vertical scroll: left tap goes to previous chapter
                                                 viewModel.previousChapter()
                                             } else {
                                                 // In horizontal: left tap scrolls left or prev chapter
                                                 webViewRef?.evaluateJavascript(
-                                                    "if (window.scrollX > 0) { window.scrollBy(-window.innerWidth, 0); } else { Android.prevChapter(); }", null
+                                                    "if (Math.round(window.scrollX) > 0) { window.scrollTo({ left: Math.round((window.scrollX - window.innerWidth) / window.innerWidth) * window.innerWidth, behavior: 'smooth' }); } else { Android.prevChapter(); }", null
                                                 )
                                             }
                                         }
-                                        x > width * 0.7 -> {
+                                        x > width * 0.75 -> {
                                             if (uiState.isVerticalScroll) {
                                                 viewModel.nextChapter()
                                             } else {
+                                                // In horizontal: right tap scrolls right or next chapter
                                                 webViewRef?.evaluateJavascript(
-                                                    "if (Math.ceil(window.scrollX + window.innerWidth) < document.body.scrollWidth) { window.scrollBy(window.innerWidth, 0); } else { Android.nextChapter(); }", null
+                                                    "if (Math.ceil(window.scrollX + window.innerWidth) < document.body.scrollWidth - 5) { window.scrollTo({ left: Math.round((window.scrollX + window.innerWidth) / window.innerWidth) * window.innerWidth, behavior: 'smooth' }); } else { Android.nextChapter(); }", null
                                                 )
                                             }
                                         }
@@ -312,17 +351,17 @@ fun ReaderScreen(
                                             // In vertical scroll: swipe changes chapter directly
                                             if (diffX < 0) viewModel.nextChapter() else viewModel.previousChapter()
                                         } else {
-                                        if (diffX < 0) {
-                                            // Swipe left -> next page
-                                            webViewRef?.evaluateJavascript(
-                                                "if (Math.ceil(window.scrollX + window.innerWidth) < document.body.scrollWidth) { window.scrollBy(window.innerWidth, 0); } else { Android.nextChapter(); }", null
-                                            )
-                                        } else {
-                                            // Swipe right -> previous page
-                                            webViewRef?.evaluateJavascript(
-                                                "if (window.scrollX > 0) { window.scrollBy(-window.innerWidth, 0); } else { Android.prevChapter(); }", null
-                                            )
-                                        }
+                                            if (diffX < 0) {
+                                                // Swipe left -> next page
+                                                webViewRef?.evaluateJavascript(
+                                                    "if (Math.ceil(window.scrollX + window.innerWidth) < document.body.scrollWidth - 5) { window.scrollTo({ left: Math.round((window.scrollX + window.innerWidth) / window.innerWidth) * window.innerWidth, behavior: 'smooth' }); } else { Android.nextChapter(); }", null
+                                                )
+                                            } else {
+                                                // Swipe right -> previous page
+                                                webViewRef?.evaluateJavascript(
+                                                    "if (Math.round(window.scrollX) > 0) { window.scrollTo({ left: Math.round((window.scrollX - window.innerWidth) / window.innerWidth) * window.innerWidth, behavior: 'smooth' }); } else { Android.prevChapter(); }", null
+                                                )
+                                            }
                                         }
                                         return true
                                     }
@@ -332,7 +371,12 @@ fun ReaderScreen(
                             setOnTouchListener { v, event ->
                                 gestureDetector.onTouchEvent(event)
                                 // In vertical scroll mode, let WebView handle all touch events natively
-                                if (uiState.isVerticalScroll) false else v.performClick().let { false }
+                                if (uiState.isVerticalScroll) false else {
+                                    v.performClick()
+                                    // In horizontal mode, we handle paging via gesture detector.
+                                    // Returning true blocks WebView's native horizontal scrolling if any is left.
+                                    true 
+                                }
                             }
                         }
                     },
@@ -607,7 +651,9 @@ fun ReaderScreen(
                           smilHighlightColor = uiState.smilHighlightColor,
                           smilUnderlineColor = uiState.smilUnderlineColor,
                           onSmilHighlightColorChanged = viewModel::setSmilHighlightColor,
-                          onSmilUnderlineColorChanged = viewModel::setSmilUnderlineColor
+                          onSmilUnderlineColorChanged = viewModel::setSmilUnderlineColor,
+                          isLiveSyncEnabled = uiState.isLiveSyncEnabled,
+                          onLiveSyncChanged = viewModel::setLiveSyncEnabled
                       )
                   }
               }
@@ -739,6 +785,7 @@ private fun injectStyles(webView: WebView, state: ReaderUiState) {
         document.documentElement.style.width = '100vw';
         document.documentElement.style.overflowX = 'hidden';
         document.documentElement.style.overflowY = 'auto';
+        document.documentElement.style.scrollSnapType = 'none';
         
         document.body.style.height = 'auto';
         document.body.style.width = '100vw';
@@ -749,21 +796,24 @@ private fun injectStyles(webView: WebView, state: ReaderUiState) {
         document.body.style.display = 'block';
         """
     } else {
-        // Horizontal Pagination Mode (Strict CSS Columns)
+        // Horizontal Pagination Mode (Strict CSS Columns with Snapping)
         """
         document.documentElement.style.height = '100vh';
         document.documentElement.style.width = '100vw';
         document.documentElement.style.overflow = 'hidden';
+        document.documentElement.style.scrollSnapType = 'x mandatory';
         
         document.body.style.height = '100vh';
         document.body.style.width = '100vw';
         document.body.style.margin = '0';
-        document.body.style.padding = '0';
-        document.body.style.overflow = 'hidden';
+        document.body.style.padding = '0'; // Padding moved to columns via sub-elements or container adjustment
+        document.body.style.overflowX = 'auto';
+        document.body.style.overflowY = 'hidden';
         document.body.style.display = 'block';
         document.body.style.columnWidth = '100vw';
         document.body.style.columnGap = '0px';
         document.body.style.columnFill = 'auto';
+        document.body.style.webkitColumnFill = 'auto';
         """
     }
 
@@ -775,9 +825,9 @@ private fun injectStyles(webView: WebView, state: ReaderUiState) {
     
     // Brightness Filter
     val brightnessFilter = if (state.brightness >= 0) {
-        "html { filter: brightness(${state.brightness}); background-color: ${state.theme.backgroundColor}; } body { background-color: transparent; }"
+        "html { filter: brightness(${state.brightness}); background-color: ${state.theme.backgroundColor} !important; } body { background-color: transparent !important; }"
     } else {
-        "html { filter: none; } body { background-color: ${state.theme.backgroundColor}; }"
+        "html { filter: none; } body { background-color: ${state.theme.backgroundColor} !important; }"
     }
 
     val js = """
@@ -789,15 +839,35 @@ private fun injectStyles(webView: WebView, state: ReaderUiState) {
             document.head.appendChild(styleTag);
         }
         styleTag.innerHTML = `
+            * {
+                box-sizing: border-box !important;
+                -webkit-tap-highlight-color: transparent !important;
+            }
+            html {
+                scroll-snap-type: ${if (state.isVerticalScroll) "none" else "x mandatory"};
+            }
             body {
                 font-size: ${state.fontSize}% !important;
                 color: ${state.theme.textColor} !important;
                 line-height: ${state.lineHeight} !important;
                 margin: 0 !important;
-                padding: 24px $marginVal !important;
+                padding: 32px $marginVal !important;
                 font-family: '${state.fontFamily}', serif !important;
                 text-align: ${state.textAlignment.lowercase()} !important;
-                box-sizing: border-box !important;
+                column-fill: auto !important;
+                scroll-snap-align: start !important;
+            }
+            img, svg, video, table {
+                max-width: 100% !important;
+                height: auto !important;
+                break-inside: avoid !important;
+                -webkit-column-break-inside: avoid !important;
+            }
+            h1, h2, h3, h4, h5, h6 {
+                break-after: avoid !important;
+                -webkit-column-break-after: avoid !important;
+            }
+            p, blockquote {
                 -webkit-column-break-inside: avoid;
                 page-break-inside: avoid;
                 break-inside: avoid;
@@ -1008,7 +1078,9 @@ fun ReaderSettingsSheet(
     smilHighlightColor: String,
     smilUnderlineColor: String,
     onSmilHighlightColorChanged: (String) -> Unit,
-    onSmilUnderlineColorChanged: (String) -> Unit
+    onSmilUnderlineColorChanged: (String) -> Unit,
+    isLiveSyncEnabled: Boolean,
+    onLiveSyncChanged: (Boolean) -> Unit
 ) {
     Column(
         modifier = Modifier

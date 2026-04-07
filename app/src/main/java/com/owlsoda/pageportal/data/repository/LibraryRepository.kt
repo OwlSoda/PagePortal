@@ -150,7 +150,7 @@ class LibraryRepository @Inject constructor(
         return syncRepository.syncAll()
     }
 
-    suspend fun triggerReadAloud(bookId: Long): Result<Unit> {
+    suspend fun triggerReadAloud(bookId: Long, restart: Boolean = false): Result<Unit> {
         return try {
             val book = bookDao.getBookById(bookId) ?: return Result.failure(Exception("Book not found"))
             val service = serviceManager.getService(book.serverId)
@@ -158,11 +158,12 @@ class LibraryRepository @Inject constructor(
                 return Result.failure(Exception("Action only supported for Storyteller servers"))
             }
 
-            val result = service.triggerReadAloudProcessing(book.serviceBookId)
+            val result = (service as com.owlsoda.pageportal.services.storyteller.StorytellerService).triggerReadAloudProcessing(book.serviceBookId, restart)
             if (result.isSuccess) {
                 // Update local status to reflect it's being processed
                 val updatedBook = book.copy(
                     processingStatus = "processing",
+                    processingStage = if (restart) "restarting" else "queued",
                     updatedAt = System.currentTimeMillis()
                 )
                 bookDao.updateBook(updatedBook)
@@ -217,10 +218,11 @@ class LibraryRepository @Inject constructor(
             val details = service.getBookDetails(book.serviceBookId)
             val updatedBook = book.copy(
                 processingStatus = details.readAloudStatus,
+                processingStage = details.readAloudStage,
                 processingProgress = details.readAloudProgress,
                 hasEbook = details.files.any { it.mimeType.contains("epub") },
                 hasAudiobook = details.files.any { it.mimeType.contains("audio") || it.filename.endsWith(".m4b") },
-                hasReadAloud = details.readAloudStatus != null,
+                hasReadAloud = details.readAloudStatus?.uppercase() == "COMPLETED" || details.readAloudStatus?.uppercase() == "READY" || details.readAloudStatus?.uppercase() == "ALIGNED",
                 updatedAt = System.currentTimeMillis()
             )
             bookDao.updateBook(updatedBook)

@@ -183,6 +183,7 @@ class StorytellerService(
         val readaloud = response.readaloud ?: response.readAloudField
         val raStatus = readaloud?.status
         val raProgress = readaloud?.stageProgress?.toFloat()
+        val raStage = readaloud?.currentStage
 
         return ServiceBookDetails(
             book = serviceBook.copy(duration = durationSeconds),
@@ -214,9 +215,9 @@ class StorytellerService(
                         downloadUrl = url
                     ))
                 }
-                // ReadAloud - ONLY if completed/aligned
+                // ReadAloud matches from earlier
                 readaloud?.let {
-                    Log.d(TAG, "Book $bookIdFromResponse ReadAloud status: ${it.status}, uuid: ${it.uuid}, id: ${it.id}, filepath: ${it.filepath}")
+                    Log.d(TAG, "Book $bookIdFromResponse ReadAloud status: ${it.status}, stage: ${it.currentStage}, progress: ${it.stageProgress}")
                     if (isReadAloudReady(it.status)) {
                         val url = getReadAloudDownloadUrl(bookIdFromResponse)
                         
@@ -229,14 +230,21 @@ class StorytellerService(
                         ))
                     }
                 }
-            },
+            }.filter { it.downloadUrl.isNotBlank() },
             totalDuration = durationSeconds,
             lastProgress = position?.toReadingProgress(bookIdFromResponse),
             readAloudStatus = raStatus,
-            readAloudProgress = raProgress
+            readAloudProgress = raProgress,
+            readAloudStage = raStage
         ).also {
-            log("Book details fetched: ${it.book.title}, ReadAloud Status: $raStatus")
+            log("Book details fetched: ${it.book.title}, ReadAloud Status: $raStatus, Stage: $raStage")
         }
+    }
+
+    private fun isReadAloudReady(status: String?): Boolean {
+        if (status == null) return false
+        val s = status.uppercase()
+        return s == "COMPLETED" || s == "READY" || s == "ALIGNED" || s == "DONE"
     }
     
     override suspend fun getProgress(bookId: String): ReadingProgress? {
@@ -347,11 +355,11 @@ class StorytellerService(
         return "$base/api/v2/books/$bookId/files?format=readaloud"
     }
 
-    suspend fun triggerReadAloudProcessing(bookId: String): Result<Unit> {
-        log("triggerReadAloudProcessing(bookId=$bookId) started")
+    suspend fun triggerReadAloudProcessing(bookId: String, restart: Boolean = false): Result<Unit> {
+        log("triggerReadAloudProcessing(bookId=$bookId, restart=$restart) started")
         return try {
-            getApi().processBook(bookId)
-            log("ReadAloud processing triggered for $bookId")
+            getApi().processBook(bookId, restart)
+            log("ReadAloud processing triggered for $bookId (restart=$restart)")
             Result.success(Unit)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to trigger ReadAloud processing for $bookId", e)

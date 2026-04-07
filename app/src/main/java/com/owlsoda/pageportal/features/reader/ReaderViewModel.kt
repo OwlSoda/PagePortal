@@ -82,7 +82,9 @@ data class ReaderUiState(
     val rewindSeconds: Int = 10,
     val forwardSeconds: Int = 30,
     val smilHighlightColor: String = "#FFF176",
-    val smilUnderlineColor: String = "#FF6D00"
+    val smilUnderlineColor: String = "#FF6D00",
+    val isLiveSyncEnabled: Boolean = false,
+    val isZeroSyncActive: Boolean = false
 )
 
 enum class ReaderTheme(val backgroundColor: String, val textColor: String) {
@@ -138,11 +140,18 @@ class ReaderViewModel @Inject constructor(
     // Auto-rewind
     private var lastPausePosition: Long? = null
     
+    // On-Device ZeroSync Aligner
+    private var zeroSyncAligner: ZeroSyncAligner? = null
+    private var isLiveSyncPreferenceEnabled: Boolean = false
+    
     // Audio Equalizer
     private var equalizerManager: AudioEqualizerManager? = null
     
     // Cache for extracted audio files
     private var audioCacheDir: File? = null
+    
+    // Chapter content for Zero-Sync
+    private val chapterTextElements = mutableListOf<Pair<String, String>>()
     
     // Chapter HTML cache — avoids re-parsing EPUB entries on swipe
     private val chapterHtmlCache = LruCache<Int, String>(5)
@@ -358,16 +367,26 @@ class ReaderViewModel @Inject constructor(
         
         // Find and load the first chapter that has SMIL audio data
         val book = _uiState.value.book
-        if (book != null && book.smilData.isNotEmpty()) {
+        if (book != null) {
+            // Lazy init ZeroSyncAligner
+            if (zeroSyncAligner == null) {
+                appContext?.let { ctx ->
+                    zeroSyncAligner = ZeroSyncAligner(ctx, viewModelScope)
+                }
+            }
+            
+            val hasSmilData = book.smilData.isNotEmpty()
             val firstAudioChapterIndex = book.chapters.indexOfFirst { chapter ->
                 val smil = book.smilData[chapter.id]
                 smil != null && smil.parList.isNotEmpty()
             }
+            
             if (firstAudioChapterIndex >= 0) {
                 appendLog("First audio chapter at index $firstAudioChapterIndex (${book.chapters[firstAudioChapterIndex].id})")
                 loadAudioForChapter(firstAudioChapterIndex)
             } else {
-                appendLog("No chapters with SMIL data found")
+                appendLog("No chapters with SMIL data found. Live Sync availability: $isLiveSyncPreferenceEnabled")
+                _uiState.update { it.copy(isReadAloudAvailable = isLiveSyncPreferenceEnabled) }
             }
         }
     }
@@ -380,6 +399,7 @@ class ReaderViewModel @Inject constructor(
                 override fun onIsPlayingChanged(isPlaying: Boolean) {
                     _uiState.update { it.copy(isPlayingAudio = isPlaying) }
                     if (isPlaying) startSyncTicker() else stopSyncTicker()
+                    updateZeroSyncState()
                 }
                 
                 override fun onPlaybackStateChanged(playbackState: Int) {
@@ -466,6 +486,8 @@ class ReaderViewModel @Inject constructor(
         if (smilData == null) {
             // Not an error - many chapters (cover, TOC, etc.) legitimately have no audio
             appendLog("No SMIL for chapter '${chapter.id}' - this chapter has no audio overlay (normal for front/back matter)")
+            currentChapterId = chapter.id
+            updateZeroSyncState()
             return
         }
         
@@ -499,6 +521,8 @@ class ReaderViewModel @Inject constructor(
                 }
             }
         )
+        
+        updateZeroSyncState()
         
         val firstPar = smilData.parList.firstOrNull() ?: run {
             // Not an error - some chapters have SMIL entries but no audio pars
@@ -650,6 +674,7 @@ class ReaderViewModel @Inject constructor(
                 startSyncTicker()
             }
             _uiState.update { it.copy(isPlayingAudio = player.isPlaying) }
+            updateZeroSyncState()
         }
     }
     
@@ -677,6 +702,20 @@ class ReaderViewModel @Inject constructor(
     private var sleepTimerJob: Job? = null
 
     private fun observePreferences() {
+        viewModelScope.launch {
+            preferencesRepository.readerFontFamily.collect { family ->
+                _uiState.update { it.copy(fontFamily = family) }
+            }
+        }
+        
+        viewModelScope.launch {
+            preferencesRepository.readerLiveSyncEnabled.collect { enabled ->
+                isLiveSyncPreferenceEnabled = enabled
+                _uiState.update { it.copy(isLiveSyncEnabled = enabled) }
+                updateZeroSyncState()
+            }
+        }
+
         viewModelScope.launch {
             // Part 1: Visual Settings
             launch {
@@ -1062,6 +1101,30 @@ class ReaderViewModel @Inject constructor(
     fun setSmilUnderlineColor(color: String) {
         viewModelScope.launch {
             preferencesRepository.setReaderSmilUnderlineColor(color)
+        }
+    }
+    
+    fun setLiveSyncEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            preferencesRepository.setReaderLiveSyncEnabled(enabled)
+        }
+    }
+
+    private fun updateZeroSyncState() {
+        val uiState = _uiState.value
+        val hasManualSmil = uiState.book?.smilData?.get(currentChapterId)?.parList?.isNotEmpty() ?: false
+        val shouldBeActive = isLiveSyncPreferenceEnabled && uiState.isPlayingAudio && !hasManualSmil
+        
+        android.util.Log.d("ReaderViewModel", "updateZeroSyncState: enabled=$isLiveSyncPreferenceEnabled, playing=${uiState.isPlayingAudio}, hasSmil=$hasManualSmil -> active=$shouldBeActive")
+        
+        if (shouldBeActive) {
+            zeroSyncAligner?.start { elementId ->
+                _uiState.update { it.copy(activeSmilHighlightId = elementId) }
+            }
+            _uiState.update { it.copy(isZeroSyncActive = true) }
+        } else {
+            zeroSyncAligner?.stop()
+            _uiState.update { it.copy(isZeroSyncActive = false) }
         }
     }
 

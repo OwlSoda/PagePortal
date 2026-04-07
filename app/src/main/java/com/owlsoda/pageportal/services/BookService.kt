@@ -137,7 +137,8 @@ data class ServiceBookDetails(
     val totalDuration: Long? = null,
     val lastProgress: ReadingProgress? = null,
     val readAloudStatus: String? = null,
-    val readAloudProgress: Float? = null
+    val readAloudProgress: Float? = null,
+    val readAloudStage: String? = null
 )
 
 data class Chapter(
