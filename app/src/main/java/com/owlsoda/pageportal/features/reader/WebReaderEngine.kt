@@ -39,6 +39,9 @@ fun WebReaderEngine(
         modifier = Modifier.size(1.dp), // Minimal size to ensure it keeps running
         factory = { ctx ->
             WebView(ctx).apply {
+                // Enable Remote Debugging via chrome://inspect
+                WebView.setWebContentsDebuggingEnabled(true)
+
                 // HARDENING: Standard settings for SPA stability
                 settings.javaScriptEnabled = true
                 settings.domStorageEnabled = true

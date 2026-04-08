@@ -134,14 +134,37 @@ fun WebReaderScreen(
                                     }
                                 }
 
+                                override fun onReceivedSslError(
+                                    view: WebView?,
+                                    handler: android.webkit.SslErrorHandler?,
+                                    error: android.net.http.SslError?
+                                ) {
+                                    android.util.Log.e("WebReader", "SSL Error: ${error?.primaryError}. URL: ${error?.url}")
+                                    // In debug builds or for specific user certs, we might want to proceed
+                                    // But for now, just log to diagnose.
+                                    handler?.cancel() 
+                                }
+
+                                override fun onReceivedError(
+                                    view: WebView?,
+                                    request: android.webkit.WebResourceRequest?,
+                                    error: android.webkit.WebResourceError?
+                                ) {
+                                    if (request?.isForMainFrame == true) {
+                                        android.util.Log.e("WebReader", "Net Error: ${error?.errorCode} - ${error?.description}. URL: ${request.url}")
+                                    }
+                                }
+
                                 override fun shouldOverrideUrlLoading(
                                     view: WebView?,
                                     request: android.webkit.WebResourceRequest?
                                 ): Boolean {
-                                    // Relaxed blocking to resolve white screen issues with redirects/blobs
                                     return false 
                                 }
                             }
+                            
+                            // Enable Remote Debugging via chrome://inspect
+                            WebView.setWebContentsDebuggingEnabled(true)
                             
                             webChromeClient = object : android.webkit.WebChromeClient() {
                                 override fun onConsoleMessage(consoleMessage: android.webkit.ConsoleMessage?): Boolean {
@@ -221,20 +244,63 @@ fun WebReaderScreen(
                 }
             }
             
-            // Subtle "Exit" button when full-screen
-            if (!isLoading && !state.isLoading) {
-                IconButton(
-                    onClick = onBack,
+            // Diagnostics HUD (visible when loading or after long loading)
+            var showDiagnostics by remember { mutableStateOf(false) }
+            val alpha by animateFloatAsState(if (showDiagnostics || isLoading) 1f else 0f, label = "diagAlpha")
+            
+            if (alpha > 0f) {
+                Box(
                     modifier = Modifier
+                        .align(Alignment.BottomCenter)
                         .padding(16.dp)
-                        .statusBarsPadding()
-                        .size(40.dp)
-                        .background(Color.Black.copy(alpha = 0.3f), MaterialTheme.shapes.small)
+                        .padding(bottom = 32.dp)
                 ) {
-                    Icon(
-                        Icons.AutoMirrored.Filled.ArrowBack, 
-                        contentDescription = "Exit",
-                        tint = Color.White
+                    Button(
+                        onClick = { 
+                            webView?.clearCache(true)
+                            webView?.reload() 
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f * alpha),
+                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = alpha)
+                        ),
+                        modifier = Modifier.height(40.dp)
+                    ) {
+                        Text("Hard Reload")
+                    }
+                }
+            }
+
+            // Top Bar / Status
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .statusBarsPadding()
+                    .padding(8.dp)
+            ) {
+                // Exit Button (Always visible when not loading)
+                if (!isLoading) {
+                    IconButton(
+                        onClick = onBack,
+                        modifier = Modifier
+                            .align(Alignment.TopStart)
+                            .size(40.dp)
+                            .background(Color.Black.copy(alpha = 0.3f), MaterialTheme.shapes.small)
+                    ) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack, 
+                            contentDescription = "Exit",
+                            tint = Color.White
+                        )
+                    }
+                }
+
+                if (isLoading) {
+                    Text(
+                        "URL: ${webView?.url ?: "Initializing..."}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                        modifier = Modifier.align(Alignment.Center)
                     )
                 }
             }
