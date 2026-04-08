@@ -414,7 +414,7 @@ class LibraryViewModel @Inject constructor(
             filtered = applySorting(filtered, state.sortOption, state.viewMode, state.selectedFilter)
             
             // Home Screen Data - Filtered by tab if not All
-            val homeSource = if (selectedTab?.id == -1L) allUnifiedBooks else filtered
+            val homeSource = filtered
             val recent = homeSource.filter { it.listeningProgress > 0 }.take(10)
             
             // Group by Author for Home
@@ -443,7 +443,7 @@ class LibraryViewModel @Inject constructor(
                 newTabs
                     .filter { it.id != -1L }
                     .associate { tab ->
-                        val tabBooks = allUnifiedBooks.filter { book -> book.serverIds.contains(tab.id) }
+                        val tabBooks = filtered.filter { book -> book.serverIds.contains(tab.id) }
                         tab to tabBooks
                     }
                     .filter { it.value.isNotEmpty() }
