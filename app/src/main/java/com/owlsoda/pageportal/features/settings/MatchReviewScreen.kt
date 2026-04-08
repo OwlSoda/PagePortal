@@ -110,7 +110,7 @@ fun MatchCard(
                 Row(modifier = Modifier.fillMaxSize()) {
                     AsyncImage(
                         model = candidate.book.coverUrl,
-                        contentDescription = null,
+                        contentDescription = "Cover of ${candidate.book.title}",
                         modifier = Modifier
                             .width(100.dp)
                             .fillMaxHeight()
@@ -149,7 +149,7 @@ fun MatchCard(
                 Row(modifier = Modifier.fillMaxSize()) {
                     AsyncImage(
                         model = candidate.potentialMatch.coverUrl,
-                        contentDescription = null,
+                        contentDescription = "Cover of ${candidate.potentialMatch.title}",
                         modifier = Modifier
                             .width(100.dp)
                             .fillMaxHeight()
@@ -199,7 +199,7 @@ fun MatchCard(
                         .size(64.dp)
                         .background(MaterialTheme.colorScheme.errorContainer, CircleShape)
                 ) {
-                    Icon(Icons.Default.Close, null, tint = MaterialTheme.colorScheme.onErrorContainer)
+                    Icon(Icons.Default.Close, "Reject match", tint = MaterialTheme.colorScheme.onErrorContainer)
                 }
                 
                 IconButton(
@@ -208,7 +208,7 @@ fun MatchCard(
                         .size(56.dp)
                         .background(PagePortalPurple, CircleShape)
                 ) {
-                    Icon(Icons.Default.Check, null, tint = Color.White)
+                    Icon(Icons.Default.Check, "Confirm match", tint = Color.White)
                 }
             }
         }
