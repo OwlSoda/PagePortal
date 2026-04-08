@@ -419,11 +419,12 @@ class AudiobookPlayerViewModel @Inject constructor(
                     (state.currentPosition.toFloat() / state.duration * 100).coerceIn(0f, 100f)
                 } else 0f,
                 lastUpdated = System.currentTimeMillis()
+                // syncedAt intentionally left null — marks progress as "dirty"
+                // SyncWorker will pick it up and do a bidirectional sync
             )
             progressDao.insertProgress(progress)
-            
-            // Push to server
-            syncRepository.pushProgress(id) // ephemeral message reminder
+            // DO NOT push directly here — that would overwrite newer remote data.
+            // The SyncWorker (every 15 min) and the onCleared hook handle server writes.
         }
     }
     
@@ -431,6 +432,30 @@ class AudiobookPlayerViewModel @Inject constructor(
         super.onCleared()
         progressUpdateJob?.cancel()
         sleepTimerJob?.cancel()
-        saveProgress()
+        // Save progress to Room immediately on teardown
+        val state = _state.value
+        if (state.bookId.isNotEmpty()) {
+            val id = state.bookId.toLongOrNull()
+            if (id != null) {
+                // Use GlobalScope + NonCancellable so this survives ViewModel cancellation.
+                // Only push if data is actually dirty (not yet synced).
+                @Suppress("GlobalCoroutineUsage")
+                kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.IO + kotlinx.coroutines.NonCancellable) {
+                    try {
+                        val localProgress = progressDao.getProgressByBookId(id)
+                        val isDirty = localProgress != null &&
+                                (localProgress.syncedAt == null || localProgress.lastUpdated > localProgress.syncedAt!!)
+                        if (isDirty) {
+                            android.util.Log.d("AudiobookPlayerVM", "onCleared: Data is dirty — running bidirectional sync for book $id")
+                            syncRepository.syncProgress(id)  // bidirectional, not blind push
+                        } else {
+                            android.util.Log.d("AudiobookPlayerVM", "onCleared: Data already synced for book $id — skipping push")
+                        }
+                    } catch (e: Exception) {
+                        android.util.Log.e("AudiobookPlayerVM", "onCleared: Final sync failed: ${e.message}")
+                    }
+                }
+            }
+        }
     }
 }

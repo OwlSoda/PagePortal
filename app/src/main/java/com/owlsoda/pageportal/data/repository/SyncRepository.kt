@@ -10,6 +10,10 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import android.content.Context
+import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -17,83 +21,92 @@ import javax.inject.Singleton
 class SyncRepository @Inject constructor(
     private val progressDao: ProgressDao,
     private val bookDao: BookDao,
-    private val serviceManager: ServiceManager
+    private val serviceManager: ServiceManager,
+    @ApplicationContext private val context: Context
 ) {
     private val _isSyncing = MutableStateFlow<Map<Long, Boolean>>(emptyMap())
     val isSyncing: StateFlow<Map<Long, Boolean>> = _isSyncing.asStateFlow()
 
+    // Per-book mutexes prevent concurrent syncs from racing each other.
+    // Without this, two coroutines can both read "local > remote" and push in parallel.
+    private val bookMutexes = java.util.concurrent.ConcurrentHashMap<Long, Mutex>()
+
     /**
      * Sync progress for a specific book.
      * Strategy: Latest timestamp wins.
+     * Thread-safe: per-book mutex prevents concurrent syncs racing.
      */
     suspend fun syncProgress(bookId: Long): Result<Unit> {
-        return withContext(Dispatchers.IO) {
-            try {
-                _isSyncing.value = _isSyncing.value + (bookId to true)
-                val book = bookDao.getBookById(bookId) ?: return@withContext Result.failure(Exception("Book not found"))
-                val service = serviceManager.getService(book.serverId) ?: return@withContext Result.failure(Exception("Service not found"))
-                
-                // 1. Get Local Progress
-                val localProgress = progressDao.getProgressByBookId(bookId)
-                
-                // 2. Get Remote Progress
-                val remoteProgress = try {
-                    service.getProgress(book.serviceBookId)
-                } catch (e: Exception) {
-                    android.util.Log.e("SyncRepository", "Failed to fetch remote progress for ${book.title}: ${e.message}")
-                    null
-                }
-                
-                if (remoteProgress == null) {
-                    // If remote failed or empty, try pushing local if it exists
-                    if (localProgress != null && (localProgress.syncedAt == null || localProgress.lastUpdated > localProgress.syncedAt!!)) {
-                        pushProgress(bookId)
+        val mutex = bookMutexes.getOrPut(bookId) { Mutex() }
+        return mutex.withLock {
+            withContext(Dispatchers.IO) {
+                try {
+                    _isSyncing.value = _isSyncing.value + (bookId to true)
+                    val book = bookDao.getBookById(bookId) ?: return@withContext Result.failure(Exception("Book not found"))
+                    val service = serviceManager.getService(book.serverId) ?: return@withContext Result.failure(Exception("Service not found"))
+                    
+                    // 1. Get Local Progress
+                    val localProgress = progressDao.getProgressByBookId(bookId)
+                    
+                    // 2. Get Remote Progress
+                    val remoteProgress = try {
+                        service.getProgress(book.serviceBookId)
+                    } catch (e: Exception) {
+                        android.util.Log.e("SyncRepository", "Failed to fetch remote progress for ${book.title}: ${e.message}")
+                        null
                     }
-                    return@withContext Result.success(Unit)
-                }
-                
-                // 3. Compare Timestamps
-                val localTime = localProgress?.lastUpdated ?: 0L
-                val remoteTime = remoteProgress.lastUpdated
-                
-                // If remote is significantly newer (e.g., > 2 seconds difference to avoid clock skew issues)
-                // Or if we have no local progress
-                if (remoteTime > localTime + 2000 || localProgress == null) {
-                    android.util.Log.d("SyncRepository", "Remote progress for '${book.title}' is newer ($remoteTime vs $localTime). Updating local DB.")
                     
-                    val newEntity = ProgressEntity(
-                        id = localProgress?.id ?: 0,
-                        bookId = bookId,
-                        currentPosition = remoteProgress.currentPosition,
-                        currentChapter = remoteProgress.currentChapter,
-                        percentComplete = remoteProgress.percentComplete,
-                        isFinished = remoteProgress.isFinished,
-                        lastUpdated = remoteTime,
-                        syncedAt = System.currentTimeMillis() // Mark as in-sync
-                    )
+                    if (remoteProgress == null) {
+                        // If remote failed or empty, try pushing local if it exists and is dirty
+                        if (localProgress != null && (localProgress.syncedAt == null || localProgress.lastUpdated > localProgress.syncedAt!!)) {
+                            pushProgress(bookId)
+                        }
+                        return@withContext Result.success(Unit)
+                    }
                     
-                    progressDao.insertProgress(newEntity)
-                    return@withContext Result.success(Unit)
+                    // 3. Compare Timestamps
+                    val localTime = localProgress?.lastUpdated ?: 0L
+                    val remoteTime = remoteProgress.lastUpdated
+                    
+                    // Remote is significantly newer (> 2s) or we have no local → pull down
+                    if (remoteTime > localTime + 2000 || localProgress == null) {
+                        android.util.Log.d("SyncRepository", "[PULL] '${book.title}' remote=$remoteTime > local=$localTime")
+                        logConflict(book.title, winner = "REMOTE", localTime = localTime, remoteTime = remoteTime)
+                        
+                        val newEntity = ProgressEntity(
+                            id = localProgress?.id ?: 0,
+                            bookId = bookId,
+                            currentPosition = remoteProgress.currentPosition,
+                            currentChapter = remoteProgress.currentChapter,
+                            percentComplete = remoteProgress.percentComplete,
+                            isFinished = remoteProgress.isFinished,
+                            lastUpdated = remoteTime,
+                            syncedAt = System.currentTimeMillis()
+                        )
+                        progressDao.insertProgress(newEntity)
+                        return@withContext Result.success(Unit)
+                    }
+                    
+                    // Local is significantly newer → push to server
+                    if (localTime > remoteTime + 2000) {
+                        android.util.Log.d("SyncRepository", "[PUSH] '${book.title}' local=$localTime > remote=$remoteTime")
+                        logConflict(book.title, winner = "LOCAL", localTime = localTime, remoteTime = remoteTime)
+                        pushProgress(bookId)
+                        return@withContext Result.success(Unit)
+                    }
+                    
+                    // Timestamps within 2s → in-sync, just mark if needed
+                    android.util.Log.d("SyncRepository", "[IN-SYNC] '${book.title}' local=$localTime remote=$remoteTime")
+                    if (localProgress != null && (localProgress.syncedAt == null || localProgress.syncedAt!! < localProgress.lastUpdated)) {
+                        progressDao.markSynced(bookId)
+                    }
+                    Result.success(Unit)
+                } catch (e: Exception) {
+                    android.util.Log.e("SyncRepository", "Sync failed for book $bookId: ${e.message}")
+                    Result.failure(e)
+                } finally {
+                    _isSyncing.value = _isSyncing.value - bookId
                 }
-                
-                // If local is significantly newer, push to server
-                if (localTime > remoteTime + 2000) {
-                    android.util.Log.d("SyncRepository", "Local progress for '${book.title}' is newer ($localTime vs $remoteTime). Pushing to server.")
-                    pushProgress(bookId)
-                    return@withContext Result.success(Unit)
-                }
-                
-                // If timestamps are close, mark as synced locally if it wasn't already
-                android.util.Log.d("SyncRepository", "Progress for '${book.title}' already in sync.")
-                if (localProgress != null && (localProgress.syncedAt == null || localProgress.syncedAt!! < localProgress.lastUpdated)) {
-                    progressDao.markSynced(bookId)
-                }
-                Result.success(Unit)
-            } catch (e: Exception) {
-                android.util.Log.e("SyncRepository", "Sync failed for book $bookId: ${e.message}")
-                Result.failure(e)
-            } finally {
-                _isSyncing.value = _isSyncing.value - bookId
             }
         }
     }
@@ -148,4 +161,22 @@ class SyncRepository @Inject constructor(
     }
 
     suspend fun pushAllUnsynced() = syncAll()
+
+    /**
+     * Appends a one-line entry to sync_conflicts.log inside filesDir.
+     * This log is shown in the Sync Diagnostics screen and helps
+     * diagnose which device "wins" most often.
+     */
+    private fun logConflict(title: String, winner: String, localTime: Long, remoteTime: Long) {
+        try {
+            val logFile = java.io.File(context.filesDir, "sync_conflicts.log")
+            val entry = "${java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US).format(java.util.Date())} | $winner won | '$title' | local=$localTime remote=$remoteTime\n"
+            logFile.appendText(entry)
+            // Keep only last 200 lines to avoid unbounded growth
+            val lines = logFile.readLines()
+            if (lines.size > 200) logFile.writeText(lines.takeLast(200).joinToString("\n") + "\n")
+        } catch (e: Exception) {
+            android.util.Log.w("SyncRepository", "Failed to write conflict log: ${e.message}")
+        }
+    }
 }

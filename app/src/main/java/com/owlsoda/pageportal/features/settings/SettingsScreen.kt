@@ -810,6 +810,35 @@ fun DiagnosticsSettings(state: SettingsState, viewModel: SettingsViewModel) {
                 onRefresh = { viewModel.loadLogs() }
             )
         }
+        
+        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+        SettingsSectionHeader("Sync")
+        
+        var showSyncDiag by remember { mutableStateOf(false) }
+        SettingsItem(
+            icon = Icons.Default.Sync,
+            title = "Sync Diagnostics",
+            subtitle = "View conflict log, unsynced books, force sync",
+            onClick = { showSyncDiag = true }
+        )
+        
+        if (showSyncDiag) {
+            // Full-screen dialog wrapping the diagnostics screen
+            androidx.compose.ui.window.Dialog(
+                onDismissRequest = { showSyncDiag = false },
+                properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
+            ) {
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(0.dp),
+                    color = MaterialTheme.colorScheme.background
+                ) {
+                    SyncDiagnosticsScreen(
+                        onNavigateBack = { showSyncDiag = false }
+                    )
+                }
+            }
+        }
     }
 }
 

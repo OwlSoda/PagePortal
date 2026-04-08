@@ -49,6 +49,9 @@ interface ProgressDao {
     @Query("SELECT * FROM progress WHERE syncedAt IS NULL OR lastUpdated > syncedAt")
     suspend fun getUnsyncedProgress(): List<ProgressEntity>
     
+    @Query("SELECT * FROM progress ORDER BY lastUpdated DESC")
+    suspend fun getAllProgress(): List<ProgressEntity>
+    
     @Delete
     suspend fun deleteProgress(progress: ProgressEntity)
     
