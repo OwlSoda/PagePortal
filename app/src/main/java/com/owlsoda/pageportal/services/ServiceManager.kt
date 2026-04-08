@@ -173,8 +173,23 @@ class ServiceManager @Inject constructor(
         return service
     }
 
+    val servicesMap: Map<Long, BookService>
+        get() = services.toMap()
+
     suspend fun getServiceEntity(serverId: Long): ServerEntity? {
         return serverDao.getServerById(serverId)
+    }
+
+    /**
+     * Finds a service by its base URL or identifying domain.
+     */
+    suspend fun getServiceByUrl(url: String): BookService? {
+        val normalizedUrl = normalizeUrl(url)
+        val server = serverDao.getActiveServers().first().find { 
+            normalizeUrl(it.serverUrl).contains(normalizedUrl, ignoreCase = true) ||
+            normalizedUrl.contains(normalizeUrl(it.serverUrl), ignoreCase = true)
+        }
+        return server?.id?.let { getService(it) }
     }
     
     /**

@@ -84,7 +84,12 @@ data class ReaderUiState(
     val smilHighlightColor: String = "#FFF176",
     val smilUnderlineColor: String = "#FF6D00",
     val isLiveSyncEnabled: Boolean = false,
-    val isZeroSyncActive: Boolean = false
+    val isZeroSyncActive: Boolean = false,
+    
+    // Ghost Engine (Remote Web Reader) State
+    val isRemoteAudioActive: Boolean = false,
+    val remoteAudioUrl: String? = null,
+    val remoteAuthToken: String? = null
 )
 
 enum class ReaderTheme(val backgroundColor: String, val textColor: String) {
@@ -113,7 +118,8 @@ class ReaderViewModel @Inject constructor(
     private val serverDao: ServerDao,
     private val preferencesRepository: PreferencesRepository,
     private val libraryRepository: LibraryRepository,
-    private val syncRepository: SyncRepository
+    private val syncRepository: SyncRepository,
+    private val serviceManager: com.owlsoda.pageportal.services.ServiceManager
 ) : ViewModel() {
 
     val isSyncing = syncRepository.isSyncing
@@ -248,28 +254,44 @@ class ReaderViewModel @Inject constructor(
                 }
             }
             
+            // Fallback: Use remote Web Reader if local files are missing but it's a Storyteller book
             if (file == null || !file.exists()) {
-                 // Try legacy/fallback location if any
-                 val server = bookEntity.serverId?.let { serverDao.getServerById(it) }
-                 if (server != null) {
-                     val serviceTypeName = server.serviceType.lowercase()
-                     val fileName = "${bookEntity.title}.bin"
-                     val legacyFile = File(baseDir, "downloads/$serviceTypeName/$fileName")
-                     if (legacyFile.exists()) {
-                         file = legacyFile
-                     }
-                 }
+                val server = bookEntity.serverId?.let { serverDao.getServerById(it) }
+                if (server != null && server.serviceType.equals("storyteller", ignoreCase = true)) {
+                    android.util.Log.d("ReaderViewModel", "Local files missing for Storyteller book, activating Ghost Engine")
+                    
+                    val service = serviceManager.getService(server.id) as? com.owlsoda.pageportal.services.storyteller.StorytellerService
+                    val token = service?.authToken
+                    
+                    // Construct Web Reader URL: base/books/uuid
+                    val webUrl = "${server.serverUrl.removeSuffix("/")}/books/${bookEntity.serviceBookId}"
+                    
+                    _uiState.update { it.copy(
+                        isRemoteAudioActive = true,
+                        remoteAudioUrl = webUrl,
+                        remoteAuthToken = token,
+                        isReadAloudAvailable = true
+                    ) }
+                    
+                    // We still need the EPUB for the native text display if possible
+                    // (The current logic might still fail here if EPUB is not downloaded)
+                }
             }
-            
+
             if (file == null || !file.exists()) {
                  _uiState.update { it.copy(
                      isLoading = false, 
-                     error = "Book file not found. Please download the book first."
+                     error = if (_uiState.value.isRemoteAudioActive) null else "Book file not found. Please download the book first."
                  ) }
-                 return@launch
+                 if (!_uiState.value.isRemoteAudioActive) return@launch
             }
             
-            parseAndLoad(file, id)
+            if (file != null && file.exists()) {
+                parseAndLoad(file, id)
+            } else {
+                // If we have no file but remote is active, just stop loading spinner
+                _uiState.update { it.copy(isLoading = false) }
+            }
             
             // Auto-play if requested and available
             if (preferReadAloud) {
@@ -615,7 +637,7 @@ class ReaderViewModel @Inject constructor(
         android.util.Log.d("ReaderViewModel", "toggleAudioPlay called")
         
         // Lazy initialization if player is missing
-        if (exoPlayer == null) {
+        if (exoPlayer == null && !_uiState.value.isRemoteAudioActive) {
              android.util.Log.d("ReaderViewModel", "exoPlayer is null, attempting lazy initialization...")
              appContext?.let { ctx ->
                  initializePlayer(ctx)
@@ -625,6 +647,11 @@ class ReaderViewModel @Inject constructor(
                  android.util.Log.e("ReaderViewModel", "Cannot initialize player: context is null")
              }
              return
+        }
+
+        if (_uiState.value.isRemoteAudioActive) {
+            _uiState.update { it.copy(isPlayingAudio = !it.isPlayingAudio) }
+            return
         }
 
         exoPlayer?.let { player ->
@@ -1153,6 +1180,35 @@ class ReaderViewModel @Inject constructor(
         viewModelScope.launch {
             preferencesRepository.setForwardSeconds(seconds)
         }
+    }
+
+    /**
+     * External progress updates from the Ghost Engine (Web Reader)
+     */
+    fun onRemoteProgressUpdate(currentSeconds: Double, totalSeconds: Double) {
+        if (!_uiState.value.isRemoteAudioActive) return
+        
+        val currentMs = (currentSeconds * 1000).toLong()
+        
+        viewModelScope.launch {
+            // Update SMIL highlights
+            smilSynchronizer?.updatePlaybackPosition(currentMs)
+            
+            // Sync with Room progress periodically
+            val bookId = currentBookId ?: return@launch
+            progressDao.updatePosition(
+                bookId = bookId,
+                position = currentMs,
+                chapter = _uiState.value.currentChapterIndex,
+                percent = calculatePercent(),
+                timestamp = System.currentTimeMillis()
+            )
+        }
+    }
+
+    fun onRemotePlaybackStatusChanged(playing: Boolean) {
+        if (!_uiState.value.isRemoteAudioActive) return
+        _uiState.update { it.copy(isPlayingAudio = playing) }
     }
     
     fun onProgressChanged(chapterIndex: Int, progressInChapter: Float) {

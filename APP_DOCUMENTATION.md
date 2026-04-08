@@ -1,7 +1,7 @@
 # PagePortal Application Documentation
 
-**Last Updated:** 2026-02-02
-**Version:** 1.0.0 (Work in Progress)
+**Last Updated:** 2026-04-08
+**Version:** 0.1.84
 
 ## 1. Overview
 PagePortal is a unified e-reading and audiobook listening application designed to aggregate books from multiple sources (Storyteller, Audiobookshelf, Booklore) and local files into a single, cohesive library. It supports seamless switching between reading and listening, with offline download capabilities.
@@ -22,17 +22,18 @@ PagePortal is a unified e-reading and audiobook listening application designed t
 ### Project Structure (Key Packages)
 - `core/database`: Room entities, DAOs, and TypeConverters.
 - `data/repository`: Data logic implementation (Library, Download, active repositories).
-- `features/`: UI screens partitioned by feature (library, reader, book, settings).
 - `services/`: Interface adapters for external providers (Storyteller, etc.).
-- `reader/`: EPUB parsing logic (`EpubParser`) and WebView bridges.
-- `workers/`: Background tasks (WorkManager) for downloads.
+- `features/reader/`: Native reader logic and the new `WebReaderScreen` for embedded streaming.
+- `core/database`: Room entities, DAOs, and TypeConverters.
+- `workers/`: Background tasks (WorkManager) for downloads and progress syncing.
 
 ## 3. Core Features
 
 ### 3.1 Unified Library
 The library aggregates books from all connected services.
 - **UnifiedBook**: When the same book exists on multiple servers (e.g., Audiobookshelf and Storyteller), they can be linked into a single `UnifiedBookEntity`.
-- **Sync**: `LibraryRepository.syncLibrary()` fetches metadata from all active services and inserts/updates the local database.
+- **Sync**: `LibraryRepository.syncLibrary()` fetches metadata.
+- **Progress Sync**: `SyncRepository` implements a "Furthest Progress Wins" tie-breaker to handle multi-device sync and clock drift within a 5-minute confidence window. Includes conflict logging in `sync_conflicts.log`.
 
 ### 3.2 Services & Providers
 The `ServiceManager` handles authentication and API calls to providers.
@@ -43,9 +44,10 @@ The `ServiceManager` handles authentication and API calls to providers.
 
 ### 3.3 The Reader (Ebooks)
 - **Engine**: Custom `EpubParser` interacting with a `WebView`.
+- **Hybrid Web Reader**: An embedded `WebReaderScreen` (WebView-based) that connects to Storyteller for native-feeling streaming of ReadAloud content and synced audio without leaving the app. Includes auto-auth cookie injection.
 - **Formatting**: Supports user-defined font size, font family, line height, and margins.
+- **Improved Layout**: Robust CSS column handling via `#page-container` wrapping and precise image scaling to prevent paged-view breakage.
 - **Themes**: Light, Dark, Sepia.
-- **Local Read**: Direct file access via `ReaderViewModel` using `context.filesDir`.
 
 ### 3.4 The Player (Audiobooks)
 - *(Documentation Pending deep dive into `player/` package)* - Generally handles media playback services.

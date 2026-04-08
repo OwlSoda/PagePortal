@@ -30,7 +30,7 @@ import com.owlsoda.pageportal.core.database.entity.UnifiedBookEntity
         CollectionEntity::class,
         BookmarkEntity::class
     ],
-    version = 9,  // Added downloadError to BookEntity
+    version = 10,
     exportSchema = false
 )
 @TypeConverters(Converters::class)

@@ -16,6 +16,7 @@ interface BookDao {
         SELECT * FROM books 
         WHERE title LIKE '%' || :query || '%' 
            OR authors LIKE '%' || :query || '%'
+           OR series LIKE '%' || :query || '%'
         ORDER BY title ASC
     """)
     fun searchBooks(query: String): Flow<List<BookEntity>>

@@ -39,12 +39,15 @@ data class BookEntity(
     val unifiedBookId: Long? = null,
     val isManuallyLinked: Boolean = false,
     val serviceBookId: String,  // The ID used by the remote service
+    @androidx.room.ColumnInfo(collate = androidx.room.ColumnInfo.NOCASE)
     val title: String,
+    @androidx.room.ColumnInfo(collate = androidx.room.ColumnInfo.NOCASE)
     val authors: String,  // JSON array of author names
     val narrators: String = "[]",  // JSON array of narrator names
     val description: String? = null,
     val coverUrl: String? = null,
     val audiobookCoverUrl: String? = null,
+    @androidx.room.ColumnInfo(collate = androidx.room.ColumnInfo.NOCASE)
     val series: String? = null,
     val seriesIndex: String? = null,
     val hasEbook: Boolean = false,
@@ -52,6 +55,7 @@ data class BookEntity(
     val hasReadAloud: Boolean = false,
     val duration: Long? = null,  // Audiobook duration in seconds
     val publishedYear: Int? = null,
+    @androidx.room.ColumnInfo(collate = androidx.room.ColumnInfo.NOCASE)
     val tags: String = "[]", // JSON array of tag names
     val isbn: String? = null,
     val asin: String? = null,

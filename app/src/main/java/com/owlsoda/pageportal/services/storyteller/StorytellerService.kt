@@ -39,8 +39,10 @@ class StorytellerService(
     override val displayName: String = "Storyteller"
     
     private var api: StorytellerApi? = null
-    private var baseUrl: String? = null
-    private var authToken: String? = null
+    var baseUrl: String? = null
+        private set
+    var authToken: String? = null
+        private set
     
     /**
      * Configure the service with server URL and auth token.

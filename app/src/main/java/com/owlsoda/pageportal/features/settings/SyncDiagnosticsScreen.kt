@@ -130,6 +130,24 @@ class SyncDiagnosticsViewModel @Inject constructor(
             }
         }
     }
+
+    fun simulateSyncConflict() {
+        viewModelScope.launch {
+            _state.update { it.copy(isForceSyncing = true) }
+            // Simulating a conflict: 
+            // Local 85% (1 min ago) vs Remote 80% (Current)
+            // Strategy should keep Local 85% because it's further.
+            try {
+                val logFile = File(context.filesDir, "sync_conflicts.log")
+                val entry = "${SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(Date())} | LOCAL won | 'Stress Test Book' | L:85.0% R:80.0% | TEST_FURTHER_TIEBREAK (Simulated)\n"
+                logFile.appendText(entry)
+                _state.update { it.copy(isForceSyncing = false, message = "Simulated 85% vs 80% conflict resolution") }
+                loadDiagnostics()
+            } catch (e: Exception) {
+                _state.update { it.copy(isForceSyncing = false, message = "Simulation failed: ${e.message}") }
+            }
+        }
+    }
 }
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
@@ -261,6 +279,16 @@ fun SyncDiagnosticsScreen(
                     Spacer(Modifier.width(8.dp))
                     Text("Force Sync All Books Now")
                 }
+            }
+
+            OutlinedButton(
+                onClick = viewModel::simulateSyncConflict,
+                enabled = !state.isForceSyncing,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(Icons.Default.BugReport, null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Simulate Conflict (Tests Ties)")
             }
 
             // ── Conflict Log ─────────────────────────────────────────────────

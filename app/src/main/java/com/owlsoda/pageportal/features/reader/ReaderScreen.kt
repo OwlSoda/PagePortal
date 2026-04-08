@@ -140,7 +140,7 @@ fun ReaderScreen(
                 
                 if (rawHtml != null) {
                     // Inject CSS to fix layout issues while preserving EPUB styling
-                    // CAUTION: Do NOT set height/overflow/position on html/body here as it conflicts with injectStyles
+                    // We use an id-based wrapper to isolate column layout from the body background
                     val cssOverride = """
                         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
                         <style>
@@ -154,10 +154,18 @@ fun ReaderScreen(
                                 margin: 0 !important;
                                 padding: 0 !important;
                                 width: 100%;
+                                height: 100%;
                                 background-color: ${uiState.theme.backgroundColor} !important;
                                 color: ${uiState.theme.textColor} !important;
                                 -webkit-text-size-adjust: 100%;
                                 -webkit-font-smoothing: antialiased;
+                                overflow: hidden; /* Critical: prevent body scroll */
+                            }
+                            #page-container {
+                                width: 100% !important;
+                                height: 100% !important;
+                                margin: 0 !important;
+                                padding: 0 !important;
                             }
                             img, video, svg {
                                 max-width: 100% !important;
@@ -165,19 +173,48 @@ fun ReaderScreen(
                                 display: block;
                                 margin-left: auto;
                                 margin-right: auto;
+                                break-inside: avoid !important;
+                                -webkit-column-break-inside: avoid !important;
                             }
                             /* Prevent long URLs from breaking the layout */
                             a { word-break: break-all; }
+                            
+                            /* Cleanse aggressive EPUB styles */
+                            [style*="width"], [style*="height"] {
+                                max-width: 100% !important;
+                            }
+                            [style*="absolute"], [style*="fixed"] {
+                                position: static !important;
+                            }
+                            [style*="float"] {
+                                float: none !important;
+                            }
                         </style>
                     """.trimIndent()
                     
-                    // Inject CSS into HTML head
-                    val htmlWithCss = if (rawHtml.contains("</head>", ignoreCase = true)) {
-                        rawHtml.replace("</head>", "$cssOverride</head>", ignoreCase = true)
-                    } else if (rawHtml.contains("<body", ignoreCase = true)) {
-                        rawHtml.replace("<body", "<head>$cssOverride</head><body", ignoreCase = true)
+                    // Wrap the body content in a container for better column control
+                    val htmlWithCss = if (rawHtml.contains("<body", ignoreCase = true)) {
+                        val bodyStart = rawHtml.indexOf("<body", ignoreCase = true)
+                        val bodyEnd = rawHtml.lastIndexOf("</body>", ignoreCase = true)
+                        if (bodyStart != -1 && bodyEnd != -1) {
+                            val head = rawHtml.substring(0, bodyStart)
+                            val bodyAttrEnd = rawHtml.indexOf(">", bodyStart) + 1
+                            val bodyTag = rawHtml.substring(bodyStart, bodyAttrEnd)
+                            val bodyContent = rawHtml.substring(bodyAttrEnd, bodyEnd)
+                            val footer = rawHtml.substring(bodyEnd)
+                            
+                            val headWithMeta = if (head.contains("</head>", ignoreCase = true)) {
+                                head.replace("</head>", "$cssOverride</head>", ignoreCase = true)
+                            } else {
+                                "<head>$cssOverride</head>$head"
+                            }
+                            
+                            "$headWithMeta$bodyTag<div id=\"page-container\">$bodyContent</div>$footer"
+                        } else {
+                            rawHtml.replace("</head>", "$cssOverride</head>", ignoreCase = true)
+                        }
                     } else {
-                        "<html><head>$cssOverride</head><body>$rawHtml</body></html>"
+                        "<html><head>$cssOverride</head><body><div id=\"page-container\">$rawHtml</div></body></html>"
                     }
                     
                     android.util.Log.d("ReaderScreen", "HTML with CSS: ${htmlWithCss.take(400)}")
@@ -222,6 +259,22 @@ fun ReaderScreen(
             .fillMaxSize()
             .background(Color(android.graphics.Color.parseColor(uiState.theme.backgroundColor))) // Match Stage to Theme
     ) {
+        // --- 0. Ghost Engine (Remote Web Reader) ---
+        if (uiState.isRemoteAudioActive && uiState.remoteAudioUrl != null) {
+            WebReaderEngine(
+                url = uiState.remoteAudioUrl!!,
+                authToken = uiState.remoteAuthToken,
+                isPlaying = uiState.isPlayingAudio,
+                onPlaybackStatusChanged = viewModel::onRemotePlaybackStatusChanged,
+                onProgressUpdate = viewModel::onRemoteProgressUpdate,
+                onHighlightUpdate = { id -> 
+                    // This will eventually update the SMIL synchronizer or direct UI
+                    viewModel.onRemoteProgressUpdate(0.0, 0.0) // Trigger sync
+                },
+                onLog = { msg -> android.util.Log.d("GhostEngine", msg) }
+            )
+        }
+
         // --- 1. Book Content Layer ---
         
         // Zero-Sync HUD Indicator (Top-Center Overlay)
@@ -790,42 +843,36 @@ fun ReaderScreen(
 private fun injectStyles(webView: WebView, state: ReaderUiState) {
     val marginVal = if (state.margin == 0) "10px" else "${state.margin}rem"
     
-    val css = if (state.isVerticalScroll) {
+    val containerCss = if (state.isVerticalScroll) {
         // Vertical Scroll Mode
         """
-        document.documentElement.style.height = 'auto';
-        document.documentElement.style.width = '100vw';
-        document.documentElement.style.overflowX = 'hidden';
-        document.documentElement.style.overflowY = 'auto';
-        document.documentElement.style.scrollSnapType = 'none';
+        var container = document.getElementById('page-container') || document.body;
+        container.style.height = 'auto';
+        container.style.width = '100vw';
+        container.style.overflowX = 'hidden';
+        container.style.overflowY = 'visible';
+        container.style.display = 'block';
+        container.style.columnWidth = 'auto';
         
-        document.body.style.height = 'auto';
-        document.body.style.width = '100vw';
-        document.body.style.overflowX = 'hidden';
-        document.body.style.overflowY = 'visible';
-        document.body.style.columnWidth = 'auto';
-        document.body.style.columnGap = 'normal';
-        document.body.style.display = 'block';
+        document.documentElement.style.overflowY = 'auto';
+        document.body.style.overflowY = 'auto';
         """
     } else {
-        // Horizontal Pagination Mode (Optimized CSS Columns)
+        // Horizontal Pagination Mode (Optimized CSS Columns on Container)
         """
-        document.documentElement.style.height = '100%';
-        document.documentElement.style.width = '100vw';
-        document.documentElement.style.overflow = 'hidden';
-        document.documentElement.style.scrollSnapType = 'x mandatory';
+        var container = document.getElementById('page-container') || document.body;
+        container.style.height = '100vh';
+        container.style.width = '100vw';
+        container.style.display = 'block';
+        container.style.columnWidth = '100vw';
+        container.style.columnGap = '0px';
+        container.style.columnFill = 'auto';
+        container.style.webkitColumnFill = 'auto';
+        container.style.overflowX = 'auto';
+        container.style.overflowY = 'hidden';
         
-        document.body.style.height = '100vh';
-        document.body.style.width = '100vw';
-        document.body.style.margin = '0';
-        document.body.style.padding = '0'; 
-        document.body.style.overflowX = 'auto';
-        document.body.style.overflowY = 'hidden';
-        document.body.style.display = 'block';
-        document.body.style.columnWidth = '100vw';
-        document.body.style.columnGap = '0px';
-        document.body.style.columnFill = 'auto';
-        document.body.style.webkitColumnFill = 'auto';
+        document.documentElement.style.overflow = 'hidden';
+        document.body.style.overflow = 'hidden';
         """
     }
 
@@ -843,7 +890,7 @@ private fun injectStyles(webView: WebView, state: ReaderUiState) {
     }
 
     val js = """
-        $css
+        $containerCss
         var styleTag = document.getElementById('reader-style');
         if (!styleTag) {
             styleTag = document.createElement('style');
@@ -855,10 +902,7 @@ private fun injectStyles(webView: WebView, state: ReaderUiState) {
                 box-sizing: border-box !important;
                 -webkit-tap-highlight-color: transparent !important;
             }
-            html {
-                scroll-snap-type: ${if (state.isVerticalScroll) "none" else "x mandatory"};
-            }
-            body {
+            #page-container {
                 font-size: ${state.fontSize}% !important;
                 color: ${state.theme.textColor} !important;
                 line-height: ${state.lineHeight} !important;
@@ -867,24 +911,25 @@ private fun injectStyles(webView: WebView, state: ReaderUiState) {
                 font-family: '${state.fontFamily}', serif !important;
                 text-align: ${state.textAlignment.lowercase()} !important;
                 column-fill: auto !important;
-                scroll-snap-align: start !important;
                 -webkit-hyphens: auto;
                 hyphens: auto;
+                /* Avoid content leaking outside of viewport */
+                overflow-wrap: break-word !important;
             }
             img, svg, video, table {
                 max-width: 100% !important;
-                /* Limit height in paged mode to prevent content cutoff */
-                ${if (!state.isVerticalScroll) "max-height: 80vh !important;" else ""}
+                /* Precise height scaling to prevent page overflows */
+                ${if (!state.isVerticalScroll) "max-height: calc(100vh - 100px - (2 * $marginVal)) !important;" else ""}
                 height: auto !important;
                 break-inside: avoid !important;
                 -webkit-column-break-inside: avoid !important;
+                margin: 1em auto !important;
             }
             h1, h2, h3, h4, h5, h6 {
                 break-after: avoid !important;
                 -webkit-column-break-after: avoid !important;
             }
             p, blockquote {
-                /* Better traditional pacing: avoid orphans/widows instead of full break avoidance */
                 orphans: 2;
                 widows: 2;
                 break-inside: auto !important;
@@ -892,8 +937,6 @@ private fun injectStyles(webView: WebView, state: ReaderUiState) {
             }
             p, div, span, h1, h2, h3, h4, h5, h6, li, td, th, a, em, strong, b, i, blockquote {
                 color: inherit !important;
-                word-wrap: break-word !important;
-                overflow-wrap: break-word !important;
             }
             $paragraphSpacingCss
             $brightnessFilter
@@ -901,9 +944,9 @@ private fun injectStyles(webView: WebView, state: ReaderUiState) {
                 background: ${state.smilHighlightColor} !important;
                 color: #000000 !important; 
                 text-decoration: underline 3px ${state.smilUnderlineColor} !important;
-                text-underline-offset: 3px !important;
+                text-underline-offset: 4px !important;
                 border-radius: 4px;
-                padding: 2px 4px;
+                padding: 1px 2px;
             }
         `;
     """.trimIndent()

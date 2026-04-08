@@ -14,6 +14,8 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
+import android.util.Log // Added import
+import android.content.Context // Added import
 
 /**
  * Unit tests for SyncRepository conflict resolution logic.
@@ -49,21 +51,29 @@ class SyncRepositoryTest {
     @Before
     fun setup() {
         MockKAnnotations.init(this)
-        every { bookDao.getBookById(testBookId) } returns testBook
-        every { serviceManager.getService(any()) } returns mockService
+        mockkStatic(Log::class)
+        every { Log.d(any(), any()) } returns 0
+        every { Log.i(any(), any()) } returns 0
+        every { Log.w(any(), any() as String) } returns 0
+        every { Log.w(any(), any(), any()) } returns 0
+        every { Log.e(any(), any()) } returns 0
+        every { Log.e(any(), any(), any()) } returns 0
+        
+        coEvery { bookDao.getBookById(testBookId) } returns testBook
+        coEvery { serviceManager.getService(any()) } returns mockService
         coEvery { progressDao.markSynced(any()) } just Runs
         coEvery { progressDao.markSynced(any(), any()) } just Runs
-        coEvery { progressDao.insertProgress(any()) } returns Unit
+        coEvery { progressDao.insertProgress(any()) } returns 23L
         coEvery { mockService.updateProgress(any(), any()) } just Runs
-        syncRepository = SyncRepository(progressDao, bookDao, serviceManager)
+        syncRepository = SyncRepository(progressDao, bookDao, serviceManager, mockk<Context>(relaxed = true))
     }
 
     // ─── SCENARIO 1: Local is newer → should push to remote ───────────────────
 
     @Test
     fun `GIVEN local newer than remote WHEN sync THEN push to remote`() = runTest {
-        val local = buildLocal(position = 5000L, lastUpdated = BASE_TIME + 10_000)
-        val remote = buildRemote(position = 3000L, lastUpdated = BASE_TIME)
+        val local = buildLocal(position = 5000L, lastUpdated = BASE_TIME + 10_000, percent = 20f)
+        val remote = buildRemote(position = 3000L, lastUpdated = BASE_TIME, percent = 10f)
 
         coEvery { progressDao.getProgressByBookId(testBookId) } returns local
         coEvery { mockService.getProgress(any()) } returns remote
@@ -78,8 +88,8 @@ class SyncRepositoryTest {
 
     @Test
     fun `GIVEN remote newer than local WHEN sync THEN update local DB`() = runTest {
-        val local = buildLocal(position = 3000L, lastUpdated = BASE_TIME)
-        val remote = buildRemote(position = 8000L, lastUpdated = BASE_TIME + 10_000)
+        val local = buildLocal(position = 3000L, lastUpdated = BASE_TIME, percent = 10f)
+        val remote = buildRemote(position = 8000L, lastUpdated = BASE_TIME + 10_000, percent = 20f)
 
         coEvery { progressDao.getProgressByBookId(testBookId) } returns local
         coEvery { mockService.getProgress(any()) } returns remote
@@ -157,7 +167,7 @@ class SyncRepositoryTest {
 
     @Test
     fun `GIVEN book not found WHEN sync THEN returns failure`() = runTest {
-        every { bookDao.getBookById(testBookId) } returns null
+        coEvery { bookDao.getBookById(testBookId) } returns null
 
         val result = syncRepository.syncProgress(testBookId)
 
@@ -169,7 +179,7 @@ class SyncRepositoryTest {
 
     @Test
     fun `GIVEN no local progress AND remote available WHEN sync THEN pull remote`() = runTest {
-        val remote = buildRemote(position = 6000L, lastUpdated = BASE_TIME)
+        val remote = buildRemote(position = 6000L, lastUpdated = BASE_TIME, percent = 15f)
 
         coEvery { progressDao.getProgressByBookId(testBookId) } returns null
         coEvery { mockService.getProgress(any()) } returns remote
@@ -184,22 +194,23 @@ class SyncRepositoryTest {
     private fun buildLocal(
         position: Long,
         lastUpdated: Long,
-        syncedAt: Long? = BASE_TIME - 1000L
+        syncedAt: Long? = BASE_TIME - 1000L,
+        percent: Float = 10f
     ) = ProgressEntity(
         id = 1L,
         bookId = testBookId,
         currentPosition = position,
         currentChapter = 2,
-        percentComplete = 25f,
+        percentComplete = percent,
         lastUpdated = lastUpdated,
         syncedAt = syncedAt
     )
 
-    private fun buildRemote(position: Long, lastUpdated: Long) = ReadingProgress(
+    private fun buildRemote(position: Long, lastUpdated: Long, percent: Float = 10f) = ReadingProgress(
         bookId = testBook.serviceBookId,
         currentPosition = position,
         currentChapter = 2,
-        percentComplete = 25f,
+        percentComplete = percent,
         isFinished = false,
         lastUpdated = lastUpdated
     )
