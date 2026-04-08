@@ -165,7 +165,18 @@ fun WebReaderScreen(
                                 mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
                                 mediaPlaybackRequiresUserGesture = false
                                 cacheMode = WebSettings.LOAD_DEFAULT
+
+                                // HARDENING: Modern User Agent to bypass SPA blockages
+                                val version = android.os.Build.VERSION.RELEASE
+                                userAgentString = "Mozilla/5.0 (Linux; Android $version; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Mobile Safari/537.36 PagePortal/0.1"
+                                
+                                // HARDENING: Support for larger SPAs
+                                setSupportZoom(true)
+                                displayZoomControls = false
                             }
+
+                            // HARDENING: Layer type adjustment for potential white screen fixes
+                            setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null)
 
                             loadUrl(url)
                             webView = this

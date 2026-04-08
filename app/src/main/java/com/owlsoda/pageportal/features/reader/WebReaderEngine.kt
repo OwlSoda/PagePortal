@@ -39,7 +39,7 @@ fun WebReaderEngine(
         modifier = Modifier.size(1.dp), // Minimal size to ensure it keeps running
         factory = { ctx ->
             WebView(ctx).apply {
-                // Background settings
+                // HARDENING: Standard settings for SPA stability
                 settings.javaScriptEnabled = true
                 settings.domStorageEnabled = true
                 settings.databaseEnabled = true
@@ -50,6 +50,10 @@ fun WebReaderEngine(
                 settings.mediaPlaybackRequiresUserGesture = false
                 settings.mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
                 
+                // HARDENING: Modern User Agent to prevent SPA boot failures
+                val version = android.os.Build.VERSION.RELEASE
+                settings.userAgentString = "Mozilla/5.0 (Linux; Android $version; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Mobile Safari/537.36 PagePortal/0.1"
+
                 // Auth Injection
                 authToken?.let { token ->
                     val cookieManager = CookieManager.getInstance()
@@ -145,10 +149,13 @@ private fun injectStorytellerBridge(view: WebView?, token: String?) {
                     }
                 }
                 
-                // Sync highlights if present
-                const activeHighlight = document.querySelector('.smil-highlight, .current-sentence');
-                if (activeHighlight && activeHighlight.id) {
-                    WebEngine.onHighlight(activeHighlight.id);
+                // HIGHLIGHT SYNC: Core priority for PagePortal
+                // We hunt for Storyteller's specific highlight attributes and element IDs
+                const activeHighlight = document.querySelector('.smil-highlight, .current-sentence, [data-active="true"], .highlight');
+                const fragmentId = activeHighlight?.id || activeHighlight?.getAttribute('data-fragment-id');
+                
+                if (fragmentId) {
+                    WebEngine.onHighlight(fragmentId);
                 }
             }, 500);
             

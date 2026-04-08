@@ -86,9 +86,10 @@ data class ReaderUiState(
     val isLiveSyncEnabled: Boolean = false,
     val isZeroSyncActive: Boolean = false,
     
-    // Ghost Engine (Remote Web Reader) State
+    // Native Remote Streaming State
     val isRemoteAudioActive: Boolean = false,
-    val remoteAudioUrl: String? = null,
+    val remoteReaderUrl: String? = null,
+    val remoteStreamUrl: String? = null,
     val remoteAuthToken: String? = null
 )
 
@@ -263,18 +264,22 @@ class ReaderViewModel @Inject constructor(
                     val service = serviceManager.getService(server.id) as? com.owlsoda.pageportal.services.storyteller.StorytellerService
                     val token = service?.authToken
                     
-                    // Construct Web Reader URL: base/books/uuid
-                    val webUrl = "${server.serverUrl.removeSuffix("/")}/books/${bookEntity.serviceBookId}"
+                    // 1. Web Reader URL (for Ghost Engine / Highlights)
+                    val readerUrl = service?.getWebReaderUrl(bookEntity.serviceBookId)
                     
-                    _uiState.update { it.copy(
-                        isRemoteAudioActive = true,
-                        remoteAudioUrl = webUrl,
-                        remoteAuthToken = token,
-                        isReadAloudAvailable = true
-                    ) }
+                    // 2. Direct Audiobook Stream URL (for Native Playback)
+                    val streamUrl = service?.getAudiobookDownloadUrl(bookEntity.serviceBookId)
                     
-                    // We still need the EPUB for the native text display if possible
-                    // (The current logic might still fail here if EPUB is not downloaded)
+                    if (streamUrl != null) {
+                        android.util.Log.d("ReaderViewModel", "Remote sources found. Stream: $streamUrl, Reader: $readerUrl")
+                        _uiState.update { it.copy(
+                            isRemoteAudioActive = true,
+                            remoteReaderUrl = readerUrl,
+                            remoteStreamUrl = streamUrl,
+                            remoteAuthToken = token,
+                            isReadAloudAvailable = true
+                        ) }
+                    }
                 }
             }
 
@@ -592,21 +597,27 @@ class ReaderViewModel @Inject constructor(
         
         val finalAudioFile = audioFile
         if (finalAudioFile != null && finalAudioFile.exists()) {
-            appendLog("SUCCESS: Loading audio from ${finalAudioFile.path}")
-            val mediaItem = MediaItem.fromUri(finalAudioFile.path)
-            exoPlayer?.let { player ->
-                player.setMediaItem(mediaItem)
-                player.prepare()
-                if (autoPlay) player.play()
-            } ?: run {
-                appendLog("ERROR: ExoPlayer is null!")
-                _uiState.update { it.copy(error = "Audio player not initialized") }
-            }
+            loadMediaUri(android.net.Uri.fromFile(finalAudioFile), autoPlay)
+        } else if (_uiState.value.isRemoteAudioActive && !_uiState.value.remoteStreamUrl.isNullOrBlank()) {
+            val remoteUrl = _uiState.value.remoteStreamUrl!!
+            appendLog("SUCCESS: Streaming remote audio from $remoteUrl")
+            loadMediaUri(android.net.Uri.parse(remoteUrl), autoPlay)
         } else {
-            val errorMsg = "Audio file not found: $audioPath"
+            val errorMsg = "Audio source not found (Remote Active: ${_uiState.value.isRemoteAudioActive})"
             appendLog("ERROR: $errorMsg")
-            appendLog("Cache dir contents: ${audioCacheDir?.listFiles()?.joinToString { it.name } ?: "N/A"}")
             _uiState.update { it.copy(error = errorMsg) }
+        }
+    }
+
+    private fun loadMediaUri(uri: android.net.Uri, autoPlay: Boolean) {
+        val mediaItem = MediaItem.fromUri(uri)
+        exoPlayer?.let { player ->
+            player.setMediaItem(mediaItem)
+            player.prepare()
+            if (autoPlay) player.play()
+        } ?: run {
+            appendLog("ERROR: ExoPlayer is null!")
+            _uiState.update { it.copy(error = "Audio player not initialized") }
         }
     }
     
@@ -649,9 +660,12 @@ class ReaderViewModel @Inject constructor(
              return
         }
 
-        if (_uiState.value.isRemoteAudioActive) {
-            _uiState.update { it.copy(isPlayingAudio = !it.isPlayingAudio) }
-            return
+        if (_uiState.value.isRemoteAudioActive && exoPlayer == null) {
+             appContext?.let { ctx ->
+                 initializePlayer(ctx)
+                 loadAudioForChapter(_uiState.value.currentChapterIndex, autoPlay = true)
+             }
+             return
         }
 
         exoPlayer?.let { player ->
@@ -1140,9 +1154,9 @@ class ReaderViewModel @Inject constructor(
     private fun updateZeroSyncState() {
         val uiState = _uiState.value
         val hasManualSmil = uiState.book?.smilData?.get(currentChapterId)?.parList?.isNotEmpty() ?: false
-        val shouldBeActive = isLiveSyncPreferenceEnabled && uiState.isPlayingAudio && !hasManualSmil
+        val shouldBeActive = isLiveSyncPreferenceEnabled && uiState.isPlayingAudio && !hasManualSmil && !uiState.isRemoteAudioActive
         
-        android.util.Log.d("ReaderViewModel", "updateZeroSyncState: enabled=$isLiveSyncPreferenceEnabled, playing=${uiState.isPlayingAudio}, hasSmil=$hasManualSmil -> active=$shouldBeActive")
+        android.util.Log.d("ReaderViewModel", "updateZeroSyncState: enabled=$isLiveSyncPreferenceEnabled, playing=${uiState.isPlayingAudio}, hasSmil=$hasManualSmil, remote=${uiState.isRemoteAudioActive} -> active=$shouldBeActive")
         
         if (shouldBeActive) {
             zeroSyncAligner?.start { elementId ->
@@ -1152,6 +1166,16 @@ class ReaderViewModel @Inject constructor(
         } else {
             zeroSyncAligner?.stop()
             _uiState.update { it.copy(isZeroSyncActive = false) }
+        }
+    }
+
+    /**
+     * Updates the active highlight ID from any sync source (local SMIL, Ghost Engine, or ZeroSync).
+     */
+    fun updateActiveSmil(fragmentId: String) {
+        if (fragmentId != _uiState.value.activeSmilHighlightId) {
+             _uiState.update { it.copy(activeSmilHighlightId = fragmentId) }
+             android.util.Log.d("ReaderViewModel", "Active highlight updated: $fragmentId")
         }
     }
 

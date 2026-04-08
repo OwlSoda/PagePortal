@@ -15,8 +15,8 @@ android {
         applicationId = "com.owlsoda.pageportal"
         minSdk = 26
         targetSdk = 35
-        versionCode = 85
-        versionName = "0.1.85"
+        versionCode = 86
+        versionName = "0.1.86"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {

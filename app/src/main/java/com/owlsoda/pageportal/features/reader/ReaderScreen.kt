@@ -260,18 +260,15 @@ fun ReaderScreen(
             .background(Color(android.graphics.Color.parseColor(uiState.theme.backgroundColor))) // Match Stage to Theme
     ) {
         // --- 0. Ghost Engine (Remote Web Reader) ---
-        if (uiState.isRemoteAudioActive && uiState.remoteAudioUrl != null) {
+        if (uiState.isRemoteAudioActive && uiState.remoteReaderUrl != null) {
             WebReaderEngine(
-                url = uiState.remoteAudioUrl!!,
+                url = uiState.remoteReaderUrl!!,
                 authToken = uiState.remoteAuthToken,
                 isPlaying = uiState.isPlayingAudio,
-                onPlaybackStatusChanged = viewModel::onRemotePlaybackStatusChanged,
-                onProgressUpdate = viewModel::onRemoteProgressUpdate,
-                onHighlightUpdate = { id -> 
-                    // This will eventually update the SMIL synchronizer or direct UI
-                    viewModel.onRemoteProgressUpdate(0.0, 0.0) // Trigger sync
-                },
-                onLog = { msg -> android.util.Log.d("GhostEngine", msg) }
+                onPlaybackStatusChanged = { /* handled via native */ },
+                onProgressUpdate = { _, _ -> /* handled via native */ },
+                onHighlightUpdate = { viewModel.updateActiveSmil(it) },
+                onLog = { android.util.Log.d("WebEngine", it) }
             )
         }
 
