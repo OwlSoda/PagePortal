@@ -145,17 +145,29 @@ fun ReaderScreen(
                         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
                         <style>
                             /* Base resets that don't interfere with column layout */
-                            * { max-width: 100% !important; box-sizing: border-box !important; }
+                            * { 
+                                max-width: 100% !important; 
+                                box-sizing: border-box !important; 
+                                -webkit-tap-highlight-color: transparent !important;
+                            }
                             html, body {
                                 margin: 0 !important;
                                 padding: 0 !important;
+                                width: 100%;
                                 background-color: ${uiState.theme.backgroundColor} !important;
                                 color: ${uiState.theme.textColor} !important;
+                                -webkit-text-size-adjust: 100%;
+                                -webkit-font-smoothing: antialiased;
                             }
                             img, video, svg {
                                 max-width: 100% !important;
                                 height: auto !important;
+                                display: block;
+                                margin-left: auto;
+                                margin-right: auto;
                             }
+                            /* Prevent long URLs from breaking the layout */
+                            a { word-break: break-all; }
                         </style>
                     """.trimIndent()
                     
@@ -796,9 +808,9 @@ private fun injectStyles(webView: WebView, state: ReaderUiState) {
         document.body.style.display = 'block';
         """
     } else {
-        // Horizontal Pagination Mode (Strict CSS Columns with Snapping)
+        // Horizontal Pagination Mode (Optimized CSS Columns)
         """
-        document.documentElement.style.height = '100vh';
+        document.documentElement.style.height = '100%';
         document.documentElement.style.width = '100vw';
         document.documentElement.style.overflow = 'hidden';
         document.documentElement.style.scrollSnapType = 'x mandatory';
@@ -806,7 +818,7 @@ private fun injectStyles(webView: WebView, state: ReaderUiState) {
         document.body.style.height = '100vh';
         document.body.style.width = '100vw';
         document.body.style.margin = '0';
-        document.body.style.padding = '0'; // Padding moved to columns via sub-elements or container adjustment
+        document.body.style.padding = '0'; 
         document.body.style.overflowX = 'auto';
         document.body.style.overflowY = 'hidden';
         document.body.style.display = 'block';
@@ -851,14 +863,18 @@ private fun injectStyles(webView: WebView, state: ReaderUiState) {
                 color: ${state.theme.textColor} !important;
                 line-height: ${state.lineHeight} !important;
                 margin: 0 !important;
-                padding: 32px $marginVal !important;
+                padding: 40px $marginVal !important;
                 font-family: '${state.fontFamily}', serif !important;
                 text-align: ${state.textAlignment.lowercase()} !important;
                 column-fill: auto !important;
                 scroll-snap-align: start !important;
+                -webkit-hyphens: auto;
+                hyphens: auto;
             }
             img, svg, video, table {
                 max-width: 100% !important;
+                /* Limit height in paged mode to prevent content cutoff */
+                ${if (!state.isVerticalScroll) "max-height: 80vh !important;" else ""}
                 height: auto !important;
                 break-inside: avoid !important;
                 -webkit-column-break-inside: avoid !important;
@@ -868,9 +884,11 @@ private fun injectStyles(webView: WebView, state: ReaderUiState) {
                 -webkit-column-break-after: avoid !important;
             }
             p, blockquote {
-                -webkit-column-break-inside: avoid;
-                page-break-inside: avoid;
-                break-inside: avoid;
+                /* Better traditional pacing: avoid orphans/widows instead of full break avoidance */
+                orphans: 2;
+                widows: 2;
+                break-inside: auto !important;
+                -webkit-column-break-inside: auto !important;
             }
             p, div, span, h1, h2, h3, h4, h5, h6, li, td, th, a, em, strong, b, i, blockquote {
                 color: inherit !important;

@@ -19,7 +19,8 @@ interface StorytellerApi {
     
     @GET("api/v2/books")
     suspend fun listBooks(
-        @Query("synced") synced: Boolean? = null
+        @Query("synced") synced: Boolean? = null,
+        @Query("query") query: String? = null
     ): List<BookResponse>
     
     @GET("api/v2/books/{uuid}")
@@ -61,6 +62,13 @@ interface StorytellerApi {
         @Path("uuid") uuid: String,
         @Body metadata: MetadataRequest
     ): BookResponse
+
+    // FUTURE: Annotations Sync
+    @PUT("api/v2/books/{uuid}/annotations")
+    suspend fun syncAnnotations(
+        @Path("uuid") uuid: String,
+        @Body annotations: List<com.owlsoda.pageportal.core.database.entity.BookmarkEntity>
+    )
 
     @Multipart
     @PUT("api/v2/books/{uuid}/cover")

@@ -148,6 +148,56 @@ class StorytellerService(
             emptyList()
         }
     }
+
+    override suspend fun searchBooks(query: String, page: Int, pageSize: Int): List<ServiceBook> {
+        return try {
+            if (BuildConfig.DEBUG) android.util.Log.d("StorytellerService", "Searching books with query: $query...")
+            // Attempt server-side search first
+            val response = getApi().listBooks(query = query)
+            
+            // Map and filter locally as fallback if server-side search is not fully supported or returned everything
+            val results = response.mapNotNull { it.toServiceBook() }
+                .filter { book ->
+                    book.title.contains(query, ignoreCase = true) ||
+                    book.authors.any { it.contains(query, ignoreCase = true) } ||
+                    book.series?.contains(query, ignoreCase = true) == true
+                }
+            
+            if (BuildConfig.DEBUG) android.util.Log.d("StorytellerService", "Found ${results.size} match(es) for '$query'")
+            results
+        } catch (e: Exception) {
+            if (BuildConfig.DEBUG) android.util.Log.e("StorytellerService", "Search failed", e)
+            emptyList()
+        }
+    }
+    override suspend fun processBook(bookId: String): Boolean {
+        return try {
+            log("Triggering alignment process for book $bookId")
+            getApi().processBook(uuid = bookId, restart = true)
+            true
+        } catch (e: Exception) {
+            log("Failed to process book $bookId: ${e.message}")
+            false
+        }
+    }
+
+    override suspend fun cancelProcessing(bookId: String): Boolean {
+        return try {
+            log("Cancelling alignment process for book $bookId")
+            getApi().cancelProcessing(uuid = bookId)
+            true
+        } catch (e: Exception) {
+            log("Failed to cancel processing for book $bookId: ${e.message}")
+            false
+        }
+    }
+
+    override suspend fun syncBookmarks(bookId: String, bookmarks: List<com.owlsoda.pageportal.core.database.entity.BookmarkEntity>): Boolean {
+        // Scaffolding for upcoming Storyteller annotations feature.
+        // Once the API (e.g. PUT /api/v2/books/{uuid}/annotations) is officially published, implement mapping here.
+        log("Stub: syncBookmarks called for $bookId with ${bookmarks.size} bookmarks. Ready for future backend support.")
+        return true
+    }
     
     override suspend fun getBookDetails(bookId: String): ServiceBookDetails {
         log("getBookDetails(bookId=$bookId) started")

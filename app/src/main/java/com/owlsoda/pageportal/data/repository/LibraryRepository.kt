@@ -11,6 +11,9 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import com.owlsoda.pageportal.data.repository.SyncRepository
 import com.owlsoda.pageportal.util.LogManager
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import com.owlsoda.pageportal.core.database.entity.ServerEntity
 
 @Singleton
 class LibraryRepository @Inject constructor(
@@ -176,6 +179,31 @@ class LibraryRepository @Inject constructor(
         }
     }
 
+    suspend fun cancelReadAloud(bookId: Long): Result<Unit> {
+        return try {
+            val book = bookDao.getBookById(bookId) ?: return Result.failure(Exception("Book not found"))
+            val service = serviceManager.getService(book.serverId)
+            if (service !is com.owlsoda.pageportal.services.storyteller.StorytellerService) {
+                return Result.failure(Exception("Action only supported for Storyteller servers"))
+            }
+
+            val result = service.cancelProcessing(book.serviceBookId)
+            if (result) {
+                val updatedBook = book.copy(
+                    processingStatus = null,
+                    processingStage = null,
+                    updatedAt = System.currentTimeMillis()
+                )
+                bookDao.updateBook(updatedBook)
+                Result.success(Unit)
+            } else {
+                Result.failure(Exception("Failed to cancel processing via service"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     suspend fun updateBookMetadata(bookId: Long, metadata: com.owlsoda.pageportal.services.MetadataUpdate): Result<Unit> {
         return try {
             val book = bookDao.getBookById(bookId) ?: return Result.failure(Exception("Book not found"))
@@ -229,6 +257,61 @@ class LibraryRepository @Inject constructor(
             Result.success(updatedBook)
         } catch (e: Exception) {
             Result.failure(e)
+        }
+    }
+
+    suspend fun searchServers(query: String): List<Pair<ServerEntity, List<ServiceBook>>> {
+        return serviceManager.searchAllServers(query)
+    }
+
+    /**
+     * Import a single book from a remote service into the local library.
+     */
+    suspend fun importBook(server: ServerEntity, searchBook: ServiceBook) {
+        withContext(Dispatchers.IO) {
+            val existing = bookDao.getBookByServiceId(server.id, searchBook.serviceId)
+            val gson = Gson()
+            
+            val entity = BookEntity(
+                id = existing?.id ?: 0,
+                serverId = server.id,
+                serviceBookId = searchBook.serviceId,
+                title = searchBook.title,
+                authors = gson.toJson(searchBook.authors),
+                narrators = gson.toJson(searchBook.narrators),
+                description = searchBook.description,
+                coverUrl = searchBook.coverUrl,
+                audiobookCoverUrl = searchBook.audiobookCoverUrl,
+                series = searchBook.series,
+                seriesIndex = searchBook.seriesIndex?.toString(),
+                hasEbook = searchBook.hasEbook,
+                hasAudiobook = searchBook.hasAudiobook,
+                hasReadAloud = searchBook.hasReadAloud,
+                duration = searchBook.duration,
+                publishedYear = searchBook.publishedYear,
+                tags = gson.toJson(searchBook.tags),
+                isbn = searchBook.isbn,
+                asin = searchBook.asin,
+                updatedAt = System.currentTimeMillis(),
+                
+                // Critical: Preserve linking state
+                unifiedBookId = existing?.unifiedBookId,
+                isManuallyLinked = existing?.isManuallyLinked ?: false,
+                
+                // Preserve download state
+                downloadStatus = existing?.downloadStatus ?: "NONE",
+                localFilePath = existing?.localFilePath,
+                downloadProgress = existing?.downloadProgress ?: 0f
+            )
+
+            if (existing != null) {
+                bookDao.updateBook(entity)
+            } else {
+                bookDao.insertBook(entity)
+            }
+            
+            // Trigger background linking to see if it matches other existing books (To be re-implemented)
+            // com.owlsoda.pageportal.data.manager.LinkManager(bookDao).autoLinkAllBooks()
         }
     }
 }

@@ -267,7 +267,7 @@ class AudiobookshelfService(
         )
     }
     
-    suspend fun searchBooks(query: String): List<ServiceBook> {
+    override suspend fun searchBooks(query: String, page: Int, pageSize: Int): List<ServiceBook> {
         return try {
             val validTypes = setOf("book", "audiobook")
             val allLibraries = getApi().getLibraries(bearerToken())
@@ -279,7 +279,9 @@ class AudiobookshelfService(
                 targetLibraries.map { library ->
                     async {
                         try {
-                            val response = getApi().search(bearerToken(), library.id, query)
+                            // Audiobookshelf search doesn't explicitly support page/pageSize in the search endpoint in the same way,
+                            // but we'll use the limit parameter if available.
+                            val response = getApi().search(bearerToken(), library.id, query, limit = pageSize)
                             response.book?.map { it.libraryItem.toServiceBook() } ?: emptyList()
                         } catch (e: Exception) {
                             emptyList<ServiceBook>()

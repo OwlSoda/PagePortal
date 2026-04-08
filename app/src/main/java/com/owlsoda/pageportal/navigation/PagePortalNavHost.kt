@@ -89,6 +89,8 @@ sealed class Screen(val route: String) {
     object EditBook : Screen("edit_book/{id}") {
         fun createRoute(id: Long) = "edit_book/$id"
     }
+    object GlobalSearch : Screen("global_search")
+    object QueueDashboard : Screen("queue_dashboard")
 }
 
 @OptIn(ExperimentalSharedTransitionApi::class)
@@ -242,6 +244,12 @@ fun PagePortalNavHost(
                                     },
                                     onNavigateToService = { service ->
                                          navController.navigate("service/$service")
+                                    },
+                                    onGlobalSearchClick = {
+                                        navController.navigate(Screen.GlobalSearch.route)
+                                    },
+                                    onQueueClick = {
+                                        navController.navigate(Screen.QueueDashboard.route)
                                     }
                                 )
                             }
@@ -474,6 +482,18 @@ fun PagePortalNavHost(
                      com.owlsoda.pageportal.features.settings.MatchReviewScreen(
                          onBack = { navController.popBackStack() }
                      )
+                }
+
+                composable(Screen.GlobalSearch.route) {
+                    com.owlsoda.pageportal.features.library.GlobalSearchScreen(
+                        onBack = { navController.popBackStack() }
+                    )
+                }
+
+                composable(Screen.QueueDashboard.route) {
+                    com.owlsoda.pageportal.features.queue.QueueDashboardScreen(
+                        onBack = { navController.popBackStack() }
+                    )
                 }
             } // NavHost End
             } // CompositionLocalProvider End

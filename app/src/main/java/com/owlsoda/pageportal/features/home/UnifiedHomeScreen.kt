@@ -23,6 +23,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
 
@@ -31,7 +33,10 @@ import androidx.compose.ui.graphics.Color
 fun UnifiedHomeScreen(
     onBookClick: (String) -> Unit,
     onNavigateToService: (String) -> Unit,
-    viewModel: LibraryViewModel = hiltViewModel()
+    onGlobalSearchClick: () -> Unit,
+    onQueueClick: () -> Unit,
+    viewModel: LibraryViewModel = hiltViewModel(),
+    queueViewModel: com.owlsoda.pageportal.features.queue.QueueDashboardViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
     
@@ -45,8 +50,21 @@ fun UnifiedHomeScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Unified Home") },
+                title = { Text("PagePortal") },
                 actions = {
+                    IconButton(onClick = onGlobalSearchClick) {
+                        Icon(Icons.Default.Search, contentDescription = "Global Search")
+                    }
+                    
+                    val activeJobs by queueViewModel.activeJobs.collectAsState()
+                    if (activeJobs.isNotEmpty()) {
+                        IconButton(onClick = onQueueClick) {
+                            BadgedBox(badge = { Badge { Text(activeJobs.size.toString()) } }) {
+                                Icon(androidx.compose.material.icons.Icons.Default.Schedule, contentDescription = "Active Alignments")
+                            }
+                        }
+                    }
+                    
                     IconButton(onClick = { 
                         importLauncher.launch(arrayOf("application/epub+zip", "audio/*", "application/zip", "application/octet-stream"))
                     }) {

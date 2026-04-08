@@ -28,7 +28,10 @@ data class BookDetailState(
     val isLoading: Boolean = true,
     val error: String? = null,
     val webReaderUrl: String? = null,
-    val lastSyncAt: Long? = null
+    val lastSyncAt: Long? = null,
+    val alignmentStatus: String? = null,
+    val alignmentStage: String? = null,
+    val alignmentProgress: Float? = null
 )
 
 @HiltViewModel
@@ -103,6 +106,9 @@ class BookDetailViewModel @Inject constructor(
                         progressPercent = progress?.percentComplete ?: 0f,
                         webReaderUrl = getWebReaderUrl(base),
                         lastSyncAt = base.lastSyncAt,
+                        alignmentStatus = base.processingStatus,
+                        alignmentStage = base.processingStage,
+                        alignmentProgress = base.processingProgress,
                         isLoading = false
                     )
 
@@ -134,6 +140,9 @@ class BookDetailViewModel @Inject constructor(
                         progressPercent = progress?.percentComplete ?: 0f,
                         webReaderUrl = getWebReaderUrl(book),
                         lastSyncAt = book.lastSyncAt,
+                        alignmentStatus = book.processingStatus,
+                        alignmentStage = book.processingStage,
+                        alignmentProgress = book.processingProgress,
                         isLoading = false
                     )
 
@@ -187,7 +196,15 @@ class BookDetailViewModel @Inject constructor(
         viewModelScope.launch {
             bookDao.observeBook(bookId).collect { book ->
                 if (book != null) {
-                    _state.update { it.copy(lastSyncAt = book.lastSyncAt) }
+                    _state.update { 
+                        it.copy(
+                            book = book, 
+                            lastSyncAt = book.lastSyncAt,
+                            alignmentStatus = book.processingStatus,
+                            alignmentStage = book.processingStage,
+                            alignmentProgress = book.processingProgress
+                        ) 
+                    }
                 }
             }
         }
@@ -235,6 +252,45 @@ class BookDetailViewModel @Inject constructor(
     fun deleteDownload(type: String) {
         viewModelScope.launch {
             linkedBooks.forEach { downloadRepository.deleteDownload(it.id, type) }
+        }
+    }
+
+    fun refreshMetadata() {
+        val id = currentBookId ?: return
+        viewModelScope.launch {
+            if (id.startsWith("u_")) {
+                linkedBooks.forEach { book ->
+                    libraryRepository.refreshBookMetadata(book.id)
+                }
+            } else {
+                val bookId = id.toLongOrNull() ?: return@launch
+                libraryRepository.refreshBookMetadata(bookId)
+            }
+        }
+    }
+
+    fun triggerReadAloudAlignment() {
+        val bookId = linkedBooks.firstOrNull()?.id ?: return
+        viewModelScope.launch {
+            val result = libraryRepository.triggerReadAloud(bookId, restart = true)
+            if (result.isSuccess) {
+                // Instantly query back so we get the 'processing' state
+                libraryRepository.refreshBookMetadata(bookId)
+            } else {
+                _state.value = _state.value.copy(error = result.exceptionOrNull()?.message ?: "Failed to trigger alignment")
+            }
+        }
+    }
+
+    fun cancelAlignment() {
+        val bookId = linkedBooks.firstOrNull()?.id ?: return
+        viewModelScope.launch {
+            val result = libraryRepository.cancelReadAloud(bookId)
+            if (result.isSuccess) {
+                libraryRepository.refreshBookMetadata(bookId)
+            } else {
+                _state.value = _state.value.copy(error = result.exceptionOrNull()?.message ?: "Failed to cancel alignment")
+            }
         }
     }
     

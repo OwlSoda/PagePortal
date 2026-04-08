@@ -156,6 +156,20 @@ class BookloreService(
         }
     }
 
+    override suspend fun searchBooks(query: String, page: Int, pageSize: Int): List<ServiceBook> {
+        // For OPDS, a true search requires locating the 'search' link template in the feed.
+        // For now, we'll perform a local filter on the current feed as a fallback.
+        return try {
+            val books = listBooks(0, 100) // Fetch top-level
+            books.filter { book ->
+                book.title.contains(query, ignoreCase = true) ||
+                book.authors.any { it.contains(query, ignoreCase = true) }
+            }
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
     override suspend fun getBookDetails(bookId: String): ServiceBookDetails {
         val entry = entryCache[bookId] ?: throw Exception("Book not found in cache. Sync library first.")
         

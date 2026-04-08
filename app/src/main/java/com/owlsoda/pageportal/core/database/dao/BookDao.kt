@@ -114,4 +114,7 @@ interface BookDao {
 
     @Query("SELECT * FROM books WHERE serverId = :serverId AND serviceBookId IN (:serviceIds) ORDER BY title ASC")
     fun getBooksByServiceIds(serverId: Long, serviceIds: List<String>): Flow<List<BookEntity>>
+
+    @Query("SELECT * FROM books WHERE processingStatus IN ('queued', 'processing', 'restarting', 'aligning') ORDER BY title ASC")
+    fun getActiveProcessingBooks(): Flow<List<BookEntity>>
 }

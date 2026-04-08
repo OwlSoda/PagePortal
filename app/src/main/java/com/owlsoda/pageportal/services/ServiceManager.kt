@@ -228,6 +228,27 @@ class ServiceManager @Inject constructor(
     }
     
     /**
+     * Search all active servers for books matching the query.
+     */
+    suspend fun searchAllServers(query: String): List<Pair<ServerEntity, List<ServiceBook>>> {
+        val activeServers = serverDao.getActiveServers().first()
+        android.util.Log.d("ServiceManager", "Starting search for '${query}' across ${activeServers.size} servers")
+        
+        return activeServers.mapNotNull { server ->
+            val service = getService(server.id) ?: return@mapNotNull null
+            try {
+                val results = service.searchBooks(query, page = 0, pageSize = 25)
+                if (results.isNotEmpty()) {
+                    server to results
+                } else null
+            } catch (e: Exception) {
+                android.util.Log.e("ServiceManager", "Search failed for ${server.serverUrl}", e)
+                null
+            }
+        }
+    }
+    
+    /**
      * Remove a server.
      */
     suspend fun removeServer(serverId: Long) {

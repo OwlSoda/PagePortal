@@ -65,7 +65,38 @@ interface BookService {
      * Update metadata for a book.
      */
     suspend fun updateMetadata(bookId: String, metadata: MetadataUpdate): Result<ServiceBook>
+
+    /**
+     * Search for books on the service.
+     * @param query Search query
+     * @param page Pagination page number (0-indexed)
+     * @param pageSize Number of items per page
+     */
+    suspend fun searchBooks(query: String, page: Int = 0, pageSize: Int = 50): List<ServiceBook>
+
+    /**
+     * Trigger background alignment processing for a book.
+     */
+    suspend fun processBook(bookId: String): Boolean {
+        // Default implementation returns false to indicate unsupported
+        return false
+    }
+
+    /**
+     * Cancel an active alignment processing job.
+     */
+    suspend fun cancelProcessing(bookId: String): Boolean {
+        return false
+    }
+
+    /**
+     * Sync local bookmarks/annotations to the server.
+     */
+    suspend fun syncBookmarks(bookId: String, bookmarks: List<com.owlsoda.pageportal.core.database.entity.BookmarkEntity>): Boolean {
+        return false
+    }
 }
+
 
 enum class ServiceType {
     STORYTELLER,

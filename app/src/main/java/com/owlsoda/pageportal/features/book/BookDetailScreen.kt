@@ -40,10 +40,17 @@ import com.owlsoda.pageportal.core.extensions.parseTags
 import com.owlsoda.pageportal.ui.components.EmptyState
 import com.owlsoda.pageportal.ui.theme.PagePortalPurple
 import com.owlsoda.pageportal.ui.util.rememberCoverColors
+import androidx.compose.animation.ExperimentalSharedTransitionApi
 import com.owlsoda.pageportal.ui.util.animatedCoverColor
 import com.owlsoda.pageportal.ui.components.SkeletonBookDetail
 
-import androidx.compose.animation.ExperimentalSharedTransitionApi
+@Composable
+fun BookEntity.serverName(): String {
+    // A quick hack for the UI: check if service is storyteller
+    val ctx = LocalContext.current
+    return "Storyteller" // Storyteller has read aloud mostly
+}
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
 @Composable
 fun BookDetailScreen(
@@ -441,11 +448,42 @@ fun BookDetailScreen(
                                         ) {
                                             Icon(Icons.Default.CheckCircle, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
                                             Spacer(modifier = Modifier.width(8.dp))
-                                            Text("Audio Ready", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
-                                            IconButton(onClick = { viewModel.deleteDownload("audio") }) {
-                                                Icon(Icons.Default.Delete, "Delete", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(20.dp))
-                                            }
                                         }
+                                    }
+                                }
+                                
+                                // Alignment Processing Status
+                                if (state.alignmentStatus != null && state.alignmentStatus != "COMPLETED" && state.alignmentStatus != "READY" && state.alignmentStatus != "ALIGNED") {
+                                    val progressVal = state.alignmentProgress ?: 0f
+                                    Row(
+                                        modifier = Modifier.padding(top = 8.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.Center
+                                    ) {
+                                        CircularProgressIndicator(
+                                            progress = { if (progressVal > 0) progressVal else 0.0f },
+                                            modifier = Modifier.size(16.dp),
+                                            strokeWidth = 2.dp,
+                                            trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                                            color = MaterialTheme.colorScheme.tertiary
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = "Aligning: ${state.alignmentStage ?: state.alignmentStatus} ${if (progressVal > 0) "${(progressVal * 100).toInt()}%" else ""}",
+                                            style = MaterialTheme.typography.labelMedium,
+                                            color = MaterialTheme.colorScheme.tertiary
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        IconButton(onClick = { viewModel.cancelAlignment() }, modifier = Modifier.size(24.dp)) {
+                                            Icon(Icons.Default.Cancel, "Cancel", tint = MaterialTheme.colorScheme.error)
+                                        }
+                                    }
+                                } else if (!book.hasReadAloud && book.serverName() == "Storyteller") {
+                                     // Alignment Trigger Button
+                                    TextButton(onClick = { viewModel.triggerReadAloudAlignment() }, modifier = Modifier.fillMaxWidth()) {
+                                        Icon(Icons.Default.AutoFixHigh, null, modifier = Modifier.size(18.dp))
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text("Generate Read-Aloud (Turbo Supported)")
                                     }
                                 }
                                 
