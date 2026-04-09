@@ -118,9 +118,6 @@ object DownloadUtils {
         return aExists || eExists || rExists
     }
 
-    /**
-     * Get the file path for a specific format.
-     */
     fun getFilePath(filesDir: File, book: BookEntity, format: DownloadFormat): File {
         val bookDir = getBookDir(filesDir, book)
         val baseFileName = getBaseFileName(book)
@@ -131,6 +128,39 @@ object DownloadUtils {
             DownloadFormat.READALOUD -> "$baseFileName (readaloud).epub"
         }
         return File(bookDir, fileName)
+    }
+
+    /**
+     * Get a temporary file path for a book download that is independent of metadata.
+     */
+    fun getTempFilePath(filesDir: File, bookId: Long, format: DownloadFormat): File {
+        val tempDir = File(filesDir, ".tmp_downloads")
+        if (!tempDir.exists()) tempDir.mkdirs()
+        
+        val fileName = when (format) {
+            DownloadFormat.AUDIO -> "book_${bookId}_audio.tmp"
+            DownloadFormat.EBOOK -> "book_${bookId}_ebook.tmp"
+            DownloadFormat.PDF -> "book_${bookId}_pdf.tmp"
+            DownloadFormat.READALOUD -> "book_${bookId}_readaloud.tmp"
+        }
+        return File(tempDir, fileName)
+    }
+
+    /**
+     * Safe file move/rename.
+     */
+    fun moveFile(src: File, dst: File) {
+        if (!src.exists()) return
+        dst.parentFile?.mkdirs()
+        if (src.renameTo(dst)) return
+        
+        // Fallback for cross-partition move
+        src.inputStream().use { input ->
+            dst.outputStream().use { output ->
+                input.copyTo(output)
+            }
+        }
+        src.delete()
     }
 
     /**
@@ -183,41 +213,52 @@ object DownloadUtils {
             return@coroutineScope
         }
 
-        val numParts = 2
-        Log.d(TAG, "Starting multi-part download ($numParts parts, size=$contentLength)")
-        
-        val partSize = contentLength / numParts
-        val progressMap = java.util.concurrent.ConcurrentHashMap<Int, Long>()
-        var lastTotalReported = 0L
+        try {
+            val numParts = 2
+            Log.d(TAG, "Starting multi-part download ($numParts parts, size=$contentLength)")
+            
+            val partSize = contentLength / numParts
+            val progressMap = java.util.concurrent.ConcurrentHashMap<Int, Long>()
+            var lastTotalReported = 0L
 
-        withContext(Dispatchers.IO) {
-            RandomAccessFile(file, "rw").use { raf ->
-                if (raf.length() != contentLength) {
-                    raf.setLength(contentLength)
-                }
-            }
-        }
-
-        (0 until numParts).map { i ->
-            async(Dispatchers.IO) {
-                val start = i * partSize
-                val end = if (i == numParts - 1) contentLength - 1 else (i + 1) * partSize - 1
-                
-                downloadPart(client, url, file, start, end, headers) { bytesRead ->
-                    val currentStored = progressMap[i] ?: 0L
-                    if (bytesRead > currentStored) {
-                        progressMap[i] = bytesRead
-                        val totalRead = progressMap.values.sum()
-                        if (totalRead > lastTotalReported + (contentLength / 200)) {
-                            lastTotalReported = totalRead
-                            onProgress(totalRead.toFloat() / contentLength)
-                        }
+            withContext(Dispatchers.IO) {
+                RandomAccessFile(file, "rw").use { raf ->
+                    if (raf.length() != contentLength) {
+                        raf.setLength(contentLength)
                     }
                 }
             }
-        }.awaitAll()
-        
-        onProgress(1.0f)
+
+            (0 until numParts).map { i ->
+                async(Dispatchers.IO) {
+                    val start = i * partSize
+                    val end = if (i == numParts - 1) contentLength - 1 else (i + 1) * partSize - 1
+                    
+                    downloadPart(client, url, file, start, end, headers) { bytesRead ->
+                        val currentStored = progressMap[i] ?: 0L
+                        if (bytesRead > currentStored) {
+                            progressMap[i] = bytesRead
+                            val totalRead = progressMap.values.sum()
+                            if (totalRead > lastTotalReported + (contentLength / 200)) {
+                                lastTotalReported = totalRead
+                                onProgress(totalRead.toFloat() / contentLength)
+                            }
+                        }
+                    }
+                }
+            }.awaitAll()
+            
+            onProgress(1.0f)
+        } catch (e: Exception) {
+            Log.w(TAG, "Multi-part download failed, falling back to single stream: ${e.message}")
+            // Clear the file size if it was pre-allocated to avoid corrupted resume
+            if (file.exists() && file.length() == contentLength) {
+                 // don't delete, just truncate or let singleDownload handle it. 
+                 // Actually, if we pre-allocated, we should probably delete to be safe.
+                 file.delete() 
+            }
+            downloadFileSingle(client, url, file, headers, onProgress)
+        }
     }
 
     private suspend fun downloadPart(

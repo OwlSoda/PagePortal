@@ -154,8 +154,13 @@ class StorytellerService(
     override suspend fun searchBooks(query: String, page: Int, pageSize: Int): List<ServiceBook> {
         return try {
             if (BuildConfig.DEBUG) android.util.Log.d("StorytellerService", "Searching books with query: $query...")
-            // Attempt server-side search first
-            val response = getApi().listBooks(query = query)
+            
+            // Attempt server-side search first. If it throws a 400 or other error because of the query param, fallback
+            val response = try {
+                getApi().listBooks(query = query)
+            } catch (ignore: Exception) {
+                getApi().listBooks()
+            }
             
             // Map and filter locally as fallback if server-side search is not fully supported or returned everything
             val results = response.mapNotNull { it.toServiceBook() }

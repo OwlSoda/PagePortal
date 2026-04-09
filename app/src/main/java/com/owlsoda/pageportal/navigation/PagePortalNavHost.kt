@@ -91,6 +91,7 @@ sealed class Screen(val route: String) {
     }
     object GlobalSearch : Screen("global_search")
     object QueueDashboard : Screen("queue_dashboard")
+    object SystemLogs : Screen("system_logs")
 }
 
 @OptIn(ExperimentalSharedTransitionApi::class)
@@ -332,7 +333,8 @@ fun PagePortalNavHost(
                         onBack = { navController.popBackStack() },
                         onServersClick = { navController.navigate(Screen.ServerManagement.route) },
                         onMatchReviewClick = { navController.navigate(Screen.MatchReview.route) },
-                        onStorageClick = { navController.navigate(Screen.StorageManagement.route) }
+                        onStorageClick = { navController.navigate(Screen.StorageManagement.route) },
+                        onSystemLogsClick = { navController.navigate(Screen.SystemLogs.route) }
                     )
                 }
         
@@ -486,12 +488,21 @@ fun PagePortalNavHost(
 
                 composable(Screen.GlobalSearch.route) {
                     com.owlsoda.pageportal.features.library.GlobalSearchScreen(
-                        onBack = { navController.popBackStack() }
+                        onBack = { navController.popBackStack() },
+                        onBookClick = { bookId -> 
+                            navController.navigate(Screen.BookDetail.createRoute(bookId.toString()))
+                        }
                     )
                 }
 
                 composable(Screen.QueueDashboard.route) {
                     com.owlsoda.pageportal.features.queue.QueueDashboardScreen(
+                        onBack = { navController.popBackStack() }
+                    )
+                }
+
+                composable(Screen.SystemLogs.route) {
+                    com.owlsoda.pageportal.features.settings.SystemLogsScreen(
                         onBack = { navController.popBackStack() }
                     )
                 }

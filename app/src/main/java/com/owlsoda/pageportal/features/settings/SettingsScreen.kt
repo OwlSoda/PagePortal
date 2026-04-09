@@ -64,6 +64,7 @@ fun SettingsScreen(
     onServersClick: () -> Unit = {},
     onMatchReviewClick: () -> Unit = {},
     onStorageClick: () -> Unit = {},
+    onSystemLogsClick: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsState()
@@ -132,7 +133,8 @@ fun SettingsScreen(
                         viewModel = viewModel,
                         onServersClick = onServersClick,
                         onMatchReviewClick = onMatchReviewClick,
-                        onStorageClick = onStorageClick
+                        onStorageClick = onStorageClick,
+                        onSystemLogsClick = onSystemLogsClick
                     )
                 }
             }
@@ -212,7 +214,8 @@ fun SettingsCategoryDetail(
     viewModel: SettingsViewModel,
     onServersClick: () -> Unit,
     onMatchReviewClick: () -> Unit,
-    onStorageClick: () -> Unit
+    onStorageClick: () -> Unit,
+    onSystemLogsClick: () -> Unit
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -225,7 +228,7 @@ fun SettingsCategoryDetail(
             "library" -> item { LibrarySettings(state, onServersClick, onMatchReviewClick) }
             "storage" -> item { StorageSettings(state, viewModel, onStorageClick) }
             "accessibility" -> item { AccessibilitySettings(state, viewModel) }
-            "diagnostics" -> item { DiagnosticsSettings(state, viewModel) }
+            "diagnostics" -> item { DiagnosticsSettings(state, viewModel, onSystemLogsClick) }
             "about" -> item { AboutSettings(state, viewModel) }
         }
     }
@@ -755,9 +758,12 @@ fun AccessibilitySettings(state: SettingsState, viewModel: SettingsViewModel) {
 
 // DIAGNOSTICS SETTINGS
 @Composable
-fun DiagnosticsSettings(state: SettingsState, viewModel: SettingsViewModel) {
+fun DiagnosticsSettings(
+    state: SettingsState, 
+    viewModel: SettingsViewModel,
+    onSystemLogsClick: () -> Unit
+) {
     val context = LocalContext.current
-    var showLogsDialog by remember { mutableStateOf(false) }
 
     Column {
         SettingsSectionHeader("Logs")
@@ -765,10 +771,7 @@ fun DiagnosticsSettings(state: SettingsState, viewModel: SettingsViewModel) {
             icon = Icons.Default.List,
             title = "View App Logs",
             subtitle = "Read internal debug logs",
-            onClick = { 
-                viewModel.loadLogs()
-                showLogsDialog = true 
-            }
+            onClick = onSystemLogsClick
         )
         
         SettingsItem(
@@ -802,14 +805,6 @@ fun DiagnosticsSettings(state: SettingsState, viewModel: SettingsViewModel) {
             showChevron = false,
             onClick = { viewModel.clearLogs() }
         )
-
-        if (showLogsDialog) {
-            LogsViewDialog(
-                logs = state.logsText,
-                onDismiss = { showLogsDialog = false },
-                onRefresh = { viewModel.loadLogs() }
-            )
-        }
         
         HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
         SettingsSectionHeader("Sync")

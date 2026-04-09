@@ -22,7 +22,8 @@ data class GlobalSearchUiState(
     val results: List<ServerSearchResult> = emptyList(),
     val isSearching: Boolean = false,
     val error: String? = null,
-    val bookInLibraryIds: Set<String> = emptySet()
+    val bookInLibraryIds: Set<String> = emptySet(),
+    val libraryBookMap: Map<String, Long> = emptyMap()
 )
 
 @HiltViewModel
@@ -41,14 +42,14 @@ class GlobalSearchViewModel @Inject constructor(
         observeLibraryBooks()
     }
 
-    @OptIn(FlowPreview::class)
+    @OptIn(FlowPreview::class, kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     private fun observeSearchQuery() {
         viewModelScope.launch {
             _searchQuery
                 .debounce(500)
                 .filter { it.length >= 2 }
                 .distinctUntilChanged()
-                .collect { query ->
+                .collectLatest { query ->
                     performSearch(query)
                 }
         }
@@ -58,16 +59,19 @@ class GlobalSearchViewModel @Inject constructor(
         viewModelScope.launch {
             bookDao.getAllBooks().collect { books ->
                 val ids = books.map { it.serviceBookId }.toSet()
-                _uiState.update { it.copy(bookInLibraryIds = ids) }
+                val idMap = books.associate { it.serviceBookId to it.id }
+                _uiState.update { it.copy(bookInLibraryIds = ids, libraryBookMap = idMap) }
             }
         }
     }
 
     fun updateQuery(query: String) {
         _searchQuery.value = query
-        _uiState.update { it.copy(query = query) }
-        if (query.isEmpty()) {
-            _uiState.update { it.copy(results = emptyList(), isSearching = false) }
+        if (query.isEmpty() || query.length < 2) {
+            _uiState.update { it.copy(query = query, results = emptyList(), isSearching = false) }
+        } else {
+            // Set isSearching to true immediately so UI displays spinner instead of false-positive "No results"
+            _uiState.update { it.copy(query = query, isSearching = true, error = null) }
         }
     }
 
@@ -80,6 +84,7 @@ class GlobalSearchViewModel @Inject constructor(
             }
             _uiState.update { it.copy(results = searchResults, isSearching = false) }
         } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
             _uiState.update { it.copy(isSearching = false, error = e.message) }
         }
     }

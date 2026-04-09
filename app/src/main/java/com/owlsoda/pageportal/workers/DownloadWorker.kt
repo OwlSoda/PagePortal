@@ -284,8 +284,12 @@ class DownloadWorker(
             val logUrl = downloadUrl.replace(Regex("token=[^&]+"), "token=REDACTED")
             logToFile("Resolved URL for $downloadType: $logUrl")
             
-            val targetFile = DownloadUtils.getFilePath(applicationContext.filesDir, currentBook, format)
-            targetFile.parentFile?.mkdirs()
+            // --- Step 2: Use Stable Temporary File Path ---
+            // We download to a temp file based on bookId to remain stable even if metadata (Author/Series) changes.
+            val tempFile = DownloadUtils.getTempFilePath(applicationContext.filesDir, dbBookId, format)
+            val finalFile = DownloadUtils.getFilePath(applicationContext.filesDir, currentBook, format)
+            
+            logToFile("Target Paths:\n  - Temp: ${tempFile.absolutePath}\n  - Final: ${finalFile.absolutePath}")
             
             // --- Disk Space Protection ---
             try {
@@ -306,13 +310,13 @@ class DownloadWorker(
             // Show initial notification
             setForeground(createForegroundInfo(0, currentBook.title))
             
-            logToFile("Starting download to: ${targetFile.absolutePath}")
+            logToFile("Starting download to temp file: ${tempFile.absolutePath}")
             
-            // --- Step 3: Smart download strategy (DownloadUtils decides internally) ---
+            // --- Step 3: Download Logic ---
             DownloadUtils.downloadFile(
                 client = downloadClient,
                 url = downloadUrl,
-                file = targetFile,
+                file = tempFile,
                 headers = headers,
                 onProgress = { progress ->
                     val percent = (progress * 100).toInt()
@@ -325,15 +329,19 @@ class DownloadWorker(
             )
             
             // --- Step 5: Post-download validation ---
-            val validationResult = DownloadUtils.validateDownloadedFile(targetFile, format)
+            val validationResult = DownloadUtils.validateDownloadedFile(tempFile, format)
             if (validationResult != null) {
                 logToFile("Post-download validation FAILED: $validationResult")
-                targetFile.delete()
+                tempFile.delete()
                 bookDao.updateDownloadStatus(dbBookId, DownloadStatus.FAILED.name, 0f, null, error = validationResult)
                 return Result.failure()
             }
+            logToFile("Validation passed. Moving to final destination...")
 
-            val filePath = targetFile.absolutePath
+            // --- Step 6: Move to Final Destination ---
+            DownloadUtils.moveFile(tempFile, finalFile)
+            val filePath = finalFile.absolutePath
+            
             when (format) {
                 DownloadUtils.DownloadFormat.AUDIO -> 
                     bookDao.updateAudiobookDownloaded(dbBookId, true, filePath)
@@ -351,7 +359,7 @@ class DownloadWorker(
                 logToFile("Post-processing ReadAloud: Unzipping...")
                 try {
                     val destDir = java.io.File(applicationContext.cacheDir, "readaloud/$dbBookId")
-                    DownloadUtils.unzipFile(targetFile, destDir)
+                    DownloadUtils.unzipFile(finalFile, destDir)
                     logToFile("ReadAloud unzipped to: ${destDir.absolutePath}")
                 } catch (e: Exception) {
                     logToFile("ReadAloud unzip FAILED: ${e.message}")

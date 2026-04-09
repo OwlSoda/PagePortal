@@ -31,6 +31,7 @@ import com.owlsoda.pageportal.services.ServiceBook
 @Composable
 fun GlobalSearchScreen(
     onBack: () -> Unit,
+    onBookClick: (Long) -> Unit,
     viewModel: GlobalSearchViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -80,7 +81,9 @@ fun GlobalSearchScreen(
                         ServerSection(
                             result = result,
                             inLibraryIds = uiState.bookInLibraryIds,
-                            onAdd = { viewModel.addToLibrary(result.server, it) }
+                            libraryBookMap = uiState.libraryBookMap,
+                            onAdd = { viewModel.addToLibrary(result.server, it) },
+                            onBookClick = onBookClick
                         )
                     }
                 }
@@ -101,7 +104,9 @@ fun GlobalSearchScreen(
 fun ServerSection(
     result: ServerSearchResult,
     inLibraryIds: Set<String>,
-    onAdd: (ServiceBook) -> Unit
+    libraryBookMap: Map<String, Long>,
+    onAdd: (ServiceBook) -> Unit,
+    onBookClick: (Long) -> Unit
 ) {
     Column {
         Text(
@@ -116,7 +121,15 @@ fun ServerSection(
             SearchResultCard(
                 book = book,
                 isInLibrary = inLibraryIds.contains(book.serviceId),
-                onAdd = { onAdd(book) }
+                onAdd = { onAdd(book) },
+                onClick = { 
+                    val localId = libraryBookMap[book.serviceId]
+                    if (localId != null) {
+                        onBookClick(localId)
+                    } else {
+                        onAdd(book) 
+                    }
+                }
             )
             Spacer(modifier = Modifier.height(12.dp))
         }
@@ -127,12 +140,14 @@ fun ServerSection(
 fun SearchResultCard(
     book: ServiceBook,
     isInLibrary: Boolean,
-    onAdd: () -> Unit
+    onAdd: () -> Unit,
+    onClick: () -> Unit
 ) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp)),
+            .clip(RoundedCornerShape(12.dp))
+            .clickable { onClick() },
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
         )
