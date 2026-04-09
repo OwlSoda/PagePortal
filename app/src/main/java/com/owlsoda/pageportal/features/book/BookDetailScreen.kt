@@ -93,52 +93,41 @@ fun BookDetailScreen(
         fallback = MaterialTheme.colorScheme.primaryContainer
     )
     
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
-                    }
-                },
-                actions = {
-                    var showMenu by remember { mutableStateOf(false) }
-                    IconButton(onClick = { showMenu = true }) {
-                        Icon(Icons.Default.MoreVert, "More")
-                    }
-                    DropdownMenu(
-                        expanded = showMenu,
-                        onDismissRequest = { showMenu = false }
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text("Edit Metadata") },
-                            onClick = {
-                                state.book?.id?.let { onEditClick(it) }
-                                showMenu = false
-                            },
-                            leadingIcon = { Icon(Icons.Default.Edit, null) }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Unlink Book") },
-                            onClick = {
-                                viewModel.unlinkBook()
-                                showMenu = false
-                                onBack()
-                            },
-                            leadingIcon = { Icon(Icons.Default.LinkOff, null) }
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Transparent,
-                    navigationIconContentColor = MaterialTheme.colorScheme.onSurface
+    val topBarState = com.owlsoda.pageportal.navigation.LocalTopBarState.current
+    var showMenu by remember { mutableStateOf(false) }
+
+    LaunchedEffect(state.book) {
+        topBarState.title = ""
+        topBarState.actions = {
+            IconButton(onClick = { showMenu = true }) {
+                Icon(Icons.Default.MoreVert, "More")
+            }
+            DropdownMenu(
+                expanded = showMenu,
+                onDismissRequest = { showMenu = false }
+            ) {
+                DropdownMenuItem(
+                    text = { Text("Edit Metadata") },
+                    onClick = {
+                        state.book?.id?.let { onEditClick(it) }
+                        showMenu = false
+                    },
+                    leadingIcon = { Icon(Icons.Default.Edit, null) }
                 )
-            )
-        },
-        containerColor = MaterialTheme.colorScheme.surface
-    ) { padding ->
-        Box(modifier = Modifier.fillMaxSize()) {
+                DropdownMenuItem(
+                    text = { Text("Unlink Book") },
+                    onClick = {
+                        viewModel.unlinkBook()
+                        showMenu = false
+                        onBack()
+                    },
+                    leadingIcon = { Icon(Icons.Default.LinkOff, null) }
+                )
+            }
+        }
+    }
+    
+    Box(modifier = Modifier.fillMaxSize()) {
             // Background Artwork (Fixed Full-Screen Blur)
             state.book?.coverUrl?.let { coverUrl ->
                 AsyncImage(
@@ -168,7 +157,7 @@ fun BookDetailScreen(
                     .fillMaxSize()
                     .verticalScroll(scrollState)
             ) {
-                Spacer(modifier = Modifier.height(padding.calculateTopPadding()))
+                Spacer(modifier = Modifier.height(64.dp)) // Standard TopBar height approximate
                 
                 state.book?.let { book ->
                     // Hero Content

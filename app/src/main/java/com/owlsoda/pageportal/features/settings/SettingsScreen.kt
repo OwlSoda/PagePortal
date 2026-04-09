@@ -85,38 +85,42 @@ fun SettingsScreen(
         }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = if (windowSizeClass == WindowSizeClass.COMPACT && selectedCategory != null) {
-                            settingsCategories.find { it.id == selectedCategory }?.title ?: "Settings"
-                        } else {
-                            "Settings"
-                        },
-                        style = MaterialTheme.typography.titleLarge
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = {
-                        if (windowSizeClass == WindowSizeClass.COMPACT && selectedCategory != null) {
-                            // On compact, back button goes to category list
-                            selectedCategory = null
-                        } else {
-                            onBack()
-                        }
-                    }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                }
-            )
+    val topBarState = com.owlsoda.pageportal.navigation.LocalTopBarState.current
+    
+    LaunchedEffect(windowSizeClass, selectedCategory) {
+        topBarState.title = if (windowSizeClass == WindowSizeClass.COMPACT && selectedCategory != null) {
+            settingsCategories.find { it.id == selectedCategory }?.title ?: "Settings"
+        } else {
+            "Settings"
         }
-    ) { padding ->
+        
+        topBarState.navigationIcon = {
+            IconButton(onClick = {
+                if (windowSizeClass == WindowSizeClass.COMPACT && selectedCategory != null) {
+                    selectedCategory = null
+                } else {
+                    onBack()
+                }
+            }) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+            }
+        }
+        
+        topBarState.actions = {}
+    }
+    
+    // Reset navigation icon when leaving screen
+    DisposableEffect(Unit) {
+        onDispose {
+            topBarState.navigationIcon = null
+        }
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
         ListDetailLayout(
             windowSizeClass = windowSizeClass,
             showDetail = selectedCategory != null,
-            modifier = Modifier.padding(padding),
+            modifier = Modifier.fillMaxSize(),
             listContent = {
                 SettingsCategoriesList(
                     categories = settingsCategories,

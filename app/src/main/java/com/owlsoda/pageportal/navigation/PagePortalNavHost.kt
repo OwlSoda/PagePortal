@@ -5,13 +5,14 @@ import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.animation.*
+import androidx.compose.runtime.*
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.RowScope
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -94,6 +95,15 @@ sealed class Screen(val route: String) {
     object SystemLogs : Screen("system_logs")
 }
 
+@Stable
+class TopBarState {
+    var title by mutableStateOf("PagePortal")
+    var actions by mutableStateOf<@Composable RowScope.() -> Unit>({})
+    var navigationIcon by mutableStateOf<@Composable () -> Unit>? (null)
+}
+
+val LocalTopBarState = staticCompositionLocalOf { TopBarState() }
+
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun PagePortalNavHost(
@@ -119,13 +129,43 @@ fun PagePortalNavHost(
                     
 
     val showBottomBar = isMainTab
-    val showMiniPlayer = isPlayerVisible && 
-        currentRoute?.startsWith("player/") != true && 
-        currentRoute?.startsWith("reader/") != true &&
-        currentRoute?.startsWith("comic/") != true &&
-        currentRoute?.startsWith("login") != true
+    val showMiniPlayer = playerState.isPlaying || playerState.currentPosition > 0 || playerState.title.isNotEmpty()
+    val isReader = currentRoute?.startsWith("reader/") == true || 
+                   currentRoute?.startsWith("comic/") == true ||
+                   currentRoute?.startsWith("web_reader") == true
 
+    val bottomPadding by animateDpAsState(
+        targetValue = if (showMiniPlayer && !isReader) 88.dp else 0.dp,
+        label = "MiniPlayerPadding"
+    )
+
+    val topBarState = remember { TopBarState() }
+
+    CompositionLocalProvider(
+        LocalTopBarState provides topBarState,
+        LocalNavAnimatedVisibilityScope provides null // Temporary placeholder for screens to override
+    ) {
     Scaffold(
+        topBar = {
+            // Only show TopBar if not in reader mode
+            if (!isReader) {
+                TopAppBar(
+                    title = { Text(topBarState.title) },
+                    navigationIcon = topBarState.navigationIcon ?: {
+                        if (!isMainTab && currentRoute != Screen.Login.route) {
+                            IconButton(onClick = { navController.popBackStack() }) {
+                                Icon(androidx.compose.material.icons.Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                            }
+                        }
+                    },
+                    actions = topBarState.actions,
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = if (currentRoute?.startsWith("book/") == true) Color.Transparent else MaterialTheme.colorScheme.surface,
+                        titleContentColor = MaterialTheme.colorScheme.onSurface,
+                    )
+                )
+            }
+        },
         bottomBar = {
             if (showBottomBar) {
                 NavigationBar(
@@ -234,7 +274,11 @@ fun PagePortalNavHost(
                     NavHost(
                         navController = navController,
                         startDestination = Screen.Library.route,
-                        modifier = Modifier.fillMaxSize().padding(bottom = if (showMiniPlayer) 88.dp else 0.dp)
+                        modifier = Modifier.fillMaxSize().padding(bottom = bottomPadding),
+                        enterTransition = { slideInHorizontally { it } + fadeIn() },
+                        exitTransition = { slideOutHorizontally { -it } + fadeOut() },
+                        popEnterTransition = { slideInHorizontally { -it } + fadeIn() },
+                        popExitTransition = { slideOutHorizontally { it } + fadeOut() }
                     ) {
                         // Unified Home
                         composable(Screen.Library.route) {
@@ -528,6 +572,6 @@ fun PagePortalNavHost(
                 },
                 modifier = Modifier.align(Alignment.BottomCenter)
             )
-        }
-    }
+    } // Scaffold End
+    } // CompositionLocalProvider End
 }

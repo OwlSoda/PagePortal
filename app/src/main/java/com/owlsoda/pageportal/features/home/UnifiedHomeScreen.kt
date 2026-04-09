@@ -11,6 +11,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.compose.runtime.LaunchedEffect
+import com.owlsoda.pageportal.navigation.LocalTopBarState
 import com.owlsoda.pageportal.features.library.LibraryViewModel
 import com.owlsoda.pageportal.features.library.UnifiedBookDisplay
 import com.owlsoda.pageportal.features.library.BookCard
@@ -44,42 +46,41 @@ fun UnifiedHomeScreen(
         uri?.let { viewModel.importBook(it) }
     }
     
-    // Calculate continues reading or similar logic if available
-    // For now we use recentBooks from VM
+    val topBarState = LocalTopBarState.current
+    LaunchedEffect(Unit) {
+        topBarState.title = "PagePortal"
+    }
+
+    val activeJobs by queueViewModel.activeJobs.collectAsState()
     
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("PagePortal") },
-                actions = {
-                    IconButton(onClick = onGlobalSearchClick) {
-                        Icon(Icons.Default.Search, contentDescription = "Global Search")
-                    }
-                    
-                    val activeJobs by queueViewModel.activeJobs.collectAsState()
-                    if (activeJobs.isNotEmpty()) {
-                        IconButton(onClick = onQueueClick) {
-                            BadgedBox(badge = { Badge { Text(activeJobs.size.toString()) } }) {
-                                Icon(androidx.compose.material.icons.Icons.Default.Schedule, contentDescription = "Active Alignments")
-                            }
-                        }
-                    }
-                    
-                    IconButton(onClick = { 
-                        importLauncher.launch(arrayOf("application/epub+zip", "audio/*", "application/zip", "application/octet-stream"))
-                    }) {
-                        Icon(Icons.Default.Add, contentDescription = "Import Local File")
+    LaunchedEffect(activeJobs) {
+        topBarState.actions = {
+            IconButton(onClick = onGlobalSearchClick) {
+                Icon(Icons.Default.Search, contentDescription = "Global Search")
+            }
+            
+            if (activeJobs.isNotEmpty()) {
+                IconButton(onClick = onQueueClick) {
+                    BadgedBox(badge = { Badge { Text(activeJobs.size.toString()) } }) {
+                        Icon(androidx.compose.material.icons.Icons.Default.Schedule, contentDescription = "Active Alignments")
                     }
                 }
-            )
+            }
+            
+            IconButton(onClick = { 
+                importLauncher.launch(arrayOf("application/epub+zip", "audio/*", "application/zip", "application/octet-stream"))
+            }) {
+                Icon(Icons.Default.Add, contentDescription = "Import Local File")
+            }
         }
-    ) { padding ->
-        Box(modifier = Modifier.fillMaxSize().padding(padding)) {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(24.dp)
-            ) {
+    }
+    
+    Box(modifier = Modifier.fillMaxSize()) {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(24.dp)
+        ) {
             
             // Skeleton loading state — show shimmer placeholders while data loads
             if (uiState.isLoading && uiState.books.isEmpty()) {

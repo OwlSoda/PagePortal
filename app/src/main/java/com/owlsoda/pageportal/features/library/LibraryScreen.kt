@@ -156,129 +156,76 @@ fun LibraryScreen(
         }
     }
     
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = "PagePortal",
-                        style = MaterialTheme.typography.headlineMedium,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                },
-                actions = {
-                    // Search (Primary) - Only if not already in main content area
-                    // Link: View Mode toggle
-                    IconButton(onClick = { 
-                        // Redundant now but keeping for compatibility if needed elsewhere
-                    }) {
-                        // Empty or remove
-                    }
+    val topBarState = com.owlsoda.pageportal.navigation.LocalTopBarState.current
+    LaunchedEffect(uiState.isOfflineFilterActive) {
+        topBarState.title = "PagePortal"
+        topBarState.actions = {
+            IconButton(onClick = { 
+                importLauncher.launch(arrayOf("application/epub+zip", "audio/*", "video/mp4"))
+            }) {
+                Icon(Icons.Default.Add, contentDescription = "Import Content")
+            }
 
-                    // Import (Primary)
-                    IconButton(onClick = { 
-                        importLauncher.launch(arrayOf("application/epub+zip", "audio/*", "video/mp4"))
-                    }) {
-                        Icon(Icons.Default.Add, contentDescription = "Import Content")
-                    }
-
-                    // Settings (Primary)
-                    IconButton(onClick = onSettingsClick) {
-                        Icon(Icons.Default.Settings, contentDescription = "Settings")
-                    }
-                    
-                    // Overflow for secondary actions
-                    Box {
-                        IconButton(onClick = { showOverflowMenu = true }) {
-                            Icon(Icons.Default.MoreVert, contentDescription = "More")
-                        }
-                        DropdownMenu(
-                            expanded = showOverflowMenu,
-                            onDismissRequest = { showOverflowMenu = false }
-                        ) {
-                            // Sort
-                            DropdownMenuItem(
-                                text = { Text("Sort Books") },
-                                onClick = { 
-                                    showSortMenu = true
-                                    showOverflowMenu = false
-                                },
-                                leadingIcon = { Icon(Icons.AutoMirrored.Filled.Sort, null) }
-                            )
-                            
-                            // Refresh
-                            DropdownMenuItem(
-                                text = { Text("Refresh Library") },
-                                onClick = { 
-                                    viewModel.refresh()
-                                    showOverflowMenu = false
-                                },
-                                leadingIcon = { Icon(Icons.Default.Refresh, null) }
-                            )
-                            
-                            // Import
-                            DropdownMenuItem(
-                                text = { Text("Import Content") },
-                                onClick = { 
-                                    importLauncher.launch(arrayOf("application/epub+zip", "audio/*"))
-                                    showOverflowMenu = false
-                                },
-                                leadingIcon = { Icon(Icons.Default.Add, null) }
-                            )
-
-                            // Browse
-                            DropdownMenuItem(
-                                text = { Text("Browse Services") },
-                                onClick = { 
-                                    onBrowseClick()
-                                    showOverflowMenu = false
-                                },
-                                leadingIcon = { Icon(Icons.Default.Category, null) }
-                            )
-                            
-                            // Offline Toggle
-                            DropdownMenuItem(
-                                text = { Text(if (uiState.isOfflineFilterActive) "Show Online Content" else "Offline Only") },
-                                onClick = { 
-                                    viewModel.toggleOfflineFilter()
-                                    showOverflowMenu = false
-                                },
-                                leadingIcon = { 
-                                    Icon(
-                                        if (uiState.isOfflineFilterActive) Icons.Default.OfflinePin else Icons.Default.CloudQueue, 
-                                        null,
-                                        tint = if (uiState.isOfflineFilterActive) MaterialTheme.colorScheme.primary else LocalContentColor.current
-                                    ) 
-                                }
-                            )
-                        }
-                    }
-                }
-            )
-        },
-        floatingActionButton = {
-            val selectedTab = uiState.serverTabs.getOrNull(uiState.selectedTabIndex)
-            val isLocalTab = selectedTab?.serviceType == ServiceType.LOCAL
-            val isBooksTab = pagerState.currentPage == 3
+            IconButton(onClick = onSettingsClick) {
+                Icon(Icons.Default.Settings, contentDescription = "Settings")
+            }
             
-            if (isBooksTab && isLocalTab) {
-                ExtendedFloatingActionButton(
-                    onClick = { 
-                        importLauncher.launch(arrayOf("application/epub+zip", "audio/*", "video/mp4")) 
-                    },
-                    icon = { Icon(Icons.Default.Add, null) },
-                    text = { Text("Import Book") },
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary
-                )
+            Box {
+                IconButton(onClick = { showOverflowMenu = true }) {
+                    Icon(Icons.Default.MoreVert, contentDescription = "More")
+                }
+                DropdownMenu(
+                    expanded = showOverflowMenu,
+                    onDismissRequest = { showOverflowMenu = false }
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("Sort Books") },
+                        onClick = { 
+                            showSortMenu = true
+                            showOverflowMenu = false
+                        },
+                        leadingIcon = { Icon(Icons.AutoMirrored.Filled.Sort, null) }
+                    )
+                    
+                    DropdownMenuItem(
+                        text = { Text("Refresh Library") },
+                        onClick = { 
+                            viewModel.refresh()
+                            showOverflowMenu = false
+                        },
+                        leadingIcon = { Icon(Icons.Default.Refresh, null) }
+                    )
+                    
+                    DropdownMenuItem(
+                        text = { Text("Browse Services") },
+                        onClick = { 
+                            onBrowseClick()
+                            showOverflowMenu = false
+                        },
+                        leadingIcon = { Icon(Icons.Default.Category, null) }
+                    )
+                    
+                    DropdownMenuItem(
+                        text = { Text(if (uiState.isOfflineFilterActive) "Show Online Content" else "Offline Only") },
+                        onClick = { 
+                            viewModel.toggleOfflineFilter()
+                            showOverflowMenu = false
+                        },
+                        leadingIcon = { 
+                            Icon(
+                                if (uiState.isOfflineFilterActive) Icons.Default.OfflinePin else Icons.Default.CloudQueue, 
+                                null,
+                                tint = if (uiState.isOfflineFilterActive) MaterialTheme.colorScheme.primary else LocalContentColor.current
+                            ) 
+                        }
+                    )
+                }
             }
         }
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-        ) {
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(modifier = Modifier.fillMaxSize()) {
             // Search bar
             OutlinedTextField(
                 value = uiState.searchQuery,
@@ -457,8 +404,28 @@ fun LibraryScreen(
                     modifier = Modifier.align(Alignment.TopCenter)
                 )
             }
+        } // End of main Column
+        
+        // Local FAB
+        val selectedTab = uiState.serverTabs.getOrNull(uiState.selectedTabIndex)
+        val isLocalTab = selectedTab?.serviceType == com.owlsoda.pageportal.services.ServiceType.LOCAL
+        val isBooksTab = pagerState.currentPage == 3
+        
+        if (isBooksTab && isLocalTab) {
+            ExtendedFloatingActionButton(
+                onClick = { 
+                    importLauncher.launch(arrayOf("application/epub+zip", "audio/*", "video/mp4")) 
+                },
+                icon = { Icon(Icons.Default.Add, null) },
+                text = { Text("Import Book") },
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(24.dp)
+            )
         }
-    }
+    } // End of main Box
 }
 
 @Composable
