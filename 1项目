@@ -1,0 +1,144 @@
+e: file:///Users/radams/Documents/Antigravity/PagePortal/app/src/main/java/com/owlsoda/pageportal/features/book/BookDetailScreen.kt:290:82 Unresolved reference: formatLastSynce: file:///Users/radams/Documents/Antigravity/PagePortal/app/src/main/java/com/owlsoda/pageportal/features/book/BookDetailScreen.kt:290:82 Unresolved reference: formatLastSync
+e: file:///Users/radams/Documents/Antigravity/PagePortal/app/src/main/java/com/owlsoda/pageportal/features/book/BookDetailScreen.kt:309:33 Unresolved reference: MainActionButton
+e: file:///Users/radams/Documents/Antigravity/PagePortal/app/src/main/java/com/owlsoda/pageportal/features/book/BookDetailScreen.kt:309:33 Unresolved reference: MainActionButton
+
+e: file:///Users/radams/Documents/Antigravity/PagePortal/app/src/main/java/com/owlsoda/pageportal/features/book/BookDetailScreen.kt:321:33 Unresolved reference: MainActionButtone: file:///Users/radams/Documents/Antigravity/PagePortal/app/src/main/java/com/owlsoda/pageportal/features/book/BookDetailScreen.kt:321:33 Unresolved reference: MainActionButton
+
+e: file:///Users/radams/Documents/Antigravity/PagePortal/app/src/main/java/com/owlsoda/pageportal/features/book/BookDetailScreen.kt:334:33 Unresolved reference: MainActionButtone: file:///Users/radams/Documents/Antigravity/PagePortal/app/src/main/java/com/owlsoda/pageportal/features/book/BookDetailScreen.kt:334:33 Unresolved reference: MainActionButton
+
+e: file:///Users/radams/Documents/Antigravity/PagePortal/app/src/main/java/com/owlsoda/pageportal/features/book/BookDetailScreen.kt:348:29 Unresolved reference: MainActionButtone: file:///Users/radams/Documents/Antigravity/PagePortal/app/src/main/java/com/owlsoda/pageportal/features/book/BookDetailScreen.kt:348:29 Unresolved reference: MainActionButton
+
+e: file:///Users/radams/Documents/Antigravity/PagePortal/app/src/main/java/com/owlsoda/pageportal/features/book/BookDetailScreen.kt:591:21 Unresolved reference: BookMetadataRow
+e: file:///Users/radams/Documents/Antigravity/PagePortal/app/src/main/java/com/owlsoda/pageportal/features/book/BookDetailScreen.kt:591:21 Unresolved reference: BookMetadataRow
+e: file:///Users/radams/Documents/Antigravity/PagePortal/app/src/main/java/com/owlsoda/pageportal/features/book/BookDetailScreen.kt:640:37 Unresolved reference: TagChip
+e: file:///Users/radams/Documents/Antigravity/PagePortal/app/src/main/java/com/owlsoda/pageportal/features/book/BookDetailScreen.kt:640:37 Unresolved reference: TagChip
+e: file:///Users/radams/Documents/Antigravity/PagePortal/app/src/main/java/com/owlsoda/pageportal/features/book/BookDetailScreen.kt:696:9 Unresolved reference: MetadataIteme: file:///Users/radams/Documents/Antigravity/PagePortal/app/src/main/java/com/owlsoda/pageportal/features/book/BookDetailScreen.kt:696:9 Unresolved reference: MetadataItem
+
+e: file:///Users/radams/Documents/Antigravity/PagePortal/app/src/main/java/com/owlsoda/pageportal/features/book/BookDetailScreen.kt:700:94 Cannot find a parameter with this name: alphae: file:///Users/radams/Documents/Antigravity/PagePortal/app/src/main/java/com/owlsoda/pageportal/features/book/BookDetailScreen.kt:700:94 Cannot find a parameter with this name: alpha
+
+e: file:///Users/radams/Documents/Antigravity/PagePortal/app/src/main/java/com/owlsoda/pageportal/features/book/BookDetailScreen.kt:701:9 Unresolved reference: MetadataIteme: file:///Users/radams/Documents/Antigravity/PagePortal/app/src/main/java/com/owlsoda/pageportal/features/book/BookDetailScreen.kt:701:9 Unresolved reference: MetadataItem
+
+e: file:///Users/radams/Documents/Antigravity/PagePortal/app/src/main/java/com/owlsoda/pageportal/features/book/BookDetailScreen.kt:703:42 Unresolved reference: formatDuratione: file:///Users/radams/Documents/Antigravity/PagePortal/app/src/main/java/com/owlsoda/pageportal/features/book/BookDetailScreen.kt:703:42 Unresolved reference: formatDuration
+
+e: file:///Users/radams/Documents/Antigravity/PagePortal/app/src/main/java/com/owlsoda/pageportal/features/book/BookDetailScreen.kt:706:98 Cannot find a parameter with this name: alphae: file:///Users/radams/Documents/Antigravity/PagePortal/app/src/main/java/com/owlsoda/pageportal/features/book/BookDetailScreen.kt:706:98 Cannot find a parameter with this name: alpha
+
+e: file:///Users/radams/Documents/Antigravity/PagePortal/app/src/main/java/com/owlsoda/pageportal/features/book/BookDetailScreen.kt:707:13 Unresolved reference: MetadataIteme: file:///Users/radams/Documents/Antigravity/PagePortal/app/src/main/java/com/owlsoda/pageportal/features/book/BookDetailScreen.kt:707:13 Unresolved reference: MetadataItem
+
+e: file:///Users/radams/Documents/Antigravity/PagePortal/app/src/main/java/com/owlsoda/pageportal/features/book/BookDetailScreen.kt:745:1 Modifier 'private' is not applicable to 'local function'e: file:///Users/radams/Documents/Antigravity/PagePortal/app/src/main/java/com/owlsoda/pageportal/features/book/BookDetailScreen.kt:745:1 Modifier 'private' is not applicable to 'local function'
+
+e: file:///Users/radams/Documents/Antigravity/PagePortal/app/src/main/java/com/owlsoda/pageportal/features/book/BookDetailScreen.kt:752:1 Modifier 'private' is not applicable to 'local function'e: file:///Users/radams/Documents/Antigravity/PagePortal/app/src/main/java/com/owlsoda/pageportal/features/book/BookDetailScreen.kt:752:1 Modifier 'private' is not applicable to 'local function'
+
+e: file:///Users/radams/Documents/Antigravity/PagePortal/app/src/main/java/com/owlsoda/pageportal/navigation/PagePortalNavHost.kt:138:26 Unresolved reference: animateDpAsStatee: file:///Users/radams/Documents/Antigravity/PagePortal/app/src/main/java/com/owlsoda/pageportal/navigation/PagePortalNavHost.kt:138:26 Unresolved reference: animateDpAsState
+
+e: file:///Users/radams/Documents/Antigravity/PagePortal/app/src/main/java/com/owlsoda/pageportal/navigation/PagePortalNavHost.kt:153:17 This material API is experimental and is likely to change or to be removed in the future.e: file:///Users/radams/Documents/Antigravity/PagePortal/app/src/main/java/com/owlsoda/pageportal/navigation/PagePortalNavHost.kt:153:17 This material API is experimental and is likely to change or to be removed in the future.
+
+e: file:///Users/radams/Documents/Antigravity/PagePortal/app/src/main/java/com/owlsoda/pageportal/navigation/PagePortalNavHost.kt:158:96 Unresolved reference: ArrowBacke: file:///Users/radams/Documents/Antigravity/PagePortal/app/src/main/java/com/owlsoda/pageportal/navigation/PagePortalNavHost.kt:158:96 Unresolved reference: ArrowBack
+
+e: file:///Users/radams/Documents/Antigravity/PagePortal/app/src/main/java/com/owlsoda/pageportal/navigation/PagePortalNavHost.kt:163:30 This material API is experimental and is likely to change or to be removed in the future.e: file:///Users/radams/Documents/Antigravity/PagePortal/app/src/main/java/com/owlsoda/pageportal/navigation/PagePortalNavHost.kt:163:30 This material API is experimental and is likely to change or to be removed in the future.
+
+e: file:///Users/radams/Documents/Antigravity/PagePortal/app/src/main/java/com/owlsoda/pageportal/navigation/PagePortalNavHost.kt:163:48 This material API is experimental and is likely to change or to be removed in the future.e: file:///Users/radams/Documents/Antigravity/PagePortal/app/src/main/java/com/owlsoda/pageportal/navigation/PagePortalNavHost.kt:163:48 This material API is experimental and is likely to change or to be removed in the future.
+
+e: file:///Users/radams/Documents/Antigravity/PagePortal/app/src/main/java/com/owlsoda/pageportal/features/book/BookDetailScreen.kt:290:82 Unresolved reference: formatLastSync
+e: file:///Users/radams/Documents/Antigravity/PagePortal/app/src/main/java/com/owlsoda/pageportal/features/book/BookDetailScreen.kt:309:33 Unresolved reference: MainActionButton
+e: file:///Users/radams/Documents/Antigravity/PagePortal/app/src/main/java/com/owlsoda/pageportal/features/book/BookDetailScreen.kt:321:33 Unresolved reference: MainActionButton
+e: file:///Users/radams/Documents/Antigravity/PagePortal/app/src/main/java/com/owlsoda/pageportal/features/book/BookDetailScreen.kt:290:82 Unresolved reference: formatLastSync
+e: file:///Users/radams/Documents/Antigravity/PagePortal/app/src/main/java/com/owlsoda/pageportal/features/book/BookDetailScreen.kt:309:33 Unresolved reference: MainActionButton
+e: file:///Users/radams/Documents/Antigravity/PagePortal/app/src/main/java/com/owlsoda/pageportal/features/book/BookDetailScreen.kt:321:33 Unresolved reference: MainActionButton
+e: file:///Users/radams/Documents/Antigravity/PagePortal/app/src/main/java/com/owlsoda/pageportal/features/book/BookDetailScreen.kt:334:33 Unresolved reference: MainActionButtone: file:///Users/radams/Documents/Antigravity/PagePortal/app/src/main/java/com/owlsoda/pageportal/features/book/BookDetailScreen.kt:334:33 Unresolved reference: MainActionButton
+
+e: file:///Users/radams/Documents/Antigravity/PagePortal/app/src/main/java/com/owlsoda/pageportal/features/book/BookDetailScreen.kt:348:29 Unresolved reference: MainActionButtone: file:///Users/radams/Documents/Antigravity/PagePortal/app/src/main/java/com/owlsoda/pageportal/features/book/BookDetailScreen.kt:348:29 Unresolved reference: MainActionButton
+
+e: file:///Users/radams/Documents/Antigravity/PagePortal/app/src/main/java/com/owlsoda/pageportal/features/book/BookDetailScreen.kt:591:21 Unresolved reference: BookMetadataRowe: file:///Users/radams/Documents/Antigravity/PagePortal/app/src/main/java/com/owlsoda/pageportal/features/book/BookDetailScreen.kt:591:21 Unresolved reference: BookMetadataRow
+e: file:///Users/radams/Documents/Antigravity/PagePortal/app/src/main/java/com/owlsoda/pageportal/features/book/BookDetailScreen.kt:640:37 Unresolved reference: TagChip
+
+e: file:///Users/radams/Documents/Antigravity/PagePortal/app/src/main/java/com/owlsoda/pageportal/features/book/BookDetailScreen.kt:640:37 Unresolved reference: TagChip
+e: file:///Users/radams/Documents/Antigravity/PagePortal/app/src/main/java/com/owlsoda/pageportal/features/book/BookDetailScreen.kt:696:9 Unresolved reference: MetadataItem
+e: file:///Users/radams/Documents/Antigravity/PagePortal/app/src/main/java/com/owlsoda/pageportal/features/book/BookDetailScreen.kt:696:9 Unresolved reference: MetadataItem
+e: file:///Users/radams/Documents/Antigravity/PagePortal/app/src/main/java/com/owlsoda/pageportal/features/book/BookDetailScreen.kt:700:94 Cannot find a parameter with this name: alpha
+e: file:///Users/radams/Documents/Antigravity/PagePortal/app/src/main/java/com/owlsoda/pageportal/features/book/BookDetailScreen.kt:700:94 Cannot find a parameter with this name: alpha
+e: file:///Users/radams/Documents/Antigravity/PagePortal/app/src/main/java/com/owlsoda/pageportal/features/book/BookDetailScreen.kt:701:9 Unresolved reference: MetadataIteme: file:///Users/radams/Documents/Antigravity/PagePortal/app/src/main/java/com/owlsoda/pageportal/features/book/BookDetailScreen.kt:701:9 Unresolved reference: MetadataItem
+
+e: file:///Users/radams/Documents/Antigravity/PagePortal/app/src/main/java/com/owlsoda/pageportal/features/book/BookDetailScreen.kt:703:42 Unresolved reference: formatDuration
+e: file:///Users/radams/Documents/Antigravity/PagePortal/app/src/main/java/com/owlsoda/pageportal/features/book/BookDetailScreen.kt:703:42 Unresolved reference: formatDuration
+e: file:///Users/radams/Documents/Antigravity/PagePortal/app/src/main/java/com/owlsoda/pageportal/features/book/BookDetailScreen.kt:706:98 Cannot find a parameter with this name: alphae: file:///Users/radams/Documents/Antigravity/PagePortal/app/src/main/java/com/owlsoda/pageportal/features/book/BookDetailScreen.kt:706:98 Cannot find a parameter with this name: alpha
+
+e: file:///Users/radams/Documents/Antigravity/PagePortal/app/src/main/java/com/owlsoda/pageportal/features/book/BookDetailScreen.kt:707:13 Unresolved reference: MetadataIteme: file:///Users/radams/Documents/Antigravity/PagePortal/app/src/main/java/com/owlsoda/pageportal/features/book/BookDetailScreen.kt:707:13 Unresolved reference: MetadataItem
+
+e: file:///Users/radams/Documents/Antigravity/PagePortal/app/src/main/java/com/owlsoda/pageportal/features/book/BookDetailScreen.kt:745:1 Modifier 'private' is not applicable to 'local function'e: file:///Users/radams/Documents/Antigravity/PagePortal/app/src/main/java/com/owlsoda/pageportal/features/book/BookDetailScreen.kt:745:1 Modifier 'private' is not applicable to 'local function'
+e: file:///Users/radams/Documents/Antigravity/PagePortal/app/src/main/java/com/owlsoda/pageportal/features/book/BookDetailScreen.kt:752:1 Modifier 'private' is not applicable to 'local function'
+e: file:///Users/radams/Documents/Antigravity/PagePortal/app/src/main/java/com/owlsoda/pageportal/features/book/BookDetailScreen.kt:752:1 Modifier 'private' is not applicable to 'local function'
+
+e: file:///Users/radams/Documents/Antigravity/PagePortal/app/src/main/java/com/owlsoda/pageportal/navigation/PagePortalNavHost.kt:138:26 Unresolved reference: animateDpAsStatee: file:///Users/radams/Documents/Antigravity/PagePortal/app/src/main/java/com/owlsoda/pageportal/navigation/PagePortalNavHost.kt:138:26 Unresolved reference: animateDpAsState
+
+e: file:///Users/radams/Documents/Antigravity/PagePortal/app/src/main/java/com/owlsoda/pageportal/navigation/PagePortalNavHost.kt:153:17 This material API is experimental and is likely to change or to be removed in the future.e: file:///Users/radams/Documents/Antigravity/PagePortal/app/src/main/java/com/owlsoda/pageportal/navigation/PagePortalNavHost.kt:153:17 This material API is experimental and is likely to change or to be removed in the future.
+
+e: file:///Users/radams/Documents/Antigravity/PagePortal/app/src/main/java/com/owlsoda/pageportal/navigation/PagePortalNavHost.kt:158:96 Unresolved reference: ArrowBacke: file:///Users/radams/Documents/Antigravity/PagePortal/app/src/main/java/com/owlsoda/pageportal/navigation/PagePortalNavHost.kt:158:96 Unresolved reference: ArrowBack
+
+e: file:///Users/radams/Documents/Antigravity/PagePortal/app/src/main/java/com/owlsoda/pageportal/navigation/PagePortalNavHost.kt:163:30 This material API is experimental and is likely to change or to be removed in the future.e: file:///Users/radams/Documents/Antigravity/PagePortal/app/src/main/java/com/owlsoda/pageportal/navigation/PagePortalNavHost.kt:163:30 This material API is experimental and is likely to change or to be removed in the future.
+
+e: file:///Users/radams/Documents/Antigravity/PagePortal/app/src/main/java/com/owlsoda/pageportal/navigation/PagePortalNavHost.kt:163:48 This material API is experimental and is likely to change or to be removed in the future.e: file:///Users/radams/Documents/Antigravity/PagePortal/app/src/main/java/com/owlsoda/pageportal/navigation/PagePortalNavHost.kt:163:48 This material API is experimental and is likely to change or to be removed in the future.
+
+
+FAILURE: Build completed with 2 failures.
+
+
+FAILURE: Build completed with 2 failures.
+
+1: 1: Task failed with an exception.
+-----------
+* What went wrong:
+Execution failed for task ':app:compileReleaseKotlin'.Task failed with an exception.
+-----------
+* What went wrong:
+Execution failed for task ':app:compileReleaseKotlin'.
+
+> > A failure occurred while executing org.jetbrains.kotlin.compilerRunner.GradleCompilerRunnerWithWorkers$GradleKotlinCompilerWorkActionA failure occurred while executing org.jetbrains.kotlin.compilerRunner.GradleCompilerRunnerWithWorkers$GradleKotlinCompilerWorkAction
+
+   >    > Compilation error. See log for more details
+Compilation error. See log for more details
+
+
+* Try:* Try:
+
+> > Run with --stacktraceRun with --stacktrace option to get the stack trace. option to get the stack trace.
+
+> Run with > Run with --info or --info or --debug--debug option to get more log output. option to get more log output.
+
+> > Run with Run with --scan--scan to get full insights. to get full insights.
+
+> > Get more help at Get more help at https://help.gradle.orghttps://help.gradle.org.
+.
+============================================================================================================================================================
+
+
+
+2: Task failed with an exception.2: Task failed with an exception.
+
+-----------
+-----------
+* What went wrong:* What went wrong:
+
+Execution failed for task ':app:compileDebugKotlin'.
+Execution failed for task ':app:compileDebugKotlin'.
+> A failure occurred while executing org.jetbrains.kotlin.compilerRunner.GradleCompilerRunnerWithWorkers$GradleKotlinCompilerWorkAction> A failure occurred while executing org.jetbrains.kotlin.compilerRunner.GradleCompilerRunnerWithWorkers$GradleKotlinCompilerWorkAction
+   > Compilation error. See log for more details
+
+   > Compilation error. See log for more details
+
+* Try:
+* Try:
+
+> Run with > Run with --stacktrace option to get the stack trace.--stacktrace option to get the stack trace.
+
+> > Run with Run with --info or --debug--info or --debug option to get more log output.
+ option to get more log output.
+> > Run with --scanRun with --scan to get full insights.
+ to get full insights.
+> Get more help at > Get more help at https://help.gradle.orghttps://help.gradle.org.
+.
+==============================================================================
+==============================================================================
+
+
+BUILD FAILEDBUILD FAILED in 10s
+ in 10s

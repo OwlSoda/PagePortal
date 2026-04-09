@@ -648,7 +648,6 @@ fun BookDetailScreen(
             }
         }
     }
-}
 
 @Composable
 fun MainActionButton(
