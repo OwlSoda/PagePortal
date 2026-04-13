@@ -77,7 +77,9 @@ enum class SortOption(val displayName: String) {
 data class LibraryUiState(
     val books: List<UnifiedBookDisplay> = emptyList(),
     // Grouped content for Home Screen
-    val recentBooks: List<UnifiedBookDisplay> = emptyList(),
+    val continueReading: List<UnifiedBookDisplay> = emptyList(),
+    val recentlyAdded: List<UnifiedBookDisplay> = emptyList(),
+    val offlineReady: List<UnifiedBookDisplay> = emptyList(),
     val homeAuthors: List<AuthorDisplay> = emptyList(),
     val booksByService: Map<ServerTab, List<UnifiedBookDisplay>> = emptyMap(),
     
@@ -415,7 +417,17 @@ class LibraryViewModel @Inject constructor(
             
             // Home Screen Data - Filtered by tab if not All
             val homeSource = filtered
-            val recent = homeSource.filter { it.listeningProgress > 0 }.take(10)
+            
+            // Continue Reading: Items with listening progress 
+            val continueReadingList = homeSource.filter { it.listeningProgress > 0 }
+                .sortedByDescending { it.listeningProgress }
+                .take(10)
+                
+            // Recently Added: Sorted by addedAt
+            val recentlyAddedList = homeSource.sortedByDescending { it.addedAt }.take(15)
+            
+            // Offline Ready: Downloaded books
+            val offlineReadyList = homeSource.filter { it.isDownloaded }.take(15)
             
             // Group by Author for Home
             val authorMap = mutableMapOf<String, MutableList<UnifiedBookDisplay>>()
@@ -454,7 +466,9 @@ class LibraryViewModel @Inject constructor(
             _uiState.update {
                 it.copy(
                     books = filtered,
-                    recentBooks = recent,
+                    continueReading = continueReadingList,
+                    recentlyAdded = recentlyAddedList,
+                    offlineReady = offlineReadyList,
                     homeAuthors = homeAuthors,
                     booksByService = serviceMap,
                     serverTabs = newTabs,

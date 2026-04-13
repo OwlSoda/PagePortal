@@ -443,7 +443,7 @@ fun HomeTabContent(
     } else {
         HomeView(
             selectedTabId = uiState.serverTabs.getOrNull(uiState.selectedTabIndex)?.id ?: -1L,
-            recentBooks = uiState.recentBooks,
+            recentBooks = uiState.continueReading,
             homeAuthors = uiState.homeAuthors,
             serviceMap = uiState.booksByService,
             onBookClick = onBookClick,
