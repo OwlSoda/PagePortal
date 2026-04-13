@@ -184,7 +184,7 @@ fun UnifiedHomeScreen(
                             items(uiState.recentlyAdded) { book ->
                                 BookCard(
                                     book = book,
-                                    onClick = { onBookClick(book.id.toString()) },
+                                    onClick = { onBookClick("u_${book.id}") },
                                     modifier = Modifier.width(130.dp)
                                 )
                             }
@@ -204,7 +204,7 @@ fun UnifiedHomeScreen(
                             items(uiState.offlineReady) { book ->
                                 BookCard(
                                     book = book,
-                                    onClick = { onBookClick(book.id.toString()) },
+                                    onClick = { onBookClick("u_${book.id}") },
                                     modifier = Modifier.width(130.dp)
                                 )
                             }
@@ -274,7 +274,7 @@ fun HeroCarousel(books: List<UnifiedBookDisplay>, onBookClick: (String) -> Unit)
         horizontalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         items(books) { book ->
-            HeroCard(book = book, onClick = { onBookClick(book.id.toString()) })
+            HeroCard(book = book, onClick = { onBookClick("u_${book.id}") })
         }
     }
 }
