@@ -254,11 +254,13 @@ class DownloadWorker(
             // Prepare auth headers (needed for pre-flight and multi-part)
             val headers = mutableMapOf<String, String>()
             val serviceEntity = serviceManager.getServiceEntity(serverId)
-            if (serviceEntity?.authToken != null) {
-                if (serviceEntity.serviceType == "BOOKLORE") {
-                    headers["Authorization"] = serviceEntity.authToken
+            val authToken = serviceManager.getAuthToken(serverId)
+            
+            if (authToken != null) {
+                if (serviceEntity?.serviceType == "BOOKLORE") {
+                    headers["Authorization"] = authToken
                 } else {
-                    headers["Authorization"] = "Bearer ${serviceEntity.authToken}"
+                    headers["Authorization"] = "Bearer $authToken"
                 }
             }
             

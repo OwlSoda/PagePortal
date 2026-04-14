@@ -142,6 +142,16 @@ class ServiceManager @Inject constructor(
     }
     
     /**
+     * Safely retrieves the real authentication token for a server,
+     * handling SecureTokenStore resolution.
+     */
+    suspend fun getAuthToken(serverId: Long): String? {
+        val server = serverDao.getServerById(serverId) ?: return null
+        return secureTokenStore.getToken(serverId) 
+            ?: server.authToken?.takeIf { it != SecureTokenStore.ENCRYPTED_PLACEHOLDER }
+    }
+    
+    /**
      * Get or create a service for a server.
      */
     suspend fun getService(serverId: Long): BookService? {
