@@ -51,6 +51,7 @@ data class ReaderUiState(
     val isLoading: Boolean = true,
     val error: String? = null,
     val currentChapterIndex: Int = 0,
+    val chapterProgress: Float = 0f, // 0.0 to 1.0 within the chapter
     val fontSize: Int = 100, // Percent
     val theme: ReaderTheme = ReaderTheme.LIGHT,
     val fontFamily: String = "Serif",
@@ -325,11 +326,15 @@ class ReaderViewModel @Inject constructor(
                  )
                  
                  // Load saved progress
-                 val progress = progressDao.getProgressByBookId(bookId)
-                 if (progress != null) {
-                     val safeIndex = progress.currentChapter.coerceAtLeast(0)
-                     _uiState.update { it.copy(currentChapterIndex = safeIndex) }
-                 } else if (hasAudio) {
+                  val progress = progressDao.getProgressByBookId(bookId)
+                  if (progress != null) {
+                      val safeIndex = progress.currentChapter.coerceAtLeast(0)
+                      val intraProgress = (progress.currentPosition.toFloat() / 1_000_000f).coerceIn(0f, 1f)
+                      _uiState.update { it.copy(
+                          currentChapterIndex = safeIndex,
+                          chapterProgress = intraProgress
+                      ) }
+                  } else if (hasAudio) {
                      // No saved progress + ReadAloud: auto-skip to first chapter with SMIL data
                      val firstSmilChapter = epubBook.chapters.indexOfFirst { ch ->
                          epubBook.smilData[ch.id] != null
@@ -1247,12 +1252,17 @@ class ReaderViewModel @Inject constructor(
             val clippedProgress = progressInChapter.coerceIn(0f, 1f)
             val totalProgress = ((chapterIndex + clippedProgress) / totalChapters) * 100f
             
+            // Store intra-chapter progress in currentPosition scaled by 1,000,000
+            val positionValue = (clippedProgress * 1_000_000).toLong()
+            
             progressDao.updatePosition(
                 bookId = bookId,
-                position = 0, 
+                position = positionValue, 
                 chapter = chapterIndex,
                 percent = totalProgress
             )
+            
+            _uiState.update { it.copy(chapterProgress = clippedProgress) }
             
             // Debounce network sync
             syncJob?.cancel()

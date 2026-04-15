@@ -118,6 +118,10 @@ fun ReaderScreen(
             fun nextChapter() { viewModel.nextChapter() }
             @android.webkit.JavascriptInterface
             fun prevChapter() { viewModel.previousChapter() }
+            @android.webkit.JavascriptInterface
+            fun onProgressChanged(progress: Float) {
+                viewModel.onProgressChanged(uiState.currentChapterIndex, progress)
+            }
         }
     }
     
@@ -370,6 +374,7 @@ fun ReaderScreen(
                                  override fun onPageFinished(view: WebView?, url: String?) {
                                     injectStyles(view!!, uiState)
                                     injectSelectionScript(view)
+                                    injectProgressScript(view, uiState)
                                 }
                             }
                             
@@ -834,7 +839,58 @@ fun ReaderScreen(
                   }
               }
          }
+         Spacer(modifier = Modifier.height(32.dp)) // Padding for bottom nav bar
     }
+}
+
+private fun injectProgressScript(webView: WebView, state: ReaderUiState) {
+    val scrollThreshold = 0.01f // Only report every 1% change
+    val verticalVal = state.isVerticalScroll
+    val js = """
+        (function() {
+            var isVertical = $verticalVal;
+            var lastReportedProgress = -1;
+            
+            function reportProgress() {
+                var progress = 0;
+                if (isVertical) {
+                    var scrollHeight = document.documentElement.scrollHeight - window.innerHeight;
+                    if (scrollHeight > 0) {
+                        progress = window.scrollY / scrollHeight;
+                    }
+                } else {
+                    var scrollWidth = document.documentElement.scrollWidth - window.innerWidth;
+                    if (scrollWidth > 0) {
+                        progress = window.scrollX / scrollWidth;
+                    }
+                }
+                
+                if (Math.abs(progress - lastReportedProgress) >= $scrollThreshold) {
+                    lastReportedProgress = progress;
+                    Android.onProgressChanged(progress);
+                }
+            }
+            
+            window.addEventListener('scroll', reportProgress);
+            
+            // Initial restoration
+            var initialProgress = ${state.chapterProgress};
+            if (initialProgress > 0) {
+                setTimeout(function() {
+                    if (isVertical) {
+                        var target = (document.documentElement.scrollHeight - window.innerHeight) * initialProgress;
+                        window.scrollTo(0, target);
+                    } else {
+                        var target = (document.documentElement.scrollWidth - window.innerWidth) * initialProgress;
+                        // Align to pages in horizontal mode
+                        target = Math.round(target / window.innerWidth) * window.innerWidth;
+                        window.scrollTo(target, 0);
+                    }
+                }, 100);
+            }
+        })();
+    """.trimIndent()
+    webView.evaluateJavascript(js, null)
 }
 
 private fun injectStyles(webView: WebView, state: ReaderUiState) {
