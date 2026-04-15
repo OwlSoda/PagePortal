@@ -67,6 +67,7 @@ class AudiobookPlayerViewModel @Inject constructor(
     private var progressUpdateJob: Job? = null
     private var sleepTimerJob: Job? = null
     private var lastSaveTime = 0L
+    private var pendingSeekPosition: Long = -1L // Seek applied on STATE_READY
     
     private var appContext: android.content.Context? = null
     
@@ -102,6 +103,13 @@ class AudiobookPlayerViewModel @Inject constructor(
                             isLoading = false,
                             duration = controller.duration
                         )
+                        // Apply any pending seek position now that the player is ready.
+                        // Seeking before STATE_READY is silently dropped by Media3.
+                        if (pendingSeekPosition > 0) {
+                            controller.seekTo(pendingSeekPosition)
+                            android.util.Log.d("AudiobookPlayerVM", "Applied pending seek to ${pendingSeekPosition}ms on STATE_READY")
+                            pendingSeekPosition = -1L
+                        }
                         extractChapters()
                     }
                     Player.STATE_BUFFERING -> {
@@ -229,11 +237,13 @@ class AudiobookPlayerViewModel @Inject constructor(
                 
                 withContext(Dispatchers.Main) {
                     player?.apply {
+                        // Store the position to be applied on STATE_READY.
+                        // Calling seekTo() before STATE_READY is silently ignored by Media3.
+                        if (currentPos > 0) {
+                            pendingSeekPosition = currentPos
+                        }
                         setMediaItem(mediaItem)
                         prepare()
-                        if (currentPos > 0) {
-                            seekTo(currentPos)
-                        }
                         if (autoPlay) {
                             play()
                         }
