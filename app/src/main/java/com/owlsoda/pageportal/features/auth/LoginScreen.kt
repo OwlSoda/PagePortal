@@ -186,7 +186,7 @@ fun LoginScreen(
                                 imeAction = ImeAction.Next
                             ),
                             keyboardActions = KeyboardActions(
-                                onNext = { focusManager.moveFocus(FocusDirection.Down) }
+                                onNext = { focusManager.moveFocus(FocusDirection.Next) }
                             ),
                             leadingIcon = {
                                 Surface(
@@ -219,7 +219,7 @@ fun LoginScreen(
                                     singleLine = true,
                                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
                                     keyboardActions = KeyboardActions(
-                                        onNext = { focusManager.moveFocus(FocusDirection.Down) }
+                                        onNext = { focusManager.moveFocus(FocusDirection.Next) }
                                     )
                                 )
                                 
