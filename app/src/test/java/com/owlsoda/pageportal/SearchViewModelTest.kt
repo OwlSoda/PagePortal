@@ -3,7 +3,7 @@ package com.owlsoda.pageportal
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import org.junit.Test
-import kotlin.test.assertEquals
+import org.junit.Assert.assertEquals
 
 class SearchViewModelTest {
     @OptIn(FlowPreview::class, ExperimentalCoroutinesApi::class)
