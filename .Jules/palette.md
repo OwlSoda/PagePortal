@@ -17,3 +17,7 @@
 ## 2024-10-27 - Form Input Flow Optimization
 **Learning:** Multi-field forms like logins often interrupt user flow by requiring manual taps to switch between fields. Using the keyboard's "Next" and "Done" actions significantly smooths this interaction.
 **Action:** Always set `ImeAction.Next` for intermediate `OutlinedTextField`s and use `LocalFocusManager` to advance focus. For the final field, use `ImeAction.Done` and trigger the submission action automatically if validation passes.
+
+## 2025-01-20 - Logical vs Spatial Focus Traversal
+**Learning:** Using spatial focus directions (like `FocusDirection.Down`) in forms can cause unpredictable keyboard navigation behavior on different screen sizes or layouts. Logical traversal using `FocusDirection.Next` provides a much more robust and consistent screen reader and keyboard user experience.
+**Action:** Always use `FocusDirection.Next` instead of `FocusDirection.Down` when wiring up `ImeAction.Next` in Compose forms.
