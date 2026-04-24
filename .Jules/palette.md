@@ -17,3 +17,7 @@
 ## 2024-10-27 - Form Input Flow Optimization
 **Learning:** Multi-field forms like logins often interrupt user flow by requiring manual taps to switch between fields. Using the keyboard's "Next" and "Done" actions significantly smooths this interaction.
 **Action:** Always set `ImeAction.Next` for intermediate `OutlinedTextField`s and use `LocalFocusManager` to advance focus. For the final field, use `ImeAction.Done` and trigger the submission action automatically if validation passes.
+
+## 2024-10-28 - Image Content Descriptions
+**Learning:** Screen readers announce images with `contentDescription = null` generically or not at all, severely degrading accessibility for informative images (like book or author covers). Purely decorative elements (like background blur covers) correctly use `null`.
+**Action:** When creating or modifying `AsyncImage` or `Image` components, ensure a meaningful `contentDescription` string is provided (e.g., `"Cover for ${book.title}"`). Continue using `contentDescription = null` for purely decorative images, optionally with a clarifying comment.
