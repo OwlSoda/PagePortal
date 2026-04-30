@@ -17,3 +17,6 @@
 ## 2024-10-27 - Form Input Flow Optimization
 **Learning:** Multi-field forms like logins often interrupt user flow by requiring manual taps to switch between fields. Using the keyboard's "Next" and "Done" actions significantly smooths this interaction.
 **Action:** Always set `ImeAction.Next` for intermediate `OutlinedTextField`s and use `LocalFocusManager` to advance focus. For the final field, use `ImeAction.Done` and trigger the submission action automatically if validation passes.
+## 2024-10-27 - Spatial vs Logical Focus Direction
+**Learning:** Using `FocusDirection.Down` for vertical forms can cause accessibility issues on devices with varying aspect ratios where the layout shifts. `FocusDirection.Next` explicitly honors the logical form sequence and tab ordering, ensuring a robust UX.
+**Action:** Always prefer `FocusDirection.Next` over directional values like `Down` or `Right` when advancing through a series of inputs (like forms or searches) in Jetpack Compose, regardless of their visual alignment.
