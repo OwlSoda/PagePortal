@@ -251,18 +251,35 @@ fun ComicReaderScreen(
                 
                 // Page slider
                 if (showPageSlider && state.pageCount > 1) {
-                    Slider(
-                        value = state.currentPage.toFloat(),
-                        onValueChange = { viewModel.goToPage(it.toInt()) },
-                        valueRange = 0f..(state.pageCount - 1).toFloat(),
-                        steps = state.pageCount - 2,
+                    Row(
                         modifier = Modifier.fillMaxWidth(),
-                        colors = SliderDefaults.colors(
-                            thumbColor = Color.White,
-                            activeTrackColor = Color.White,
-                            inactiveTrackColor = Color.Gray
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(
+                            onClick = { viewModel.goToPage(state.currentPage - 1) },
+                            enabled = state.currentPage > 0
+                        ) {
+                            Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, "Previous Page", tint = Color.White)
+                        }
+                        Slider(
+                            value = state.currentPage.toFloat(),
+                            onValueChange = { viewModel.goToPage(it.toInt()) },
+                            valueRange = 0f..(state.pageCount - 1).toFloat(),
+                            steps = state.pageCount - 2,
+                            modifier = Modifier.weight(1f),
+                            colors = SliderDefaults.colors(
+                                thumbColor = Color.White,
+                                activeTrackColor = Color.White,
+                                inactiveTrackColor = Color.Gray
+                            )
                         )
-                    )
+                        IconButton(
+                            onClick = { viewModel.goToPage(state.currentPage + 1) },
+                            enabled = state.currentPage < state.pageCount - 1
+                        ) {
+                            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, "Next Page", tint = Color.White)
+                        }
+                    }
                 }
             }
         }

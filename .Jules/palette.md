@@ -17,3 +17,7 @@
 ## 2024-10-27 - Form Input Flow Optimization
 **Learning:** Multi-field forms like logins often interrupt user flow by requiring manual taps to switch between fields. Using the keyboard's "Next" and "Done" actions significantly smooths this interaction.
 **Action:** Always set `ImeAction.Next` for intermediate `OutlinedTextField`s and use `LocalFocusManager` to advance focus. For the final field, use `ImeAction.Done` and trigger the submission action automatically if validation passes.
+
+## 2024-11-20 - Semantic Navigation Icons
+**Learning:** Using generic plus/minus icons (`Icons.Default.Add`/`Icons.Default.Remove`) for page navigation or horizontal stepping is semantically confusing, as these are typically associated with zoom levels or quantities.
+**Action:** When implementing horizontal stepping controls (like previous/next page navigation), explicitly use semantic directional arrows (e.g., `Icons.AutoMirrored.Filled.KeyboardArrowLeft` and `KeyboardArrowRight`) instead of generic math operators to provide clear visual cues for movement. Ensure they are imported from `Icons.AutoMirrored.Filled` for RTL support.
