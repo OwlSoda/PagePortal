@@ -98,7 +98,7 @@ fun UnifiedHomeScreen(
         if (coverUrl != null) {
             AsyncImage(
                 model = coverUrl,
-                contentDescription = null,
+                contentDescription = "Cover for ${heroBook?.title}",
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .fillMaxSize()
@@ -298,7 +298,7 @@ fun HeroCard(book: UnifiedBookDisplay, onClick: () -> Unit) {
             if (coverUrl != null) {
                 AsyncImage(
                     model = coverUrl,
-                    contentDescription = null,
+                    contentDescription = "Cover for ${book.title}",
                     contentScale = ContentScale.Crop,
                     modifier = Modifier
                         .width(100.dp)
@@ -358,7 +358,7 @@ fun AuthorChip(author: AuthorDisplay, onClick: () -> Unit) {
         if (author.coverUrl != null) {
             AsyncImage(
                 model = author.coverUrl,
-                contentDescription = null,
+                contentDescription = "Cover for ${author.name}",
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .size(80.dp)
@@ -372,7 +372,7 @@ fun AuthorChip(author: AuthorDisplay, onClick: () -> Unit) {
                     .background(MaterialTheme.colorScheme.secondaryContainer),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Default.Person, contentDescription = null, tint = MaterialTheme.colorScheme.onSecondaryContainer, modifier = Modifier.size(40.dp))
+                Icon(Icons.Default.Person, contentDescription = "Default cover for ${author.name}", tint = MaterialTheme.colorScheme.onSecondaryContainer, modifier = Modifier.size(40.dp))
             }
         }
         Spacer(modifier = Modifier.height(8.dp))

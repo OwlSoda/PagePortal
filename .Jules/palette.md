@@ -20,3 +20,7 @@
 ## 2024-10-27 - Spatial vs Logical Focus Direction
 **Learning:** Using `FocusDirection.Down` for vertical forms can cause accessibility issues on devices with varying aspect ratios where the layout shifts. `FocusDirection.Next` explicitly honors the logical form sequence and tab ordering, ensuring a robust UX.
 **Action:** Always prefer `FocusDirection.Next` over directional values like `Down` or `Right` when advancing through a series of inputs (like forms or searches) in Jetpack Compose, regardless of their visual alignment.
+
+## 2024-11-01 - Screen Reader Accessibility Labels
+**Learning:** Visual-only indicators (like cover images or generic action icons) are inaccessible to blind or low-vision users. Providing meaningful `contentDescription` attributes is essential for screen reader users to navigate the app effectively.
+**Action:** Always provide descriptive `contentDescription` values for interactive elements and decorative images that convey information. Avoid `null` descriptions unless the image is purely decorative and has no semantic meaning.
