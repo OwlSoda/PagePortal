@@ -52,6 +52,10 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.input.ImeAction
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.owlsoda.pageportal.R
 import androidx.compose.foundation.verticalScroll
@@ -1106,6 +1110,7 @@ fun SearchDialog(
     onResultClick: (SearchResult) -> Unit
 ) {
     var query by remember { mutableStateOf("") }
+    val focusManager = LocalFocusManager.current
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -1127,7 +1132,9 @@ fun SearchDialog(
                                 Icon(Icons.Default.Close, "Clear")
                             }
                         }
-                    }
+                    },
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                    keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() })
                 )
                 
                 Spacer(modifier = Modifier.height(16.dp))
