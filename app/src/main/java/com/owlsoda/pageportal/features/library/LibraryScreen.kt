@@ -55,6 +55,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.input.ImeAction
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.owlsoda.pageportal.services.ServiceType
 import androidx.compose.foundation.background
@@ -104,6 +108,7 @@ fun LibraryScreen(
     
     val pagerState = rememberPagerState(pageCount = { 4 })
     var showOverflowMenu by remember { mutableStateOf(false) }
+    val focusManager = LocalFocusManager.current
     
     val importLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
@@ -242,7 +247,9 @@ fun LibraryScreen(
                         }
                     }
                 },
-                singleLine = true
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() })
             )
 
             AnimatedVisibility(

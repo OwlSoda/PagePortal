@@ -24,3 +24,7 @@
 ## 2024-11-01 - Screen Reader Accessibility Labels
 **Learning:** Visual-only indicators (like cover images or generic action icons) are inaccessible to blind or low-vision users. Providing meaningful `contentDescription` attributes is essential for screen reader users to navigate the app effectively.
 **Action:** Always provide descriptive `contentDescription` values for interactive elements and decorative images that convey information. Avoid `null` descriptions unless the image is purely decorative and has no semantic meaning.
+
+## 2024-11-05 - Search Input Flow Optimization
+**Learning:** Users often get stuck with the software keyboard open after typing a search query because the default return key simply adds a newline or does nothing. Using `ImeAction.Search` provides an intuitive search button on the keyboard, and pairing it with `clearFocus()` on search action properly dismisses the keyboard, significantly improving the search micro-UX.
+**Action:** For search input fields in Jetpack Compose, always set `keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search)` and `keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() })`.
