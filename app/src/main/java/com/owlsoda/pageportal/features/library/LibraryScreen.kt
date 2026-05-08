@@ -69,6 +69,10 @@ import com.owlsoda.pageportal.ui.components.EmptyState
 import com.owlsoda.pageportal.features.library.components.FastScroller
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.lazy.rememberLazyListState
 import kotlinx.coroutines.launch
@@ -101,6 +105,7 @@ fun LibraryScreen(
     var showSortMenu by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val gridState = rememberLazyGridState()
+    val focusManager = LocalFocusManager.current
     
     val pagerState = rememberPagerState(pageCount = { 4 })
     var showOverflowMenu by remember { mutableStateOf(false) }
@@ -242,7 +247,9 @@ fun LibraryScreen(
                         }
                     }
                 },
-                singleLine = true
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() })
             )
 
             AnimatedVisibility(
