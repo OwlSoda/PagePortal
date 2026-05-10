@@ -24,3 +24,7 @@
 ## 2024-11-01 - Screen Reader Accessibility Labels
 **Learning:** Visual-only indicators (like cover images or generic action icons) are inaccessible to blind or low-vision users. Providing meaningful `contentDescription` attributes is essential for screen reader users to navigate the app effectively.
 **Action:** Always provide descriptive `contentDescription` values for interactive elements and decorative images that convey information. Avoid `null` descriptions unless the image is purely decorative and has no semantic meaning.
+
+## 2025-02-12 - Search Input Usability
+**Learning:** For search inputs, the default keyboard action ("Return" or "Done") often doesn't naturally dismiss the keyboard or feel like a search trigger.
+**Action:** Always set `keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search)` and provide a `KeyboardActions(onSearch = { focusManager.clearFocus() })` to give the user a clear "Search" button on the keyboard that properly dismisses the software keyboard.
