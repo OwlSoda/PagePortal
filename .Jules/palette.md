@@ -24,3 +24,7 @@
 ## 2024-11-01 - Screen Reader Accessibility Labels
 **Learning:** Visual-only indicators (like cover images or generic action icons) are inaccessible to blind or low-vision users. Providing meaningful `contentDescription` attributes is essential for screen reader users to navigate the app effectively.
 **Action:** Always provide descriptive `contentDescription` values for interactive elements and decorative images that convey information. Avoid `null` descriptions unless the image is purely decorative and has no semantic meaning.
+
+## 2024-05-11 - Search Bar Keyboard Micro-UX
+**Learning:** Default text fields in Compose show a "Return" key that just creates a newline or does nothing. Users expect a search bar to have a "Search" button on the keyboard that also dismisses the keyboard to show results.
+**Action:** For search inputs, always set `keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search)` and dismiss the keyboard via `keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() })`.
