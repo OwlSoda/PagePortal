@@ -58,6 +58,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.owlsoda.pageportal.services.ServiceType
 import androidx.compose.foundation.background
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.material3.LocalContentColor
 import com.owlsoda.pageportal.ui.theme.PagePortalPlayerBackground
 import com.owlsoda.pageportal.ui.theme.PagePortalPlayerText
@@ -99,6 +103,7 @@ fun LibraryScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var showSortMenu by remember { mutableStateOf(false) }
+    val focusManager = LocalFocusManager.current
     val scope = rememberCoroutineScope()
     val gridState = rememberLazyGridState()
     
@@ -242,7 +247,9 @@ fun LibraryScreen(
                         }
                     }
                 },
-                singleLine = true
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() })
             )
 
             AnimatedVisibility(
